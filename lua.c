@@ -16,6 +16,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+//#include "bslib.h" // ROCHUS
 
 
 
@@ -148,7 +149,6 @@ static int dolibrary (lua_State *L, const char *name) {
   lua_pushstring(L, name);
   return report(L, docall(L, 1, 1));
 }
-
 
 static const char *get_prompt (lua_State *L, int firstline) {
   const char *p;
@@ -346,9 +346,12 @@ static int pmain (lua_State *L) {
   if (argv[0] && argv[0][0]) progname = argv[0];
   lua_gc(L, LUA_GCSTOP, 0);  /* stop collector during initialization */
   luaL_openlibs(L);  /* open libraries */
+  //lua_pushcfunction(L, bs_open_busy); // ROCHUS
+  //lua_pushstring(L, BS_BSLIBNAME); // ROCHUS
+  lua_call(L, 1, 0);
   lua_gc(L, LUA_GCRESTART, 0);
-  s->status = handle_luainit(L);
-  if (s->status != 0) return 0;
+  lua_pushstring(L,progname); // ROCHUS
+  lua_setglobal(L,"#prog");
   script = collectargs(argv, &has_i, &has_v, &has_e);
   if (script < 0) {  /* invalid args? */
     print_usage();
