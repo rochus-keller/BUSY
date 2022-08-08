@@ -1,0 +1,120 @@
+// Copyright 2022 Rochus Keller <mailto:me@rochus-keller.ch>
+//
+// This file is part of the BUSY build system.
+//
+// The following is the license that applies to this copy of the
+// application. For a license to use the application under conditions
+// other than those described here, please email to me@rochus-keller.ch.
+//
+// GNU General Public License Usage
+// This file may be used under the terms of the GNU General Public
+// License (GPL) versions 2.0 or 3.0 as published by the Free Software
+// Foundation and appearing in the file LICENSE.GPL included in
+// the packaging of this file. Please review the following information
+// to ensure GNU General Public Licensing requirements will be met:
+// http://www.fsf.org/licensing/licenses/info/GPLv2.html and
+// http://www.gnu.org/copyleft/gpl.html.
+
+Busy ::=  { ( subdirectory | declaration | statement ) [';'] }
+
+typeref ::= designator [ '[]' ]
+// desig instead of ident because type could be an enum or class declared in some other module
+
+// basic type is integer | real | string | boolean | path | symbol
+
+subdirectory ::= subdir identdef [ ( '=' | ':=' ) ( path | ident ) ]
+// path may only be one relative subdirectory; '//' and '../' forbidden
+// maybe set params here, or better from toplevel via desig [ '(' paramList ')' ]
+// the directory structure is static; only what we do with it (i.e. dependencies) is dynamic
+// do we need an explicit subdir decl at all? Yes, it controls what status the system has before entering the subdir
+// and it makes it explicit, which subdir belong to the build and which don't
+
+//paramList ::= paramValue { ',' paramValue }
+
+//paramValue ::= ident '=' expression
+
+declaration ::= vardecl | typedecl
+
+vardecl ::= ( var | let | param ) identdef [ ':' typeref ] initializer
+// for all types
+// let is for immutable variables
+// see also https://docs.swift.org/swift-book/LanguageGuide/CollectionTypes.html
+// parameter declarations only on module level
+// we don't want nested initializers; even if objects would survice nested scopes it doesn't look like good practice to declare them there
+
+typedecl ::= type  identdef '=' enumdecl | classdecl
+
+enumdecl ::=  '(' symbol { ',' symbol } ')'
+// type ident = ( `A, `B, `C ) // enumeration
+// we don't need explicit symbol sets because these can be implemented with symbol[] and *=
+
+classdecl ::= class [ '(' designator ')' ] 
+	( '{' { fielddecl [';'] } '}' 
+	| { fielddecl [';'] } end )
+
+fielddecl ::= ident ':' typeref // typeref cannot directly be class; so we avoid null refs
+
+identdef ::= ident ['*'|'-'|'!']
+// *..public, -..protected, !..public and default
+
+designator ::= ['^'|'.'] ident { \LL:2\ '.' ident  }
+// '^' points to an ident in the outer directory which is only visible if public or protected; not good, otherwise ^integer required
+// use .ident in initializer block to access the object which is initialized
+
+ExpList ::= expression {',' expression}
+
+expression ::= SimpleExpression [ relation SimpleExpression ]
+
+relation ::= '==' | '!=' | '<' | '<=' | '>' | '>=' | in
+
+SimpleExpression ::= term { AddOperator term }
+
+AddOperator ::= '+' | '-' | '||'
+
+term ::= factor {MulOperator factor}
+
+MulOperator ::= '*' | '/' | '&&' | '%'
+
+factor ::= integer | real | string | symbol | path | true | false
+	| designator [ '(' [ ExpList ] ')' ]  // only built-in functions
+	| '(' expression [  '?' expression ':' expression ] ')'  // optional if expression
+	| ('+' | '-' |'!') factor
+	| '[' expression { \LL:2\ ',' expression } [ ',' ] ']' // list literal
+
+initializer ::= '{' block '}'  // block is for objects and only executed on first dependency resolution
+	| begin block end
+	| ( '=' | ':=' ) expression // expression is for base types and lists and is immediately executed
+	// like BAZL: loading phase (runs all BUSY files), analysis phase (create work tree), execution phase (run work tree depth-first)
+	// in case of an object the initializer creates an instance and initializes it; objects are reference types, i.e. the var is only a pointer
+	// lists are reference types as well; strings and paths have value type flair instead.
+
+block ::= { ( declaration | \LL:2\ statement ) [';'] } 
+
+statement ::= condition | assignment | \LL:2\ call
+
+condition ::= if expression 
+	( '{' block '}' [ else ( condition | '{' block '}' ) ] // also supports if(expression){}
+	| then block { elsif expression then block } [ else block ] end
+	)
+
+assignment ::= designator ( '=' | ':=' | '+=' | '-=' | '*=' ) expression
+
+call ::= ident '(' ExpList ')' // only built-in procedures or functions
+
+// lexer:
+ident ::=
+string ::=
+integer ::=
+real ::=
+path ::= // conceptually ['../' | './' | '//'] fsname { '/' fsname }, but no ws allowed between tokens, unless framed like 'path'
+// standardized file system path, absolute or relative (latter to cur BUSY file), c: as //c:/, forward slash only
+// see https://en.wikipedia.org/wiki/Path_(computing)
+// fsname ::= // Letters (incl. unicode), digits, '_', '-', '.'; spaces allowed if path is quoted
+// no '/', '\', '?', '*', ':', '|', '"', '<', '>', ',', ';', '='
+// see https://en.wikipedia.org/wiki/Filename
+// we only support local names, i.e. without explicit host; we start absolute paths with '//' to differentiate from '/'
+symbol ::= // an ident prefixed with '`', or maybe '$'
+// $ is unicode category Symbol_Currency
+
+tokens- ::= '$' '#' '`' '/*' '*/' begin end then elsif ':=' 
+// line comments start with #, block comments framed with /* */

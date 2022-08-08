@@ -16,7 +16,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
-//#include "bslib.h" // ROCHUS
+#include "bslib.h" // ROCHUS
 
 
 
@@ -346,8 +346,8 @@ static int pmain (lua_State *L) {
   if (argv[0] && argv[0][0]) progname = argv[0];
   lua_gc(L, LUA_GCSTOP, 0);  /* stop collector during initialization */
   luaL_openlibs(L);  /* open libraries */
-  //lua_pushcfunction(L, bs_open_busy); // ROCHUS
-  //lua_pushstring(L, BS_BSLIBNAME); // ROCHUS
+  lua_pushcfunction(L, bs_open_busy); // ROCHUS
+  lua_pushstring(L, BS_BSLIBNAME); // ROCHUS
   lua_call(L, 1, 0);
   lua_gc(L, LUA_GCRESTART, 0);
   lua_pushstring(L,progname); // ROCHUS
