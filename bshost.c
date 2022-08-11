@@ -298,6 +298,7 @@ BSPathStatus bs_thisapp()
 
 // https://stackoverflow.com/questions/7430248/creating-a-new-directory-in-c
 // https://stackoverflow.com/questions/6094665/how-does-stat-under-windows-exactly-work
+// https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
 time_t bs_exists(const char* normalizedPath)
 {
     struct stat st = {0};

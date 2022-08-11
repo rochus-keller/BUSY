@@ -42,7 +42,7 @@ vardecl ::= ( var | let | param ) identdef [ ':' typeref ] initializer
 // parameter declarations only on module level
 // we don't want nested initializers; even if objects would survice nested scopes it doesn't look like good practice to declare them there
 
-typedecl ::= type  identdef '=' enumdecl | classdecl
+typedecl ::= type  identdef '=' ( enumdecl | classdecl )
 
 enumdecl ::=  '(' symbol { ',' symbol } ')'
 // type ident = ( `A, `B, `C ) // enumeration
@@ -58,7 +58,7 @@ identdef ::= ident ['*'|'-'|'!']
 // *..public, -..protected, !..public and default
 
 designator ::= ['^'|'.'] ident { \LL:2\ '.' ident  }
-// '^' points to an ident in the outer directory which is only visible if public or protected; not good, otherwise ^integer required
+// '^' points to an ident in the outer directory which is only visible if public or protected
 // use .ident in initializer block to access the object which is initialized
 
 ExpList ::= expression {',' expression}
@@ -79,14 +79,17 @@ factor ::= integer | real | string | symbol | path | true | false
 	| designator [ '(' [ ExpList ] ')' ]  // only built-in functions
 	| '(' expression [  '?' expression ':' expression ] ')'  // optional if expression
 	| ('+' | '-' |'!') factor
-	| '[' expression { \LL:2\ ',' expression } [ ',' ] ']' // list literal
+	| list 
 
-initializer ::= '{' block '}'  // block is for objects and only executed on first dependency resolution
-	| begin block end
+list ::= '[' [ expression { \LL:2\ ',' expression } [ ',' ] ] ']'
+
+initializer ::= constructor // block is for objects and immediately executed in the statement flow
 	| ( '=' | ':=' ) expression // expression is for base types and lists and is immediately executed
 	// like BAZL: loading phase (runs all BUSY files), analysis phase (create work tree), execution phase (run work tree depth-first)
 	// in case of an object the initializer creates an instance and initializes it; objects are reference types, i.e. the var is only a pointer
 	// lists are reference types as well; strings and paths have value type flair instead.
+
+constructor ::= '{' block '}' | begin block end
 
 block ::= { ( declaration | \LL:2\ statement ) [';'] } 
 

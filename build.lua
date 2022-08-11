@@ -22,13 +22,10 @@ S = require "string"
 
 print("# Hello from BUSY version "..B.version())
 
--- TODO
--- an optional way to set default config values as supported in GN with set_defaults() and the build config file; see 'gn help execution'
--- check-only option, i.e. don't build or generate anything, just compile; e.g. '--check'
-
 local pathToSource, pathToBuild
 local params = {}
 local products
+local checkOnly = false
 
 local function parseParam(str)
 	if str == "" or str == nil then error("option -P expects a string of the form 'key=value' or 'key' (where '=true' is implicit)") end
@@ -71,6 +68,10 @@ while i <= #arg do
 		parseParam(arg[i])
 	-- elseif arg[i] == "-G" then
 		-- TODO optionally specify generator; default immediately builds products; e.g. like cmake '-G ninja'
+	elseif arg[i] == "-c" then
+		checkOnly = true
+	elseif arg[i]:sub(1,1) == "-" then
+		error("unknown option "..arg[i])
 	else
 		-- simple call similar to cmake: <path-to-source>
 		-- cmake call with <path-to-existing-build> is not supported
@@ -83,6 +84,8 @@ end
 
 local root = B.compile(pathToSource,pathToBuild,params)
 
-B.execute(root,products)
+if not checkOnly then
+	B.execute(root,products)
+end
 
 

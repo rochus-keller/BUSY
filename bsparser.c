@@ -68,7 +68,7 @@ typedef struct BSIdentDef {
 
 static void error2(BSParserContext* ctx, int row, int col, const char* format, ... )
 {
-    fprintf(stderr,"%s:%d:%d: ", ctx->label, row, col);
+    fprintf(stderr,"%s:%d:%d:ERR: ", ctx->label, row, col);
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -77,23 +77,22 @@ static void error2(BSParserContext* ctx, int row, int col, const char* format, .
     fflush(stderr);
     lua_pushnil(ctx->L);
     lua_error(ctx->L);
+}
+
+static void warning(BSParserContext* ctx, int row, int col, const char* format, ... )
+{
+    fprintf(stderr,"%s:%d:%d:WRN: ", ctx->label, row, col);
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fprintf(stderr,"\n");
+    fflush(stderr);
 }
 
 static void error3(BSParserContext* ctx, BSToken* t, const char* format, ... )
 {
-    fprintf(stderr,"%s:%d:%d: ", ctx->label, t->loc.row, t->loc.col);
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    fprintf(stderr,"\n");
-    fflush(stderr);
-    lua_pushnil(ctx->L);
-    lua_error(ctx->L);
-}
-
-static void error(BSParserContext* ctx, const char* format, ... )
-{
+    fprintf(stderr,"%s:%d:%d:ERR: ", ctx->label, t->loc.row, t->loc.col);
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -391,18 +390,11 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
     {
     case Tok_Dot:
         method = Field;
-#if 0
-        // if boundObject > 0 then leading '.' is possible; otherwhise it's an error
-        if( boundObject <= 0 )
-            error(ctx, "%d:%d: designator cannot start with '.' here", t.loc.row, t.loc.col );
-        lua_pushvalue(ctx->L,boundObject); // this is the instance
-#else
         //lua_getfield(ctx->L, scope->table, "#this" );
         goforthis(ctx,scope);
 
         if( lua_isnil(ctx->L,-1) )
             error2(ctx, t.loc.row, t.loc.col,"designator cannot start with '.' here" );
-#endif
         // from here we have the instance on the stack
         ret = 2;
         t = nextToken(ctx);
@@ -533,6 +525,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
     //   dereferenced declaration,
     // i.e. a BS_ClassDecl, BS_EnumDecl, BS_VarDecl, BS_FieldDecl, BS_Proc or BS_ModuleDef (from subdir)
 
+    int line = t.loc.row;
     t = peekToken(ctx,1);
     while( t.tok == Tok_Dot )
     {
@@ -587,6 +580,11 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         if( t.tok != Tok_ident )
             error2(ctx, t.loc.row, t.loc.col, "expecting an ident" );
 
+        if( t.loc.row != line )
+        {
+            warning(ctx,t.loc.row,t.loc.col,"designator wraps around the next line; did you miss a semicolon?");
+            line = t.loc.row;
+        }
         lua_pushlstring(ctx->L, t.val, t.len);
         lua_rawget(ctx->L,-3);
         // stack: old instance, class/mod decl, new instance, derefed decl or nil
@@ -626,152 +624,10 @@ static void resolveDecl(BSParserContext* ctx, BSScope* scope )
     // out: resolved symbol is on the stack
 {
     BS_BEGIN_LUA_FUNC(ctx,1);
-#if 0
-    BSToken t = nextToken(ctx);
-    int toOuter = 0;
-    int method;
-    switch( t.tok )
-    {
-    case Tok_Dot:
-        error(ctx, "%d:%d: designator cannot start with '.' here", t.loc.row, t.loc.col );
-        t = nextToken(ctx);
-        break;
-    case Tok_Hat:
-        toOuter = 1;
-        lua_pushvalue(ctx->L,scope->table);
-        lua_getfield(ctx->L, -1, "^");
-        lua_remove(ctx->L,-2);
-        // from here we have the nearest outer module definition on the stack, or nil
-        t = nextToken(ctx);
-        break;
-    case Tok_ident:
-        lua_pushvalue(ctx->L,scope->table);
-        // from here we have the module or block definition on the stack
-        break;
-    default:
-        error(ctx, "%d:%d: invalid designator syntax", t.loc.row, t.loc.col );
-        break;
-    }
-    // here we have the first scope on stack from where we resolve the ident
-    // either a BS_ModuleDef or a BS_ClassDecl
-    if( t.tok != Tok_ident )
-        error(ctx, "%d:%d: invalid designator syntax", t.loc.row, t.loc.col );
 
-    // now resolve the first ident of the desig
-    if( toOuter )
-    {
-        while( !lua_isnil(ctx->L,-1) )
-        {
-            lua_pushlstring(ctx->L, t.val, t.len);
-            lua_rawget(ctx->L,-2);
-            if( !lua_isnil(ctx->L, -1) )
-            {
-                // we have a hit
-                lua_remove(ctx->L,-2); // remove the scope
-                lua_getfield(ctx->L,-1,"#visi");
-                const int visi = lua_tointeger(ctx->L,-1);
-                lua_pop(ctx->L,1);
-                if( visi == BS_Private )
-                    error(ctx, "%d:%d: the identifier is not visible from here", t.loc.row, t.loc.col );
-                else
-                    break;
-            }else
-            {
-                // continue search to outer module (if present)
-                lua_pop(ctx->L,1);
-                lua_getfield(ctx->L, -1, "^");
-                lua_remove(ctx->L,-2);
-            }
-        }
-    }else
-    {
-        // method == LocalOnly
-        lua_pushlstring(ctx->L, t.val, t.len);
-        lua_rawget(ctx->L,-2);
-        if( !lua_isnil(ctx->L, -1) )
-        {
-            // we have a hit
-            lua_remove(ctx->L,-2); // remove the scope
-        }else
-        {
-            // no hit, directly look in builtins (we don't need to prefix them with ^ to desig them)
-            lua_pop(ctx->L,1); // nil
-            lua_pushlstring(ctx->L, t.val, t.len);
-            lua_rawget(ctx->L,ctx->builtins);
-            if( !lua_isnil(ctx->L, -1) )
-            {
-                // we have a hit
-                lua_remove(ctx->L,-2); // remove the scope
-            }
-        }
-    }
-    if( lua_isnil(ctx->L,-1) )
-        error(ctx, "%d:%d: unknown identifier", t.loc.row, t.loc.col );
-
-    // Now we have top on stack whatever is owned by name by a BS_ModuleDef, BS_BlockDef, BS_ClassDecl
-    //   or the builtin globals,
-    // i.e. a BS_ClassDecl, BS_EnumDecl, BS_VarDecl, BS_FieldDecl, BS_Proc or BS_ModuleDef (from subdir)
-
-    t = peekToken(ctx,1);
-    while( t.tok == Tok_Dot )
-    {
-        t = nextToken(ctx); // eat dot
-
-        lua_getfield(ctx->L,-1,"#kind");
-        int kind = lua_tointeger(ctx->L,-1);
-        lua_pop(ctx->L,1);
-
-        switch( kind )
-        {
-        case BS_ClassDecl:
-        case BS_EnumDecl:
-        case BS_Proc:
-            error(ctx, "%d:%d: cannot dereference a type declaration or procedure", t.loc.row, t.loc.col );
-            break;
-        case BS_FieldDecl:
-        case BS_VarDecl:
-            // we want to dereference a var or field, so we need the class type of it
-            lua_getfield(ctx->L,-1,"#type");
-            lua_getfield(ctx->L,-1,"#kind");
-            if( lua_tointeger(ctx->L,-1) != BS_ClassDecl )
-                error(ctx, "%d:%d: can only dereference fields or variables of class type", t.loc.row, t.loc.col );
-            lua_pop(ctx->L,1); // kind
-            lua_remove(ctx->L,-2); // remove the field or var decl; top is now a classdecl
-            break;
-        }
-
-        t = nextToken(ctx); // ident
-        if( t.tok != Tok_ident )
-            error(ctx, "%d:%d: expecting an ident", t.loc.row, t.loc.col );
-
-        lua_pushlstring(ctx->L, t.val, t.len);
-        lua_rawget(ctx->L,-2);
-        lua_remove(ctx->L,-2); // remove the scope
-
-        if( lua_isnil(ctx->L,-1) )
-            error(ctx, "%d:%d: unknown identifier", t.loc.row, t.loc.col );
-
-        lua_getfield(ctx->L,-1,"#kind");
-        kind = lua_tointeger(ctx->L,-1);
-        lua_pop(ctx->L,1);
-
-        switch( kind )
-        {
-        case BS_ModuleDef:
-        case BS_VarDecl:
-            lua_getfield(ctx->L,-1,"#visi");
-            if( lua_tointeger(ctx->L,-1) != BS_Public )
-                error(ctx, "%d:%d: the identifier is not visible from here", t.loc.row, t.loc.col );
-            break;
-        }
-        // here BS_ModuleDef, BS_VarDecl and BS_FieldDecl are left
-
-        t = peekToken(ctx,1);
-    }
-#else
     resolveInstance(ctx,scope);
     lua_remove(ctx->L,-2);
-#endif
+
     BS_END_LUA_FUNC(ctx);
 }
 
@@ -1516,7 +1372,7 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
             lua_error(ctx->L);
             break;
         case 1:
-            fprintf(stdout,"%s:%d:%d: WARNING: %s\n",ctx->label, row, col, lua_tostring(ctx->L,-1) );
+            fprintf(stderr,"%s:%d:%d:WARNING: %s\n",ctx->label, row, col, lua_tostring(ctx->L,-1) );
             break;
         default:
             fprintf(stdout,"%s:%d:%d: %s\n", ctx->label, row, col, lua_tostring(ctx->L,-1) );
@@ -1639,7 +1495,7 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
 
 
 // returns 0: no list or incompatible; 1: both list; 2: left list; 3: right list
-static int listAndElement( BSParserContext* ctx, int lhs, int rhs )
+static int isListAndElemType( BSParserContext* ctx, int lhs, int rhs )
 {
     // lhs is list and rhs is list or element or vice versa; lhs and rhs point to types
     const int top = lua_gettop(ctx->L);
@@ -1662,21 +1518,21 @@ static int listAndElement( BSParserContext* ctx, int lhs, int rhs )
     if( klhs == BS_ListType )
     {
         lua_getfield(ctx->L,lhs,"#type");
-        const int res = sameType(ctx,-1,rhs);
+        const int res = sameType(ctx,-1,rhs) || isSameOrSubclass(ctx, -1, rhs) || isInEnum(ctx,-1,rhs);
         lua_pop(ctx->L,1);
         return res ? 2 : 0; // lhs is list, rhs is element
     }
     if( krhs == BS_ListType )
     {
         lua_getfield(ctx->L,rhs,"#type");
-        const int res = sameType(ctx,lhs,-1);
+        const int res = sameType(ctx,lhs,-1) || isSameOrSubclass(ctx, lhs, -1) || isInEnum(ctx,lhs, -1);
         lua_pop(ctx->L,1);
         return res ? 3 : 0; // rhs is list, lhs is element
     }
     return 0;
 }
 
-static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark)
+static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark, int lhsType)
 {
     // in: value, type of if expression
     BS_BEGIN_LUA_FUNC(ctx,0); // out: value, type
@@ -1688,11 +1544,11 @@ static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark)
     if( ctx->skipMode )
     {
         lua_pop(ctx->L,2); // value, type
-        expression(ctx,scope,0);
+        expression(ctx,scope,lhsType);
         BSToken t = nextToken(ctx);
         if( t.tok != Tok_Colon )
             error2(ctx, t.loc.row, t.loc.col,"expecting ':'" );
-        expression(ctx,scope,0);
+        expression(ctx,scope,lhsType);
         // stack: value, type, value, type
         if( !sameType(ctx, -1,-3) )
             error2(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
@@ -1704,12 +1560,12 @@ static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark)
         lua_pop(ctx->L,2); // value, type
         if( cond )
         {
-            expression(ctx,scope,0);
+            expression(ctx,scope,lhsType);
             BSToken t = nextToken(ctx);
             if( t.tok != Tok_Colon )
                 error2(ctx, t.loc.row, t.loc.col,"expecting ':'" );
             ctx->skipMode = 1;
-            expression(ctx,scope,0);
+            expression(ctx,scope,lhsType);
             ctx->skipMode = 0;
             if( !sameType(ctx, -1,-3) )
                 error2(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
@@ -1717,12 +1573,12 @@ static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark)
         }else
         {
             ctx->skipMode = 1;
-            expression(ctx,scope,0);
+            expression(ctx,scope,lhsType);
             ctx->skipMode = 0;
             BSToken t = nextToken(ctx);
             if( t.tok != Tok_Colon )
                 error2(ctx, t.loc.row, t.loc.col,"expecting ':'" );
-            expression(ctx,scope,0);
+            expression(ctx,scope,lhsType);
             if( !sameType(ctx, -1,-3) )
                 error2(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
             lua_remove(ctx->L,-3);
@@ -1736,14 +1592,24 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     BSToken t = peekToken(ctx,1);
-    if( t.tok == Tok_Rbrack )
+    assert(lbrack);
+    if( lhsType )
+        assert( lua_istable(ctx->L,lhsType) );
+    if( t.tok == Tok_Rbrack || lbrack->tok == Tok_LbrackRbrack )
     {
+        // empty list
         nextToken(ctx); // eat it
         lua_createtable(ctx->L,0,0);
         if( lhsType )
+        {
+            lua_getfield(ctx->L,lhsType,"#kind");
+            const int k = lua_tointeger(ctx->L,-1);
+            if( k != BS_ListType )
+                error2(ctx, lbrack->loc.row, lbrack->loc.col,"incompatible type" );
+            lua_pop(ctx->L,1);
             lua_pushvalue(ctx->L,lhsType);
-        else
-            lua_pushnil(ctx->L);
+        }else
+            error2(ctx, lbrack->loc.row, lbrack->loc.col,"cannot determine list type" );
     }else
     {
         int n = 0;
@@ -1767,7 +1633,7 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
                     error2(ctx, t.loc.row, t.loc.col,"the element is not compatible with the class" );
                 // replace the type of the first expression by lhsType
                 lua_replace(ctx->L,-2);
-            }
+            }// else: the assignment type check produces the error
         }
 
         // store the first element in the list
@@ -1928,18 +1794,6 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
     case Tok_ident:
         {
             int bound = 0;
-#if 0
-            // this is now done within resolveInstance
-            if( t.tok == Tok_Dot )
-            {
-                nextToken(ctx);
-                lua_getfield(ctx->L, scope->table, "#this" );
-                if( lua_isnil(ctx->L,-1) )
-                    error2(ctx,"designator cannot be prefixed by '.' here", t.loc.row, t.loc.col );
-                else
-                    bound = lua_gettop(ctx->L);
-            }
-#endif
             ret = resolveInstance(ctx,scope);
             if( bound )
                 lua_remove(ctx->L,bound);
@@ -1970,13 +1824,13 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
         break;
     case Tok_Lpar:
         nextToken(ctx);
-        expression(ctx,scope,0);
+        expression(ctx,scope,lhsType);
         t = peekToken(ctx,1);
         if( t.tok == Tok_Qmark )
         {
             // peek '?' and eval condition expression
             nextToken(ctx);
-            evalIfExpr(ctx,scope,&t);
+            evalIfExpr(ctx,scope,&t, lhsType);
         }
         t = nextToken(ctx);
         if( t.tok != Tok_Rpar )
@@ -2017,6 +1871,7 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
         }
         break;
     case Tok_Lbrack:
+    case Tok_LbrackRbrack:
         nextToken(ctx);
         evalListLiteral(ctx,scope,&t,lhsType);
         break;
@@ -2035,7 +1890,7 @@ static void evalMulOp(BSParserContext* ctx, BSToken* tok)
     BS_BEGIN_LUA_FUNC(ctx,-2); // value, type
     const int lhs = lua_gettop(ctx->L) - 4 + 1;
     const int rhs = lua_gettop(ctx->L) - 2 + 1;
-    const int l = listAndElement(ctx,-3,-1);
+    const int l = isListAndElemType(ctx,-3,-1);
     if( l )
     {
         const int nl = l == 1 || l == 2 ? lua_objlen(ctx->L,lhs) : 0;
@@ -2186,7 +2041,7 @@ int bs_add_path(lua_State* L, int lhs, int rhs)
 
     if( strncmp(rstr,"..", 2 ) == 0 )
     {
-        // RISK: this treats root windows paths like unix paths, i.e. //c: + ../x becomes //x
+        // TODO: this treats root windows paths like unix paths, i.e. //c: + ../x becomes //x
         rstr += 2;
         assert(lstr[llen-1] != '/');
         while( llen >= 0 )
@@ -2226,7 +2081,7 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
     BS_BEGIN_LUA_FUNC(ctx,-2); // value, type
     const int lhs = lua_gettop(ctx->L) - 4 + 1;
     const int rhs = lua_gettop(ctx->L) - 2 + 1;
-    const int l = listAndElement(ctx,-3,-1);
+    const int l = isListAndElemType(ctx,-3,-1);
     if( l )
     {
         const int nl = l == 1 || l == 2 ? lua_objlen(ctx->L,lhs) : 0;
@@ -2382,7 +2237,7 @@ static int SimpleExpression(BSParserContext* ctx, BSScope* scope, int lhsType)
     while( t.tok == Tok_Plus || t.tok == Tok_Minus || t.tok == Tok_2Bar )
     {
         nextToken(ctx);
-        term(ctx,scope,0);
+        term(ctx,scope,lhsType);
         evalAddOp(ctx,&t);
         t = peekToken(ctx,1);
         ret = -1;
@@ -2405,7 +2260,7 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
 {
     // in: // value, type, value, type
     BS_BEGIN_LUA_FUNC(ctx,-2); // value, type
-    const int l = listAndElement(ctx,-3,-1);
+    const int l = isListAndElemType(ctx,-3,-1);
     const int lhs = lua_gettop(ctx->L) - 4 + 1; // value
     const int rhs = lua_gettop(ctx->L) - 2 + 1; // value
 
@@ -2574,7 +2429,7 @@ static int expression(BSParserContext* ctx, BSScope* scope, int lhsType )
     case Tok_Geq:
     case Tok_in:
         nextToken(ctx);
-        SimpleExpression(ctx,scope,0);
+        SimpleExpression(ctx,scope,lhsType);
         evalRelation(ctx, &t);
         ret = -1;
         break;
@@ -2676,6 +2531,7 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
     lua_setfield(ctx->L,var,"#ro");
 
     t = peekToken(ctx,1);
+    int explicitType = 0;
     if( t.tok == Tok_Colon )
     {
         nextToken(ctx); // eat ':'
@@ -2683,23 +2539,22 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         typeref(ctx,scope);
         lua_pushvalue(ctx->L,-1);
         lua_setfield(ctx->L,var,"#type"); // var points to its type
+        explicitType = lua_gettop(ctx->L);
     }else
         lua_pushnil(ctx->L);
-    const int explicitType = lua_gettop(ctx->L);
 
     addToScope(ctx, scope, &id, var );
 
     t = nextToken(ctx);
     if( t.tok == Tok_Lbrace || t.tok == Tok_begin )
     {
+        // constructor
         const int pascal = t.tok == Tok_begin;
-
-        // initializer block
-        if( lua_isnil(ctx->L,explicitType) )
+        if( explicitType == 0 )
             error2(ctx, t.loc.row, t.loc.col,"class instance variables require an explicit type" );
         lua_getfield(ctx->L,explicitType,"#kind");
         if( lua_tointeger(ctx->L,-1) != BS_ClassDecl )
-            error2(ctx, t.loc.row, t.loc.col,"block initializer are only supported for class instances" );
+            error2(ctx, t.loc.row, t.loc.col,"constructors are only supported for class instances" );
         lua_pop(ctx->L,1);
         if( scope != &ctx->module )
             error2(ctx, t.loc.row, t.loc.col,"class instance variables only supported on module level");
@@ -2796,32 +2651,6 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
             lua_pop(ctx->L,2); // decl, name
         }
 
-#if 0
-        lua_createtable(ctx->L,0,0); // create a temporary block definition for the local declarations
-        const int blockdecl = lua_gettop(ctx->L);
-        lua_pushinteger(ctx->L,BS_BlockDef);
-        lua_setfield(ctx->L,blockdecl,"#kind");
-        // point to outer scope
-        lua_pushvalue(ctx->L,scope->table);
-        lua_setfield(ctx->L,blockdecl,"^");
-        // the block is associated with the class instance it initializes, so syntax like ".varname" works
-        lua_pushvalue(ctx->L,instance);
-        lua_setfield(ctx->L,blockdecl,"#this");
-
-        lua_createtable(ctx->L,0,0); // create a temporary block instance for the values of local declarations
-        const int blockinst = lua_gettop(ctx->L);
-        lua_pushvalue(ctx->L,blockinst);
-        lua_setfield(ctx->L,blockdecl,"#inst");
-        lua_pushvalue(ctx->L,blockdecl);
-        lua_setmetatable(ctx->L, blockinst);
-
-        BSScope nested;
-        nested.n = 0;
-        nested.table = blockdecl;
-        block(ctx, &nested);
-
-        lua_pop(ctx->L,3); // instance, blockdecl, blockinst
-#else
         nestedblock(ctx,scope,classInst, &t, pascal);
 
         if( pascal )
@@ -2831,12 +2660,11 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
                 error2(ctx, id.loc.row, id.loc.col,"expecting 'end'" );
         }
         lua_pop(ctx->L,1); // instance
-#endif
     }else if( t.tok == Tok_Eq || t.tok == Tok_ColonEq )
     {
         const int ro = expression(ctx,scope,explicitType);
         const int type = lua_gettop(ctx->L);
-        if( !lua_isnil(ctx->L,explicitType) )
+        if( explicitType != 0 )
         {
             // check type compatibility with explicit type
             if( !sameType(ctx,explicitType,type) && !isSameOrSubclass(ctx,explicitType,type)
@@ -3028,14 +2856,14 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
     // value, type
     const int rhs = lua_gettop(ctx->L) - 1;
 
-    const int l = listAndElement(ctx,lt,rhs+1);
+    const int l = isListAndElemType(ctx,lt,rhs+1);
     const int sub = isSameOrSubclass(ctx,lt,rhs+1);
     const int same = sameType(ctx,lt,rhs+1);
     const int inenum = isInEnum(ctx,lt,rhs);
     if( !same && !(l == 1 || l == 2) && !sub  && !inenum )
-    {
         error2(ctx, t.loc.row, t.loc.col,"left and right side are not assignment compatible" );
-    }
+    if( l == 2 && t.tok == Tok_Eq )
+        error2(ctx, t.loc.row, t.loc.col,"cannot assign an element to a list; use += instead" );
 
     lua_getfield(ctx->L,lt,"#kind");
     const int klt = lua_tointeger(ctx->L,-1);
@@ -3582,35 +3410,8 @@ int bs_parse(lua_State* L)
         lua_error(L);
     }
 
-#if 1
     block(&ctx,&ctx.module,0,0);
     lua_pushvalue(L,BS_NewModule);
-#else
-    // TEST
-    int j = 1;
-    while(1)
-    {
-        int i = 1;
-        fprintf(stdout,"*** start peek\n");
-        BSToken t = peekToken(&ctx,i);
-        while( t.tok != Tok_Invalid && t.tok != Tok_Eof && i <= j )
-        {
-            bslex_dump(&t);
-            t = peekToken(&ctx,++i);
-        }
-        fprintf(stdout,"*** start next\n");
-        t = nextToken(&ctx);
-        while( t.tok != Tok_Invalid && t.tok != Tok_Eof && i > 1 )
-        {
-            bslex_dump(&t);
-            t = nextToken(&ctx);
-            i--;
-        }
-        if( t.tok == Tok_Invalid || t.tok == Tok_Eof )
-            break;
-        j++;
-    }
-#endif
 
     bslex_free(ctx.lex);
     BS_END_LUA_FUNC(&ctx);

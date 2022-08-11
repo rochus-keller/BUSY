@@ -123,11 +123,13 @@ With the `-T` option you can explicitly select which products should be built; e
 
 With the `-P` option parameter values can be set; the syntax is `-P x.y=value`, where value is a valid BUSY basic type literal syntax; the syntax of strings and symbols usually has to make use of command line escapes, e.g. like `-P "string_param=\"this is a string\""`. Again it is possible to set parameters of BUSY files located further down the source tree, but only if the subdirectory declarations in the designator are public.
 
+With the `-c` option only the parser and analyzer is run to check the BUSY files.
+
 In a future version of BUSY, with the `-G` option the backend can be set, e.g. like `-G ninja`.
 
 ### Specifying builds
 
-Builds are specified using BUSY files written in the BUSY specification language; see <TODO> for detailed information about the specification language.
+Builds are specified using BUSY files including code written in the BUSY specification language; see [The BUSY Build System - Language and Built-ins Specification](Specification.html) for detailed information about the specification language.
 
 There is a BUSY file in the root of the source tree and any subdirectory which includes files or other subdirectories relevant to the build.
 
@@ -160,7 +162,8 @@ The current BUSY version so far has been used with the NAppGUI framework (see ht
 - [x] Support for unicode (UTF-8) in strings, symbols, paths, comments and identifiers
 - [x] Support C as well as Pascal flair syntax versions
 - [x] Able to directly run the build (i.e. independently of Make, NMake or Ninja)
-- [ ] Specification, manual, tutorials
+- [x] Language specification
+- [ ] Tutorials
 - [ ] Make a Mono CLR source tree version using BUSY
 - [ ] Make a lean Qt source tree version using BUSY
 - [ ] Check and adapt more concepts from GN as need be

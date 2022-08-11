@@ -118,8 +118,8 @@ static void push_normalized(lua_State *L, int path)
     }
 }
 
-// check https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
-// https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
+// TODO: an optional way to set default config values as supported in GN with set_defaults() and the build config
+// file; see 'gn help execution'
 
 // opt param: path to source root directory (default '..')
 // opt param: path to output root dir (default ./output)
@@ -148,29 +148,6 @@ static int bs_compile (lua_State *L)
         lua_replace(L,3);
     }
 
-#if 0
-    lua_pushvalue(L,1);
-    lua_pushstring(L,LUA_DIRSEP);
-    lua_pushstring(L,"BUSY");
-    lua_concat(L,3);
-    const char* rootPath = lua_tostring(L,-1);
-
-    fprintf(stdout,"lexing \"%s\"\n",rootPath);
-    fflush(stdout);
-
-    BSLexer* lex = bslex_open(rootPath);
-    if( lex == 0 )
-        return 0;
-    BSToken t = bslex_next(lex);
-    while(t.tok != Tok_Invalid && t.tok != Tok_Eof )
-    {
-        bslex_dump(&t);
-        t = bslex_next(lex);
-    }
-    bslex_free(lex);
-    lua_pop(L,1);
-    lua_pushnil(L);
-#else
     // set lua path so no environment can intervene
     lua_getglobal(L, "package");
     lua_pushstring(L,"./?.lua");
@@ -210,8 +187,6 @@ static int bs_compile (lua_State *L)
         luaL_error(L,"cannot set unknown parameter: %s", lua_tostring(L,-2) );
         lua_pop(L, 1);
     }
-
-#endif
 
     return 1;
 }

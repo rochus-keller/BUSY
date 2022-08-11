@@ -1,0 +1,1253 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
+<html><META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<head><title>2022-07-17 BUSY Manual</title>
+<style type="text/css" media="screen, projection, print">
+body{font-family:Arial,sans-serif;font-size:small;orphans:2;widows:2;}
+h1,h2,h3,h4{background-color:#F5F5F5;padding:0.3em;page-break-after:avoid;margin:0;border-style:solid;border-color:white #F5F5F5 #F5F5F5 #F5F5F5;border-width:thin;}
+span.label{position:absolute;top:auto;left:0;margin-top:0.2em;font-size:smaller;color:darkblue; }
+span.ident{background-color:aliceblue;font-weight:bold;padding:0 0.2em 0 0.2em;}
+a[href^="#"]{text-decoration:none;font-weight:normal;color:darkblue;background-color:#F5F5F5;}
+div{border-style:none solid solid solid;border-width:thin;border-color:#F5F5F5;margin:0;padding:0.3em;}
+ol,ul{margin:0;}
+</style>
+</head><body>
+<h4 style="margin-left:9px"><span class="label"><a name="11863">1</a></span>
+Front Matter</h4>
+<h4 style="margin-left:27px"><span class="label"><a name="11942">1.1</a></span>
+Title</h4>
+<div style="margin-left:45px"><span class="label"><a name="11943">1.1.1</a></span>
+The BUSY Build System - Language and Built-ins Specification</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
+Version</h4>
+<div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
+2022-08-11, Work in progress</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
+Author</h4>
+<div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
+me@rochus-keller.ch</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11940">1.4</a></span>
+<b>Additional Credits</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11864">1.4.1</a></span>
+The sections <a href="#11631">3 Predeclared Class Reference</a> and <a href="#11697">4 Predeclared  Field Reference</a> are derived from the help text included in GN (<a href="https://gn.googlesource.com/gn/"><u>gn.googlesource.com/.../</u></a> as of July 2019), copyright (c) 2013 by The Chromium Authors, made available under a BSD-style license.</div>
+<div style="margin-left:45px"><span class="label"><a name="12207">1.4.2</a></span>
+A lot of text is derived from the Oberon+ language specification, <a href="https://github.com/oberon-lang/specification"><u>github.com/.../specification</u></a></div>
+<h4 style="margin-left:27px"><span class="label"><a name="12253">1.5</a></span>
+<b>Table of Contents</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12260">1.5.1</a></span>
+<a href="#11632">2 Language Specification</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12261">1.5.1.1</a></span>
+<a href="#11720">2.1 Introduction</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12262">1.5.1.2</a></span>
+<a href="#12059">2.2 Syntax</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12263">1.5.1.3</a></span>
+<a href="#12066">2.3 Vocabulary and Representation</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12264">1.5.1.3.1</a></span>
+<a href="#12069">2.3.3 Identifiers</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12265">1.5.1.3.2</a></span>
+<a href="#12081">2.3.4 Booleans</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12266">1.5.1.3.3</a></span>
+<a href="#12071">2.3.5 Numbers</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12267">1.5.1.3.4</a></span>
+<a href="#12074">2.3.6 Strings</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12268">1.5.1.3.5</a></span>
+<a href="#12078">2.3.7 Symbols</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12269">1.5.1.3.6</a></span>
+<a href="#12080">2.3.8 Paths</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12270">1.5.1.3.7</a></span>
+<a href="#12099">2.3.9 Operators and Delimiters</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12271">1.5.1.3.8</a></span>
+<a href="#12103">2.3.10 Reserved Words</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12272">1.5.1.3.9</a></span>
+<a href="#12107">2.3.11 Comments</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12273">1.5.1.4</a></span>
+<a href="#12109">2.4 Declarations and scope rules</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12274">1.5.1.5</a></span>
+<a href="#12048">2.5 Type declarations</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12275">1.5.1.5.1</a></span>
+<a href="#12120">2.5.3 Basic types</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12276">1.5.1.5.2</a></span>
+<a href="#12130">2.5.4 Class types</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12277">1.5.1.5.3</a></span>
+<a href="#12137">2.5.5 Enumeration types</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12278">1.5.1.5.4</a></span>
+<a href="#12139">2.5.6 List types</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12279">1.5.1.6</a></span>
+<a href="#12151">2.6 Variable declarations</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12280">1.5.1.7</a></span>
+<a href="#12167">2.7 Expressions</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12281">1.5.1.7.1</a></span>
+<a href="#12196">2.7.2 Operands</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12282">1.5.1.7.2</a></span>
+<a href="#12204">2.7.3 Operators</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12283">1.5.1.7.2.1</a></span>
+<a href="#12217">2.7.3.3 Logical operators</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12284">1.5.1.7.2.2</a></span>
+<a href="#12220">2.7.3.4 Arithmetic operators</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12285">1.5.1.7.2.3</a></span>
+<a href="#12224">2.7.3.5 Relations</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12286">1.5.1.7.2.4</a></span>
+<a href="#12230">2.7.3.7 Function Call</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12287">1.5.1.8</a></span>
+<a href="#12168">2.8 Statements</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12288">1.5.1.9</a></span>
+<a href="#12169">2.9 Modules</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12289">1.5.1.10</a></span>
+<a href="#12241">2.10 Alternative Syntax</a></div>
+<div style="margin-left:45px"><span class="label"><a name="12290">1.5.2</a></span>
+<a href="#11631">3 Predeclared Class Reference</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12291">1.5.2.1</a></span>
+<a href="#11686">3.1 Config</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12292">1.5.2.2</a></span>
+<a href="#11676">3.2 Product</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12293">1.5.2.2.1</a></span>
+<a href="#11677">3.2.3 ConfigurableProduct</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12294">1.5.2.2.1.1</a></span>
+<a href="#11661">3.2.3.1 CompiledProduct</a></div>
+<div style="margin-left:117px"><span class="label"><a name="12295">1.5.2.2.1.1.1</a></span>
+<a href="#11633">3.2.3.1.4 Executable</a></div>
+<div style="margin-left:117px"><span class="label"><a name="12296">1.5.2.2.1.1.2</a></span>
+<a href="#11662">3.2.3.1.5 Library</a></div>
+<div style="margin-left:117px"><span class="label"><a name="12297">1.5.2.2.1.1.3</a></span>
+<a href="#11647">3.2.3.1.6 SourceSet</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12298">1.5.2.2.2</a></span>
+<a href="#11671">3.2.4 Group</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12299">1.5.2.2.3</a></span>
+<a href="#11678">3.2.5 Action</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12300">1.5.2.2.3.1</a></span>
+<a href="#11949">3.2.5.1 Script</a></div>
+<div style="margin-left:117px"><span class="label"><a name="12301">1.5.2.2.3.1.1</a></span>
+<a href="#11679">3.2.5.1.2 LuaScript</a></div>
+<div style="margin-left:117px"><span class="label"><a name="12302">1.5.2.2.3.1.2</a></span>
+<a href="#11681">3.2.5.1.3 LuaScriptForeach</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12303">1.5.2.2.3.2</a></span>
+<a href="#11893">3.2.5.2 Copy</a></div>
+<div style="margin-left:45px"><span class="label"><a name="12305">1.5.3</a></span>
+<a href="#11697">4 Predeclared  Field Reference</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12306">1.5.3.1</a></span>
+<a href="#11917">4.1 args</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12307">1.5.3.2</a></span>
+<a href="#11698">4.2 cflags</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12308">1.5.3.3</a></span>
+<a href="#11703">4.3 cflags_c</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12309">1.5.3.4</a></span>
+<a href="#11705">4.4 cflags_cc</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12310">1.5.3.5</a></span>
+<a href="#11707">4.5 cflags_objc</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12311">1.5.3.6</a></span>
+<a href="#11709">4.6 cflags_objcc</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12312">1.5.3.7</a></span>
+<a href="#11812">4.7 configs</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12315">1.5.3.8</a></span>
+<a href="#11741">4.8 defines</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12316">1.5.3.9</a></span>
+<a href="#11975">4.9 def_file</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12317">1.5.3.10</a></span>
+<a href="#11831">4.10 deps</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12319">1.5.3.11</a></span>
+<a href="#11825">4.11 frameworks</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12320">1.5.3.12</a></span>
+<a href="#11757">4.12 include_dirs</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12321">1.5.3.13</a></span>
+<a href="#11772">4.13 ldflags</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12322">1.5.3.14</a></span>
+<a href="#11776">4.14 lib_dirs</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12323">1.5.3.15</a></span>
+<a href="#11799">4.15 lib_names</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12324">1.5.3.16</a></span>
+<a href="#11782">4.16 lib_files</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12326">1.5.3.17</a></span>
+<a href="#11962">4.17 lib_type</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12327">1.5.3.18</a></span>
+<a href="#11978">4.18 name</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12328">1.5.3.19</a></span>
+<a href="#11907">4.19 outputs</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12329">1.5.3.20</a></span>
+<a href="#11901">4.20 script</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12330">1.5.3.21</a></span>
+<a href="#11885">4.21 sources</a></div>
+<div style="margin-left:45px"><span class="label"><a name="12343">1.5.4</a></span>
+<a href="#11934">5 Predeclared Enumeration Reference</a></div>
+<div style="margin-left:45px"><span class="label"><a name="12344">1.5.5</a></span>
+<a href="#11920">6 Predeclared  Variable Reference</a></div>
+<div style="margin-left:45px"><span class="label"><a name="12345">1.5.6</a></span>
+<a href="#11996">7 Predeclared  Procedure Reference</a></div>
+<h4 style="margin-left:9px"><span class="label"><a name="11632">2</a></span>
+Language Specification</h4>
+<h4 style="margin-left:27px"><span class="label"><a name="11720">2.1</a></span>
+<b>Introduction</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12056">2.1.1</a></span>
+BUSY (for <i>BU</i>ild <i>SY</i>stem) is a lean, cross-platform build system with very little system requirements and easy bootsrapping.</div>
+<div style="margin-left:45px"><span class="label"><a name="12057">2.1.2</a></span>
+The BUSY build specifcation language features modularity, information hiding, static typing with strong type checking, immutability and garbage collection. The language is not a full programming language by intention.</div>
+<div style="margin-left:45px"><span class="label"><a name="12058">2.1.3</a></span>
+This report is not intended as a programmer’s tutorial. It is intentionally kept concise. Its function is to serve as a reference for programmers, implementors, and tutorial writers. What remains unsaid is mostly left so intentionally, either because it can be derived from stated rules of the language, or because it would require to commit the definition when a general commitment appears as unwise.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12059">2.2</a></span>
+<a href=""><b>S</b></a><b>yntax</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12060">2.2.1</a></span>
+An extended Backus-Naur Formalism (EBNF) is used to describe the syntax of BUSY:</div>
+<div style="margin-left:63px"><span class="label"><a name="12061">2.2.1.1</a></span>
+Alternatives are separated by <b>|</b>.</div>
+<div style="margin-left:63px"><span class="label"><a name="12062">2.2.1.2</a></span>
+Brackets <b>[</b> and <b>]</b> denote optionality of the enclosed expression.</div>
+<div style="margin-left:63px"><span class="label"><a name="12063">2.2.1.3</a></span>
+Braces <b>{</b> and <b>}</b> denote its repetition (possibly 0 times).</div>
+<div style="margin-left:63px"><span class="label"><a name="12064">2.2.1.4</a></span>
+Syntactic entities (non-terminal symbols) are denoted by English words expressing their intuitive meaning.</div>
+<div style="margin-left:63px"><span class="label"><a name="12065">2.2.1.5</a></span>
+Symbols of the language vocabulary (terminal symbols) are denoted by strings formatted in bold face.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12066">2.3</a></span>
+Vocabulary and Representation</h4>
+<div style="margin-left:45px"><span class="label"><a name="12067">2.3.1</a></span>
+BUSY source code is a string of characters encoded using the UTF-8 variable-width encoding as defined in ISO/IEC 10646. Numbers, operators, keywords and delimiters are represented using the ASCII character set; identifiers, strings, symbols, paths and comments are represented using the Unicode Basic Multilingual Plane (BMP, plane 0, as defined in ISO/IEC 10646) character set.</div>
+<div style="margin-left:45px"><span class="label"><a name="12068">2.3.2</a></span>
+The following lexical rules apply: blanks and line breaks must not occur within symbols (except in block comments, and blanks in strings); they are ignored unless they are essential to separate two consecutive symbols. Capital and lower-case letters are considered as distinct.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12069">2.3.3</a></span>
+Identifiers</h4>
+<div style="margin-left:63px"><span class="label"><a name="12070">2.3.3.1</a></span>
+Identifiers are sequences of unicode letters, unicode digits and underscore. The first character must be a unicode letter or an underscore.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12081">2.3.4</a></span>
+<b>Booleans</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="12082">2.3.4.1</a></span>
+Boolean literals are represented by the keywords <b>true</b> and <b>false</b>.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12071">2.3.5</a></span>
+<a href=""><b>N</b></a><b>umbers</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="12072">2.3.5.1</a></span>
+Number literals are (unsigned) integer or real constants. If the literal is specified with the prefix <b>0x</b>, the representation is hexadecimal, otherwise the representation is decimal. </div>
+<div style="margin-left:63px"><span class="label"><a name="12073">2.3.5.2</a></span>
+A real number always contains a decimal point and at least one digit before the point. Optionally it may also contain a decimal scale factor. The letter <b>e</b> means <i>times ten to the power of</i>. </div>
+<h4 style="margin-left:45px"><span class="label"><a name="12074">2.3.6</a></span>
+Strings</h4>
+<div style="margin-left:63px"><span class="label"><a name="12075">2.3.6.1</a></span>
+Strings are sequences of printable unicode characters enclosed in <b>"</b> (quote marks). A string must not extend over the end of a line. Strings use backslash as the escape character. The only escape sequences supported are: </div>
+<div style="margin-left:81px"><span class="label"><a name="12076">2.3.6.1.1</a></span>
+<b>\"</b> (for literal quote)</div>
+<div style="margin-left:81px"><span class="label"><a name="12077">2.3.6.1.2</a></span>
+<b>\\</b> (for literal backslash)</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12078">2.3.7</a></span>
+<b>Symbols</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="12079">2.3.7.1</a></span>
+Symbols are interned strings consisting of unicode letters, unicode digits and underscores; symbols are prefixed by <b>`</b> (backquote, ASCII 0x60).</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12080">2.3.8</a></span>
+Paths</h4>
+<div style="margin-left:63px"><span class="label"><a name="12083">2.3.8.1</a></span>
+A path is an abstraction of a file system absolute or relative file or directory path. A path is a sequence of zero or more name segments, separated by the <b>/</b> (slash) character, with a path prefix. Paths are relative to the current module (see <a href="#12169">2.9 Modules</a>). The following path prefixes are supported:</div>
+<div style="margin-left:81px"><span class="label"><a name="12084">2.3.8.1.1</a></span>
+<b>//</b> (for an absolute path in Unix file systems)</div>
+<div style="margin-left:81px"><span class="label"><a name="12097">2.3.8.1.2</a></span>
+a <b>//</b> followed by one ASCII letter followed by one <b>:</b> (colon, for an absolute path in Windows file systems)</div>
+<div style="margin-left:81px"><span class="label"><a name="12085">2.3.8.1.3</a></span>
+<b>./</b> (for a path relative to the current module)</div>
+<div style="margin-left:81px"><span class="label"><a name="12086">2.3.8.1.4</a></span>
+<b>../</b> (for a path relative to the directory immediately above the current module)</div>
+<div style="margin-left:81px"><span class="label"><a name="12095">2.3.8.1.5</a></span>
+a sequence of two or more <b>../</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12088">2.3.8.2</a></span>
+A name segment consists of a sequence of one or more printable unicode characters. A name segment cannot include the following characters: <b>/ \ ? * : | " &lt; &gt; , ; =</b> . A name segment cannot include sequences of <b>.</b> (dot).</div>
+<div style="margin-left:63px"><span class="label"><a name="12090">2.3.8.3</a></span>
+If a name segment includes unicode characters which qualify as white space (blanks), the path must be enclosed in <b>'</b> (tick marks); line breaks in name segments are not allowed.</div>
+<div style="margin-left:63px"><span class="label"><a name="12091">2.3.8.4</a></span>
+If a path is enclosed in <b>'</b> (tick marks), the <b>./</b> path prefix is optional.</div>
+<div style="margin-left:63px"><span class="label"><a name="12089">2.3.8.5</a></span>
+As a special case, a path may consist only of one of the following character combinations:</div>
+<div style="margin-left:81px"><span class="label"><a name="12092">2.3.8.5.1</a></span>
+<b>//</b> (for the absolute root in a Unix file system)</div>
+<div style="margin-left:81px"><span class="label"><a name="12098">2.3.8.5.2</a></span>
+a <b>//</b> followed by one ASCII letter followed by one <b>:</b> (colon, for the absolute root in a Windows file system)</div>
+<div style="margin-left:81px"><span class="label"><a name="12093">2.3.8.5.3</a></span>
+<b>.</b> (for the current module)</div>
+<div style="margin-left:81px"><span class="label"><a name="12094">2.3.8.5.4</a></span>
+<b>..</b> (for the directory immediately above the current module)</div>
+<div style="margin-left:81px"><span class="label"><a name="12096">2.3.8.5.5</a></span>
+a sequence of one or more <b>../</b> followed by <b>..</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12390">2.3.8.6</a></span>
+Relative paths </div>
+<h4 style="margin-left:45px"><span class="label"><a name="12099">2.3.9</a></span>
+<a href=""><b>O</b></a><b>perators and Delimiters</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="12100">2.3.9.1</a></span>
+Operators and delimiters are the special characters, or character pairs listed here:</div>
+<div style="margin-left:81px"><span class="label"><a name="12101">2.3.9.1.1</a></span>
+<b>! != # % &amp;&amp; || ( ) * /* */ *= -= += + - ; , . / : := &lt; &lt;= = == &gt; &gt;= ? [ ] [] ^ ` { }</b></div>
+<h4 style="margin-left:45px"><span class="label"><a name="12103">2.3.10</a></span>
+<a href=""><b>R</b></a><b>eserved Words</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="12102">2.3.10.1</a></span>
+The reserved words (keywords) consist of all lower case letters and cannot be used as identifiers. All words listed here are reserved:</div>
+<div style="margin-left:81px"><span class="label"><a name="12104">2.3.10.1.1</a></span>
+<b>begin class else elsif end false if in let param subdir then true type var </b></div>
+<div style="margin-left:63px"><span class="label"><a name="12105">2.3.10.2</a></span>
+In addition the following words are reserved for future extensions:</div>
+<div style="margin-left:81px"><span class="label"><a name="12106">2.3.10.2.1</a></span>
+<b>import is</b></div>
+<h4 style="margin-left:45px"><span class="label"><a name="12107">2.3.11</a></span>
+<a href=""><b>C</b></a><b>omments</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="12108">2.3.11.1</a></span>
+Comments are arbitrary character sequences opened by the bracket <b>/</b><b><code>*</code></b> and closed by <b><code>*/</code></b>. Comments may be nested. They do not affect the meaning of a program. BUSY also supports line comments; text starting with <b><code>#</code></b> up to a line break is considered a comment.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12109">2.4</a></span>
+<a href=""><b>D</b></a><b>eclarations and scope rules</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12110">2.4.1</a></span>
+Every identifier occurring in a BUSY file must be introduced by a declaration, unless it is a predeclared identifier. Declarations also specify certain permanent properties of an object, such as whether it is a constant, a type, or a variable. The identifier is then used to refer to the associated object.</div>
+<div style="margin-left:45px"><span class="label"><a name="12111">2.4.2</a></span>
+The scope of an object x extends textually from the point of its declaration to the end of the block (module, constructor, condition, or class) to which the declaration belongs and hence to which the object is local. It excludes the scopes of equally named objects which are declared in nested blocks. The scope rules are:</div>
+<div style="margin-left:63px"><span class="label"><a name="12112">2.4.2.1</a></span>
+No identifier may denote more than one object within a given scope (i.e. no identifier may be declared twice in a block)</div>
+<div style="margin-left:63px"><span class="label"><a name="12113">2.4.2.2</a></span>
+An object may only be referenced within its scope</div>
+<div style="margin-left:63px"><span class="label"><a name="12114">2.4.2.3</a></span>
+Identifiers denoting class fields are valid in class designators only</div>
+<div style="margin-left:45px"><span class="label"><a name="12193">2.4.3</a></span>
+If a module N declares the subdirectory M using the <b>subdir</b> keyword (see <a href="#12169">2.9 Modules</a>), the BUSY file in the corresponding subdirectory becomes a nested module of N.</div>
+<div style="margin-left:45px"><span class="label"><a name="12116">2.4.4</a></span>
+An identifier declared in a module may be followed by an export mark (<b>*</b>, <b>-</b> or <b>!</b>) in its declaration to indicate that it is visible to either both outer and nested modules (<b>*</b> and <b>!</b>), or only to nested modules (<b>-</b>).</div>
+<div style="margin-left:45px"><span class="label"><a name="12163">2.4.5</a></span>
+Syntax:</div>
+<div style="margin-left:63px"><span class="label"><a name="12377">2.4.5.1</a></span>
+<code>identdef ::= ident ['*'|'-'|'!']</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12244">2.4.5.2</a></span>
+<code>declaration ::= vardecl | typedecl</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12378">2.4.5.3</a></span>
+<code>designator ::= ['^'|'.'] ident { '.' ident }</code></div>
+<div style="margin-left:45px"><span class="label"><a name="12117">2.4.6</a></span>
+A nested module M can access a visible identifier x declared in an outer module N by <b>^</b>x, if it was declared before the <b>subdir</b> M declaration in N (<b>^</b> is the outer module operator). A module N can access an identifier y declared in a nested module by M<b>.</b>x, but only after the <b>subdir</b> M declaration</div>
+<div style="margin-left:45px"><span class="label"><a name="12115">2.4.7</a></span><span class="ident">NOTE</span>
+This implies that a nested module cannot reference objects declared after the subdir declaration in the outer modules which (directly or indirectly) references the nested module.</div>
+<div style="margin-left:45px"><span class="label"><a name="12118">2.4.8</a></span>
+The identifiers in section <a href="#11631">3 Predeclared Class Reference</a>, <a href="#11697">4 Predeclared  Field Reference</a>, <a href="#11934">5 Predeclared Enumeration Reference</a>, <a href="#11920">6 Predeclared  Variable Reference</a>, and <a href="#11996">7 Predeclared  Procedure Reference</a> are predeclared; their meaning is defined in the indicated sections.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12048">2.5</a></span>
+<b>Type declarations</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12049">2.5.1</a></span>
+A data type determines the set of values which variables of that type may assume, and the operators that are applicable. A type declaration associates an identifier with a type. In the case of class types it also defines the structure of variables of this type. </div>
+<div style="margin-left:45px"><span class="label"><a name="12245">2.5.2</a></span>
+Syntax:</div>
+<div style="margin-left:63px"><span class="label"><a name="12246">2.5.2.1</a></span>
+<code>typedecl ::= type identdef '=' ( enumdecl | classdecl )</code></div>
+<h4 style="margin-left:45px"><span class="label"><a name="12120">2.5.3</a></span>
+Basic types</h4>
+<div style="margin-left:63px"><span class="label"><a name="12123">2.5.3.1</a></span>
+The basic types are denoted by predeclared identifiers. The associated operators are defined in <a href="#12204">2.7.3 Operators</a>. The values of the given basic types are the following:</div>
+<div style="margin-left:81px"><span class="label"><a name="12124">2.5.3.1.1</a></span>
+<b>bool</b> (see <a href="#12081">2.3.4 Booleans</a>); the default value is false</div>
+<div style="margin-left:81px"><span class="label"><a name="12125">2.5.3.1.2</a></span>
+<b>int</b> (see <a href="#12071">2.3.5 Numbers</a>); the default value is 0; an implementation shall at least support 52 bit resolution</div>
+<div style="margin-left:81px"><span class="label"><a name="12126">2.5.3.1.3</a></span>
+<b>real</b> (see <a href="#12071">2.3.5 Numbers</a>); the default value is 0.0; an implementation shall at least support IEEE 754 64 bit resolution </div>
+<div style="margin-left:81px"><span class="label"><a name="12127">2.5.3.1.4</a></span>
+<b>string</b> (see <a href="#12074">2.3.6 Strings</a>); the default value is the empty string</div>
+<div style="margin-left:81px"><span class="label"><a name="12128">2.5.3.1.5</a></span>
+<b>path</b> (see <a href="#12080">2.3.8 Paths</a>); the default value is <b>'.'</b></div>
+<div style="margin-left:81px"><span class="label"><a name="12129">2.5.3.1.6</a></span>
+<b>symbol</b> (see <a href="#12078">2.3.7 Symbols</a>); the default value is an empty string</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12130">2.5.4</a></span>
+Class types</h4>
+<div style="margin-left:63px"><span class="label"><a name="12131">2.5.4.1</a></span>
+A class type is a structure consisting of a fixed number of elements, called fields, with possibly different types. The class type declaration specifies the name and type of each field. The scope of the field identifiers extends from the point of their declaration to the end of the class type, but they are also visible within designators referring to elements of class variables (see <a href="#12196">2.7.2 Operands</a>). If a variable of class type is visible, also all field identifiers are visible. </div>
+<div style="margin-left:63px"><span class="label"><a name="12132">2.5.4.2</a></span>
+Class types are extensible, i.e. a class type can be declared as an extension of another class type. In the example</div>
+<div style="margin-left:81px"><span class="label"><a name="12136">2.5.4.2.1</a></span>
+<code>type T0 = class { x: int } <br />type T1 = class (T0) { y: real }</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12134">2.5.4.3</a></span>
+T1 is a (direct) <i>extension</i> of T0 and T0 is the (direct) base type of T1. An extended type T1 consists of the fields of its base type and of the fields which are declared in T1. In general all identifiers declared in the extended class must be different from the identifiers declared in its base type classes.</div>
+<div style="margin-left:63px"><span class="label"><a name="12159">2.5.4.4</a></span>
+Syntax:</div>
+<div style="margin-left:81px"><span class="label"><a name="12160">2.5.4.4.1</a></span>
+<code>classdecl ::= class [ '(' designator ')' ] '{' { fielddecl [';'] } '}'</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12161">2.5.4.4.2</a></span>
+<code>fielddecl ::= ident ':' typeref</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12149">2.5.4.5</a></span>
+Classes are reference types, i.e. an assignment of variables of class type creates a copy of the reference, not a copy of the referenced object.</div>
+<div style="margin-left:63px"><span class="label"><a name="12172">2.5.4.6</a></span>
+Fields can be of basic, enumeration or list types.</div>
+<div style="margin-left:63px"><span class="label"><a name="12174">2.5.4.7</a></span><span class="ident">NOTE</span>
+Fields cannot be of class type, but they can be of a list type the element type of which is a class type.</div>
+<div style="margin-left:63px"><span class="label"><a name="12370">2.5.4.8</a></span>
+This specification includes a set of predeclared classes with a defined meaning for the build process (see <a href="#11631">3 Predeclared Class Reference</a>).</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12137">2.5.5</a></span>
+<b>Enumeration types</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="12138">2.5.5.1</a></span>
+An enumeration is a sequence of symbols that denote the values which constitute the data type. They, and no other values, belong to this type. The default value of an enumeration type is the first symbol of the sequence.</div>
+<div style="margin-left:63px"><span class="label"><a name="12142">2.5.5.2</a></span>
+Syntax:</div>
+<div style="margin-left:81px"><span class="label"><a name="12144">2.5.5.2.1</a></span>
+<code>enumeration = '(' symbol { [','] symbol } ')'</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12145">2.5.5.3</a></span>
+Example:</div>
+<div style="margin-left:81px"><span class="label"><a name="12366">2.5.5.3.1</a></span>
+<code>type color = ( `red, `green, `blue )</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12371">2.5.5.4</a></span>
+There are predeclared enumeration types (see <a href="#11934">5 Predeclared Enumeration Reference</a>).</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12139">2.5.6</a></span>
+List types</h4>
+<div style="margin-left:63px"><span class="label"><a name="12148">2.5.6.1</a></span>
+A list is a dynamic structure consisting of a variable number of elements which are all of the same type, called the element type. </div>
+<div style="margin-left:63px"><span class="label"><a name="12140">2.5.6.2</a></span>
+List types are not declared using the <b>type</b> keyword. Instead each variable or field of basic, class or enumeration type becomes a list by appending <b>[]</b> to its type.</div>
+<div style="margin-left:63px"><span class="label"><a name="12175">2.5.6.3</a></span>
+The elements of a list cannot be of list type.</div>
+<div style="margin-left:63px"><span class="label"><a name="12183">2.5.6.4</a></span>
+Lists are created by list literals. If the list literal appears on the right side of an assignment or initializer, the list type is given by the left side; otherwise or when the left side has no explicit type, then the type of the list is determined by the first element expression of the list literal. The type of an empty list literal is undefined. </div>
+<div style="margin-left:63px"><span class="label"><a name="12180">2.5.6.5</a></span>
+The default value of a field of list type is the empty list.</div>
+<div style="margin-left:63px"><span class="label"><a name="12150">2.5.6.6</a></span>
+Lists are reference types, i.e. an assignment of variables of list type creates a copy of the reference, not a copy of the referenced list.</div>
+<div style="margin-left:63px"><span class="label"><a name="12157">2.5.6.7</a></span>
+Syntax:</div>
+<div style="margin-left:81px"><span class="label"><a name="12182">2.5.6.7.1</a></span>
+<code>list_type ::= designator '[]'</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12158">2.5.6.7.2</a></span>
+<code>list ::= '[' [ expression { ',' expression } [ ',' ] ] ']'</code></div>
+<h4 style="margin-left:27px"><span class="label"><a name="12151">2.6</a></span>
+Variable declarations</h4>
+<div style="margin-left:45px"><span class="label"><a name="12152">2.6.1</a></span>
+Variable declarations introduce variables by defining an identifier and an optional data type for them. Variables are immediately initialized, either by a default value or an object constructor.</div>
+<div style="margin-left:45px"><span class="label"><a name="12153">2.6.2</a></span>
+Syntax:</div>
+<div style="margin-left:63px"><span class="label"><a name="12154">2.6.2.1</a></span>
+<code>vardecl ::= ( var | let | param ) identdef [ ':' explicitType ] initializer</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12155">2.6.2.2</a></span>
+<code>initializer ::= constructor | defaultValue</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12166">2.6.2.3</a></span>
+<code>constructor ::= '{' block '}'</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12186">2.6.2.4</a></span>
+<code>defaultValue ::= '=' expression</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12156">2.6.2.5</a></span>
+<code>explicitType ::= designator [ '[]' ]</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12185">2.6.2.6</a></span>
+<code>designator ::= ['^'|'.'] ident {'.' ident }</code></div>
+<div style="margin-left:45px"><span class="label"><a name="12165">2.6.3</a></span>
+Variables declared with <b>var</b> or <b>param</b> are mutable. Variables declared with <b>let</b> are immutable. The immutability is transitive: when the variable is of class or list type, also the class fields or list elements are immutable.</div>
+<div style="margin-left:45px"><span class="label"><a name="12170">2.6.4</a></span>
+The explicit type reference is optional if an default vallue is assigned; if an explicit type reference is present, then the type of the default value must be assignment compatible with the explicit type (see <a href="#12240">2.8.3 Assignments</a>).</div>
+<div style="margin-left:45px"><span class="label"><a name="12379">2.6.5</a></span>
+Variables declared as <b>param</b> can only be of basic or enumeration type.</div>
+<div style="margin-left:45px"><span class="label"><a name="12171">2.6.6</a></span>
+If an explicit type reference is present and of class type, then the initializer can be an object constructor. Before the object constructor runs, an instance of the explicit class type is created and initialized with default values by the runtime. The created instance is mutable within the constructor block even if the variable is declared with <b>let</b>. The created instance can be referenced by a designator with a '.' prefix (local instance operator). Here is an example:</div>
+<div style="margin-left:63px"><span class="label"><a name="12190">2.6.6.1</a></span>
+<code>type T1 = class (T0) { y: real }</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12191">2.6.6.2</a></span>
+<code>let t : T1 { .y = 12.3 }</code></div>
+<div style="margin-left:45px"><span class="label"><a name="12233">2.6.7</a></span><span class="ident">NOTE</span>
+If in a constructor a designator is followed by a '.' prefix, a semicolon must be put in between, otherwise the '.' ident is added to the previous designator.</div>
+<div style="margin-left:45px"><span class="label"><a name="12192">2.6.8</a></span>
+Constructors can only appear on module level, not in constructor or condition scopes. Constructors and default value assignments are executed in the regular declaration and statement flow.</div>
+<div style="margin-left:45px"><span class="label"><a name="12372">2.6.9</a></span>
+There are predefined variables with global scope (see <a href="#11920">6 Predeclared  Variable Reference</a>).</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12167">2.7</a></span>
+Expressions</h4>
+<div style="margin-left:45px"><span class="label"><a name="12195">2.7.1</a></span>
+Expressions are constructs denoting rules of computation whereby constants and current values of variables are combined to compute other values by the application of operators and function procedures. Expressions consist of operands and operators. Parentheses may be used to express specific associations of operators and operands.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12196">2.7.2</a></span>
+Operands</h4>
+<div style="margin-left:63px"><span class="label"><a name="12197">2.7.2.1</a></span>
+With the exception of literal constants (numbers, strings, paths, symbols, or lists), operands are denoted by designators. A designator consists of an identifier referring to a variable, type, or predeclared procedure. This identifier may possibly be qualified by one or more module identifier, an outer module operator or local instance operator (see <a href="#12109">2.4 Declarations and scope rules</a>, <a href="#12151">2.6 Variable declarations</a> and <a href="#12169">2.9 Modules</a>), and may be followed by selectors if the designated object is a class field.</div>
+<div style="margin-left:63px"><span class="label"><a name="12198">2.7.2.2</a></span>
+Syntax:</div>
+<div style="margin-left:81px"><span class="label"><a name="12199">2.7.2.2.1</a></span>
+<code>designator ::= ['^'|'.'] ident { '.' ident }</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12200">2.7.2.2.2</a></span>
+<code>ExpList ::= expression {',' expression}</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12201">2.7.2.3</a></span>
+If <i>r</i> designates a class, then <i>r.f</i> denotes the field <i>f</i> of <i>r</i>. </div>
+<div style="margin-left:63px"><span class="label"><a name="12202">2.7.2.4</a></span>
+If the designated object is a constant or a variable, then the designator refers to its current value. </div>
+<div style="margin-left:63px"><span class="label"><a name="12203">2.7.2.5</a></span>
+If the designated object is a predeclared procedure, the designator implies an activation of that procedure and stands for the value resulting from its execution; the actual parameters must correspond to the formal parameters.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12204">2.7.3</a></span>
+Operators</h4>
+<div style="margin-left:63px"><span class="label"><a name="12205">2.7.3.1</a></span>
+Four classes of operators with different precedences (binding strengths) are syntactically distinguished in expressions. The operator <b>!</b> as well as the unary <b>+</b> and <b>-</b> operators have the highest precedence, followed by multiplication operators, addition operators, and relations. Operators of the same precedence associate from left to right. For example, <code>x - y - z</code> stands for <code>(x - y) - z</code>.</div>
+<div style="margin-left:63px"><span class="label"><a name="12206">2.7.3.2</a></span>
+Syntax:</div>
+<div style="margin-left:81px"><span class="label"><a name="12208">2.7.3.2.1</a></span>
+<code>expression ::= SimpleExpression [ relation SimpleExpression ]</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12211">2.7.3.2.2</a></span>
+<code>relation ::= '==' | '!=' | '&lt;' | '&lt;=' | '&gt;' | '&gt;=' | in</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12210">2.7.3.2.3</a></span>
+<code>SimpleExpression ::= term { AddOperator term }</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12212">2.7.3.2.4</a></span>
+<code>AddOperator ::= '+' | '-' | '||'</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12213">2.7.3.2.5</a></span>
+<code>term ::= factor {MulOperator factor}</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12214">2.7.3.2.6</a></span>
+<code>MulOperator ::= '*' | '/' | '&amp;&amp;' | '%'</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12215">2.7.3.2.7</a></span>
+<code>factor ::= integer | real | string | symbol | path | true | false</code>
+<br><code>           | designator [ '(' [ ExpList ] ')' ]  </code>
+<br><code>           | '(' expression [  '?' expression ':' expression ] ')'  </code>
+<br><code>           | ('+' | '-' |'!') factor</code>
+<br><code>           | list </code></div>
+<div style="margin-left:81px"><span class="label"><a name="12216">2.7.3.2.8</a></span>
+<code>list ::= '[' [ expression { ',' expression } [ ',' ] ] ']'</code></div>
+<h4 style="margin-left:63px"><span class="label"><a name="12217">2.7.3.3</a></span>
+Logical operators</h4>
+<div style="margin-left:81px"><span class="label"><a name="12218">2.7.3.3.1</a></span>
+<table border=1 cellspacing=0 CELLPADDING=3 >
+<tr>
+<td>
+|| </td>
+<td>
+<br>logical disjunction </td>
+<td>
+<br><code>p || q</code> </td>
+<td>
+<br><i>if p then </i><i><b>true</b></i><i>, else q</i> </td></tr>
+<tr>
+<td>
+<br>&amp;&amp; </td>
+<td>
+<br>logical conjunction </td>
+<td>
+<br><code>p &amp;&amp; q</code> </td>
+<td>
+<br><i>if p then q, else </i><i><b>false</b></i> </td></tr>
+<tr>
+<td>
+<br>! </td>
+<td>
+<br>negation </td>
+<td>
+<br><code>!p</code> </td>
+<td>
+<br><i>not p</i></td></tr></table></div>
+<div style="margin-left:81px"><span class="label"><a name="12219">2.7.3.3.2</a></span>
+These operators apply to <b>bool</b> operands and yield a <b>bool</b> result.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="12220">2.7.3.4</a></span>
+Arithmetic operators</h4>
+<div style="margin-left:81px"><span class="label"><a name="12221">2.7.3.4.1</a></span>
+<table border=1 cellspacing=0 CELLPADDING=3 >
+<tr>
+<td>
++ </td>
+<td>
+<br>sum </td></tr>
+<tr>
+<td>
+<br>- </td>
+<td>
+<br>difference </td></tr>
+<tr>
+<td>
+<br>* </td>
+<td>
+<br>product </td></tr>
+<tr>
+<td>
+<br>/ </td>
+<td>
+<br>quotient </td></tr>
+<tr>
+<td>
+<br>% </td>
+<td>
+<br>modulus </td></tr></table></div>
+<div style="margin-left:81px"><span class="label"><a name="12222">2.7.3.4.2</a></span>
+The operators <b>+</b>, <b>-</b>, <b>*</b>, and <b>/</b> apply to operands of numeric types (<b>int</b> and <b>real</b>). Both operands must be of the same type. To convert from <b>real</b> to <b>int</b> or back use the predeclared toint() or toreal() functions (see <a href="#11996">7 Predeclared  Procedure Reference</a>). The type of the result is the type of the operands. When used as monadic operators, <b>-</b> denotes sign inversion and <b>+</b> denotes the identity operation. </div>
+<div style="margin-left:81px"><span class="label"><a name="12228">2.7.3.4.3</a></span>
+The operators <b>+</b>, <b>-</b> and <b>*</b> also apply to list types and mixed list and element types. Each operator creates a new list and doesn't affect the operands. The operands must be of the same type (if both are lists) or the element types must be assignment compatible (see <a href="#12240">2.8.3 Assignments</a>). The result of the <b>+</b> operator is a list consisting of the right operand appended to the left operand (at least one of the operands must be a list type). The result of the <b>*</b> operator is a list with the right operand (a list element) appended to the left operand (a list), but only if not contained in the left operand, or a list which corresponds to the intersection of the operands (both lists). The result of the <b>-</b> operator is a list which corresponds to the left operand (a list) with the right operand (a list or a list element) removed.</div>
+<div style="margin-left:81px"><span class="label"><a name="12229">2.7.3.4.4</a></span>
+The operator <b>+</b> also applies to string and path types. Both operands must be of the same type. The type of the result is the type of the operands. If the operands are strings, the result corresponds to the concatenation of the left and right operand. If the operands are paths, then the result corresponds to the concatenated, normalized path; the right operand must be a relative path; the ../ are resolved with the operation; if the left operand doesn't have enough segments to accommodate the right operand, the execution halts with an error.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="12224">2.7.3.5</a></span>
+Relations</h4>
+<div style="margin-left:81px"><span class="label"><a name="12225">2.7.3.5.1</a></span>
+<table border=1 cellspacing=0 CELLPADDING=3 >
+<tr>
+<td>
+== </td>
+<td>
+<br>equal </td></tr>
+<tr>
+<td>
+<br>!= </td>
+<td>
+<br>unequal </td></tr>
+<tr>
+<td>
+<br>&lt; </td>
+<td>
+<br>less </td></tr>
+<tr>
+<td>
+<br>&lt;= </td>
+<td>
+<br>less or equal </td></tr>
+<tr>
+<td>
+<br>&gt; </td>
+<td>
+<br>greater </td></tr>
+<tr>
+<td>
+<br>&gt;= </td>
+<td>
+<br>greater or equal </td></tr>
+<tr>
+<td>
+<br><b>in</b> </td>
+<td>
+<br>set membership </td></tr></table></div>
+<div style="margin-left:81px"><span class="label"><a name="12226">2.7.3.5.2</a></span>
+Relations yield a <b>bool</b> result. The relations <b>==</b>, <b>!=</b>, <b>&lt;</b>, <b>&lt;=</b>, <b>&gt;</b>, and <b>&gt;=</b> apply to the numeric types, as well as strings. The relations == and != also apply to <b>bool</b>, enumerations, symbols, path, class and list types. Both operands must be of the same type.</div>
+<div style="margin-left:81px"><span class="label"><a name="12227">2.7.3.5.3</a></span>
+x <b>in</b> s stands for "s contains x"; s must be of list type and x must be compatible to the element type of s.</div>
+<div style="margin-left:81px"><span class="label"><a name="12232">2.7.3.5.4</a></span><span class="ident">NOTE</span>
+The expression <code>A == B || C == D</code> corresponds to <code>(A == (B || C)) == D)</code>, not to <code>(A==B) || (C==D)</code></div>
+<h4 style="margin-left:63px"><span class="label"><a name="12380">2.7.3.6</a></span>
+Conditional expression</h4>
+<div style="margin-left:81px"><span class="label"><a name="12381">2.7.3.6.1</a></span>
+The value of an expression can depend on a condition. </div>
+<div style="margin-left:81px"><span class="label"><a name="12382">2.7.3.6.2</a></span>
+Example:</div>
+<div style="margin-left:99px"><span class="label"><a name="12385">2.7.3.6.2.1</a></span>
+<code>let x = ( cond ? 22 : 33 )</code></div>
+<div style="margin-left:81px"><span class="label"><a name="12384">2.7.3.6.3</a></span>
+If in the example <code>cond</code> is <b>true</b>, then <b><code>x</code></b> becomes 22, otherwise 33.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="12230">2.7.3.7</a></span>
+Function Call</h4>
+<div style="margin-left:81px"><span class="label"><a name="12231">2.7.3.7.1</a></span>
+A function call is a factor in an expression. Each expression in the actual parameters list (if any) is used to initialize a corresponding formal parameter. The number of expressions in the actual parameter list must correspond the number of formal parameters of the corresponding predeclared procedure (see <a href="#11996">7 Predeclared  Procedure Reference</a>).</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12168">2.8</a></span>
+Statements</h4>
+<div style="margin-left:45px"><span class="label"><a name="12234">2.8.1</a></span>
+Statements denote actions. There are elementary and structured statements. Elementary statements are not composed of any parts that are themselves statements. They are the assignment and the procedure call. Structured statements are composed of parts that are themselves statements. The condition is a structured statement. The initializer of a variable declaration is statement-like and also executed in the regular statement flow.</div>
+<div style="margin-left:45px"><span class="label"><a name="12235">2.8.2</a></span>
+Syntax:</div>
+<div style="margin-left:63px"><span class="label"><a name="12236">2.8.2.1</a></span>
+<code>statement ::= condition | assignment | call</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12237">2.8.2.2</a></span>
+<code>assignment ::= designator ( '=' | '+=' | '-=' | '*=' ) expression</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12238">2.8.2.3</a></span>
+<code>call ::= ident '(' ExpList ')'</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12239">2.8.2.4</a></span>
+<code>condition ::= if expression '{' block '}' [ else ( condition | '{' block '}' ) ] </code></div>
+<div style="margin-left:63px"><span class="label"><a name="12243">2.8.2.5</a></span>
+<code>block ::= { ( declaration | statement ) [';'] }</code></div>
+<h4 style="margin-left:45px"><span class="label"><a name="12240">2.8.3</a></span>
+Assignments</h4>
+<div style="margin-left:63px"><span class="label"><a name="12349">2.8.3.1</a></span>
+Assignments replace the current value of a variable or field by a new value specified by an expression. The expression type must be assignment compatible with the variable or field. Variables declared with <b>let</b> cannot be assigned to, nor can they be assigned to other variables not declared with <b>let</b>.</div>
+<div style="margin-left:63px"><span class="label"><a name="12386">2.8.3.2</a></span>
+Types A and B are assignment compatible, if</div>
+<div style="margin-left:81px"><span class="label"><a name="12387">2.8.3.2.1</a></span>
+A and B are the same type,</div>
+<div style="margin-left:81px"><span class="label"><a name="12388">2.8.3.2.2</a></span>
+A is the same or a base class of B,</div>
+<div style="margin-left:81px"><span class="label"><a name="12389">2.8.3.2.3</a></span>
+A is an enumeration type and B is a symbol which belongs to A.</div>
+<div style="margin-left:63px"><span class="label"><a name="12362">2.8.3.3</a></span>
+There are four assignment variants: plain replacement (<b>=</b>), in-place add (<b>+=</b>), in-place subtract (<b>-=</b>) and in-place multiply (<b>*=</b>). </div>
+<div style="margin-left:63px"><span class="label"><a name="12367">2.8.3.4</a></span>
+All four variants are available for numeric types. The in-place variants are an abbreviation of their corresponding arithmetic operators; e.g. <code>a += 10</code>  is an abbreviation of <code>a = a + 10</code> (see <a href="#12220">2.7.3.4 Arithmetic operators</a>).</div>
+<div style="margin-left:63px"><span class="label"><a name="12368">2.8.3.5</a></span>
+All four variants are available for list type variables or fields. The plain assignment replaces the the designated variable or field by the list resulting from the expression. In contrast the in-place arithmetic operations modify the list referenced by the designated variable or field. The <b>+=</b> operator appends the value of the expression (a list or element) to the list. The <b>*=</b> operator appends the value of the expression to the list, if it is a single element and not yet contained in the list. The <b>*=</b> operator replaces the contents of the list by the intersection, if the value of the expression is a list. The <b>-=</b> operator removes the given element(s) from the list, if the value of the expression is either a single element or a list.</div>
+<div style="margin-left:63px"><span class="label"><a name="12369">2.8.3.6</a></span>
+The plain replacement (<b>=</b>) and in-place add (<b>+=</b>) operators also apply to string and path types. The designated variable or field  must be of the same type as the expression. The plain assignment replaces the the designated variable or field value by the string or path resulting from the expression. In case of strings, the <b>+=</b> operator concatenates the right side to the left side. In case of paths, the left side is replaced by a concatenated, normalized version of the left and right side; the right side must be a relative path; the ../ are resolved with the operation; if the left side doesn't have enough segments to accommodate the right side, the execution halts with an error.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12350">2.8.4</a></span>
+Conditions</h4>
+<div style="margin-left:63px"><span class="label"><a name="12351">2.8.4.1</a></span>
+If statements specify the conditional execution of guarded statement sequences. The boolean expression preceding a statement sequence is called its guard. The guards are evaluated in sequence of occurrence, until one evaluates to <b>true</b>, whereafter its associated statement sequence is executed. If no guard is satisfied, the statement sequence following the symbol <b>else</b> is executed, if there is one.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12352">2.8.5</a></span>
+Calls</h4>
+<div style="margin-left:63px"><span class="label"><a name="12353">2.8.5.1</a></span>
+A procedure call activates a predeclared procedure. It has a (possibly empty) a list of actual parameters. The correspondence is established by the positions. </div>
+<div style="margin-left:63px"><span class="label"><a name="12357">2.8.5.2</a></span>
+Each actual parameter must be an expression. This expression is evaluated before the procedure activation, and the resulting value is assigned to the formal parameter.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12169">2.9</a></span>
+Modules</h4>
+<div style="margin-left:45px"><span class="label"><a name="12194">2.9.1</a></span>
+A module is a collection of declarations of types and variables, together with a sequence of statements for the purpose of assigning values to the variables. </div>
+<div style="margin-left:45px"><span class="label"><a name="12375">2.9.2</a></span>
+A module is equivalent to a directory in the source tree, and to a file in that directory named "BUSY"; each such file is either empty or includes source code as specified herein.</div>
+<div style="margin-left:45px"><span class="label"><a name="12358">2.9.3</a></span>
+Syntax:</div>
+<div style="margin-left:63px"><span class="label"><a name="12359">2.9.3.1</a></span>
+<code>Module ::= { ( subdirectory | declaration | statement ) [';'] }</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12360">2.9.3.2</a></span>
+<code>subdirectory ::= subdir identdef [ '=' ( path | ident ) ]</code></div>
+<div style="margin-left:45px"><span class="label"><a name="12374">2.9.4</a></span>
+Modules are in a hierarchical relationship to each other. This relationship is explicit. Each module declares, which other modules (i.e. subdirectories) belong to the build using the <b>subdir</b> declaration. A <b>subdir</b> declaration associates a relative path with an identifier in the module; it the trivial case the identifier directly corresponds to the subdirectory name; a path must not be <b>.</b> or <b>..</b> and must have exactly one name segment (see <a href="#12080">2.3.8 Paths</a>). If a module N references a module M using a <b>subdir</b> declaration, the module M can reference identifiers in N (see <a href="#12109">2.4 Declarations and scope rules</a>); this relation is recursive.</div>
+<div style="margin-left:45px"><span class="label"><a name="12376">2.9.5</a></span>
+Modules are parsed and executed depth-first; when the parser meets a <b>subdir</b> declaration, it parses the referenced module before it continues with the present module.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12241">2.10</a></span>
+Alternative Syntax</h4>
+<div style="margin-left:45px"><span class="label"><a name="12251">2.10.1</a></span>
+The syntax version so far has a C flair. For people preferring a Pascal flair syntax, BUSY makes the following alternatives available.</div>
+<div style="margin-left:45px"><span class="label"><a name="12252">2.10.2</a></span>
+Syntax:</div>
+<div style="margin-left:63px"><span class="label"><a name="12247">2.10.2.1</a></span>
+<code>condition ::= if expression then block { elsif expression then block } [ else block ] end</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12242">2.10.2.2</a></span>
+<code>initializer ::= constructor | ':=' expression</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12249">2.10.2.3</a></span>
+<code>constructor ::= begin block end</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12250">2.10.2.4</a></span>
+<code>assignment ::= designator ':=' expression</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12361">2.10.2.5</a></span>
+<code>subdirectory ::= subdir identdef [ ':=' ( path | ident ) ]</code></div>
+<h4 style="margin-left:9px"><span class="label"><a name="11631">3</a></span>
+<b>Predeclared Class Reference</b></h4>
+<h4 style="margin-left:27px"><span class="label"><a name="11686">3.1</a></span>
+Config</h4>
+<div style="margin-left:45px"><span class="label"><a name="11695">3.1.1</a></span>
+<b>Flags</b>: <a href="#11698">cflags</a>, <a href="#11703">cflags_c</a>, <a href="#11705">cflags_cc</a>, <a href="#11707">cflags_objc</a>, <a href="#11709">cflags_objcc</a>, <a href="#11741">defines</a>, <a href="#11757">include_dirs</a>, <a href="#11772">ldflags</a>, <a href="#11776">lib_dirs</a>, <a href="#11799">lib_names</a>, <a href="#11782">lib_files</a>, <a href="#11825">frameworks</a></div>
+<div style="margin-left:45px"><span class="label"><a name="11696">3.1.2</a></span>
+<b>Nested configs</b>: <a href="#11812">configs</a></div>
+<div style="margin-left:45px"><span class="label"><a name="11687">3.1.3</a></span>
+Configuration objects can be applied to products and specify sets of compiler flags, includes, defines, etc. They provide a way to conveniently group sets of this configuration information.</div>
+<div style="margin-left:45px"><span class="label"><a name="11688">3.1.4</a></span>
+The values in a config are additive only. If you want to remove a flag you need to remove the corresponding config that sets it. The final set of flags, defines, etc. for a target is generated in this order:</div>
+<div style="margin-left:63px"><span class="label"><a name="11689">3.1.4.1</a></span>
+The values specified directly on the Product (rather than using a Config)</div>
+<div style="margin-left:63px"><span class="label"><a name="11690">3.1.4.2</a></span>
+The configs specified in the ConfigurableProduct's <a href="#11812">configs</a> list, in order.</div>
+<div style="margin-left:45px"><span class="label"><a name="11693">3.1.5</a></span>
+Configs solve a problem where the build system needs to have a higher-level understanding of various compiler settings. For example, some compiler flags have to appear in a certain order relative to each other, some settings like defines and flags logically go together, and the build system needs to de-duplicate flags even though raw command-line parameters can't always be operated on in that way.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11676">3.2</a></span>
+<b>Product</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11948">3.2.1</a></span>
+A Product is also called a "build target". Products are inputs and outputs of build stages. </div>
+<div style="margin-left:45px"><span class="label"><a name="11636">3.2.2</a></span>
+<b>Deps</b>: <a href="#11831">deps</a></div>
+<h4 style="margin-left:45px"><span class="label"><a name="11677">3.2.3</a></span>
+<b>ConfigurableProduct</b></h4>
+<h4 style="margin-left:63px"><span class="label"><a name="11661">3.2.3.1</a></span>
+<b>CompiledProduct</b></h4>
+<div style="margin-left:81px"><span class="label"><a name="11635">3.2.3.1.1</a></span>
+<b>Flags</b>: <a href="#11698">cflags</a>, <a href="#11703">cflags_c</a>, <a href="#11705">cflags_cc</a>, <a href="#11707">cflags_objc</a>, <a href="#11709">cflags_objcc</a>, <a href="#11741">defines</a>, <a href="#11757">include_dirs</a>, <a href="#11772">ldflags</a>, <a href="#11776">lib_dirs</a>, <a href="#11799">lib_names</a>, <a href="#11782">lib_files</a>, <a href="#11825">frameworks</a></div>
+<div style="margin-left:81px"><span class="label"><a name="11638">3.2.3.1.2</a></span>
+<b>General</b>: <a href="#11812">configs</a>, <a href="#11885">sources</a></div>
+<div style="margin-left:81px"><span class="label"><a name="11634">3.2.3.1.3</a></span>
+The tools and commands used to create this product type will be determined by the source files in its <a href="#11885">sources</a>. Products containing multiple compiler-incompatible languages are not allowed (e.g. a target containing both C and C++ sources is acceptable, but a target containing C and Rust sources is not).</div>
+<h4 style="margin-left:81px"><span class="label"><a name="11633">3.2.3.1.4</a></span>
+<b>Executable</b></h4>
+<div style="margin-left:99px"><span class="label"><a name="11981">3.2.3.1.4.1</a></span>
+<b>General: </b><a href="#11978">name</a></div>
+<div style="margin-left:99px"><span class="label"><a name="11957">3.2.3.1.4.2</a></span>
+Make a binary which can be directly run by the OS.</div>
+<div style="margin-left:99px"><span class="label"><a name="11958">3.2.3.1.4.3</a></span>
+This is only the core binary, i.e. not a bundle as common on Mac.</div>
+<h4 style="margin-left:81px"><span class="label"><a name="11662">3.2.3.1.5</a></span>
+<b>Library</b></h4>
+<div style="margin-left:99px"><span class="label"><a name="11670">3.2.3.1.5.1</a></span>
+<b>General</b>: <a href="#11962">lib_type</a>, <a href="#11975">def_file</a>, <a href="#11978">name</a></div>
+<div style="margin-left:99px"><span class="label"><a name="11645">3.2.3.1.5.2</a></span>
+Make a ".a" / ".lib" / ".so" / ".dll" / ".dylib" file.</div>
+<div style="margin-left:99px"><span class="label"><a name="11640">3.2.3.1.5.3</a></span>
+If you only need the static library for intermediate results in the build, you should consider a SourceSet instead since it will skip the (potentially slow) step of creating the intermediate library file.</div>
+<div style="margin-left:99px"><span class="label"><a name="11659">3.2.3.1.5.4</a></span>
+A shared library will be specified on the linker line for targets listing the shared library in its <a href="#11831">deps</a>. If you don't want this (say you dynamically load the library at runtime), then you should depend on the shared library via <a href="#11850">data_deps</a>.</div>
+<h4 style="margin-left:81px"><span class="label"><a name="11647">3.2.3.1.6</a></span>
+<b>SourceSet</b></h4>
+<div style="margin-left:99px"><span class="label"><a name="11648">3.2.3.1.6.1</a></span>
+The language of a SourceSet target is determined by the extensions present in its sources.</div>
+<div style="margin-left:99px"><span class="label"><a name="11649">3.2.3.1.6.2</a></span>
+A source set is a collection of sources that get compiled, but are not linked to produce any kind of library. Instead, the resulting object files are implicitly added to the linker line of all targets that depend on the source set.</div>
+<div style="margin-left:99px"><span class="label"><a name="11650">3.2.3.1.6.3</a></span>
+In most cases, a source set will behave like a static library, except no actual library file will be produced. This will make the build go a little faster by skipping creation of a large static library, while maintaining the organizational benefits of focused build targets.</div>
+<div style="margin-left:99px"><span class="label"><a name="11651">3.2.3.1.6.4</a></span>
+The main difference between a source set and a static library is around handling of exported symbols. Most linkers assume declaring a function exported means exported from the static library. The linker can then do dead code elimination to delete code not reachable from exported functions.</div>
+<div style="margin-left:99px"><span class="label"><a name="11652">3.2.3.1.6.5</a></span>
+A source set will not do this code elimination since there is no link step. This allows you to link many source sets into a shared library and have the "exported symbol" notation indicate "export from the final shared library and not from the intermediate targets." There is no way to express this concept when linking multiple static libraries into a shared library.</div>
+<div style="margin-left:99px"><span class="label"><a name="11988">3.2.3.1.6.6</a></span>
+TODO: what does a SourceSet with linker flags? Warning? Silently ignore?</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11671">3.2.4</a></span>
+<b>Group</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="11672">3.2.4.1</a></span>
+This target type allows you to create meta-targets that just collect a set of dependencies into one named target. </div>
+<div style="margin-left:81px"><span class="label"><a name="11965">3.2.4.1.1</a></span>
+TODO Groups can additionally specify configs that apply to their dependents.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11678">3.2.5</a></span>
+<b>Action</b></h4>
+<h4 style="margin-left:63px"><span class="label"><a name="11949">3.2.5.1</a></span>
+Script</h4>
+<div style="margin-left:81px"><span class="label"><a name="11682">3.2.5.1.1</a></span>
+<b>Main</b>: <a href="#11917">args</a>, <a href="#11901">script</a></div>
+<h4 style="margin-left:81px"><span class="label"><a name="11679">3.2.5.1.2</a></span>
+<b>LuaScript</b></h4>
+<div style="margin-left:99px"><span class="label"><a name="11680">3.2.5.1.2.1</a></span>
+This product type allows you to run a Lua script a single time to produce one or more output files. If you want to run a script once for each of a set of input files, see <a href="#11681">LuaScriptForeach</a>.</div>
+<h4 style="margin-left:81px"><span class="label"><a name="11681">3.2.5.1.3</a></span>
+<b>LuaScriptForeach</b></h4>
+<div style="margin-left:99px"><span class="label"><a name="11685">3.2.5.1.3.1</a></span>
+<b>Main</b>: <a href="#11885">sources</a></div>
+<div style="margin-left:99px"><span class="label"><a name="11684">3.2.5.1.3.2</a></span>
+This product type allows you to run a script once-per-file over a set of sources. If you want to run a script once that takes many files as input, see <a href="#11679">LuaScript</a>.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="11893">3.2.5.2</a></span>
+<b>Copy</b></h4>
+<div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.2.1</a></span>
+<b>Main</b>: <a href="#11885">sources</a>, <a href="#11907">outputs</a></div>
+<div style="margin-left:81px"><span class="label"><a name="11894">3.2.5.2.2</a></span>
+All output files must be inside the output directory of the build. You would generally use |$target_out_dir| or |$target_gen_dir| to reference the output or generated intermediate file directories, respectively. TODO</div>
+<div style="margin-left:81px"><span class="label"><a name="11905">3.2.5.2.3</a></span>
+Both <a href="#11885">sources</a> and <a href="#11907">outputs</a> must be specified. Sources can include as many files as you want, but there can only be one item in the outputs list (plural is used for the name for consistency with other target types).</div>
+<div style="margin-left:81px"><span class="label"><a name="11906">3.2.5.2.4</a></span>
+If there is more than one source file, your output name should specify a mapping from each source file to an output file name. TODO</div>
+<h4 style="margin-left:9px"><span class="label"><a name="11697">4</a></span>
+<b>Predeclared Field Reference</b></h4>
+<h4 style="margin-left:27px"><span class="label"><a name="11917">4.1</a></span>
+args</h4>
+<div style="margin-left:45px"><span class="label"><a name="11918">4.1.1</a></span>
+<b>args: string[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11919">4.1.2</a></span>
+For <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> targets, args is the list of arguments to pass to the script. </div>
+<h4 style="margin-left:27px"><span class="label"><a name="11698">4.2</a></span>
+<b>cflags</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11701">4.2.1</a></span>
+<b>cflags : string[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11699">4.2.2</a></span>
+cflags are compiler flags passed to all invocations of the C, C++, Objective C, and Objective C++ compilers.</div>
+<div style="margin-left:45px"><span class="label"><a name="11702">4.2.3</a></span>
+Each element of the list is passed verbatim to the compiler in charge, i.e. cflags doesn't absctract away specific compiler command line syntax.</div>
+<div style="margin-left:45px"><span class="label"><a name="11700">4.2.4</a></span>
+To target one of these variants individually, use <a href="#11703">cflags_c</a>, <a href="#11705">cflags_cc</a>, <a href="#11707">cflags_objc</a>, and <a href="#11709">cflags_objcc</a>, respectively. These variant-specific versions of cflags* will be appended on the compiler command line after "cflags".</div>
+<div style="margin-left:45px"><span class="label"><a name="11711">4.2.5</a></span>
+Order of application:</div>
+<div style="margin-left:63px"><span class="label"><a name="11714">4.2.5.1</a></span>
+Those set on the current target (not in a config).</div>
+<div style="margin-left:63px"><span class="label"><a name="11715">4.2.5.2</a></span>
+Those set on the <a href="#11812">configs</a> on the product in order that the configs appear in the list. </div>
+<h4 style="margin-left:27px"><span class="label"><a name="11703">4.3</a></span>
+cflags_c</h4>
+<div style="margin-left:45px"><span class="label"><a name="11704">4.3.1</a></span>
+Like <a href="#11698">cflags</a>, but just used with C code.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11705">4.4</a></span>
+cflags_cc</h4>
+<div style="margin-left:45px"><span class="label"><a name="11706">4.4.1</a></span>
+Like <a href="#11698">cflags</a>, but just used with C++ code.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11707">4.5</a></span>
+cflags_objc</h4>
+<div style="margin-left:45px"><span class="label"><a name="11708">4.5.1</a></span>
+Like <a href="#11698">cflags</a>, but just used with Objective-C code (*.m files).</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11709">4.6</a></span>
+<b>cflags_objcc</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11710">4.6.1</a></span>
+Like <a href="#11698">cflags</a>, but just used with Objective-C++ (*.mm files)</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11812">4.7</a></span>
+configs</h4>
+<div style="margin-left:45px"><span class="label"><a name="11813">4.7.1</a></span>
+<b>configs: Config[]</b></div>
+<h4 style="margin-left:45px"><span class="label"><a name="11815">4.7.2</a></span>
+configs on a <b>CompiledProduct</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="11816">4.7.2.1</a></span>
+When used on a target, the <a href="#11757">include_dirs</a>, <a href="#11741">defines</a>, etc. in each config are appended in the order they appear to the compile command for each file in the target. They will appear after the include_dirs, defines, etc. that the target sets directly.</div>
+<div style="margin-left:63px"><span class="label"><a name="11817">4.7.2.2</a></span>
+Since configs apply after the values set on a target, directly setting a compiler flag will prepend it to the command line. If you want to append a flag instead, you can put that flag in a one-off config and append that config to the target's configs list.</div>
+<div style="margin-left:63px"><span class="label"><a name="11818">4.7.2.3</a></span>
+The build configuration script will generally set up the default configs applying to a given target type (see "set_defaults" TODO). When a target is being defined, it can add to or remove from this list.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11819">4.7.3</a></span>
+<b>configs on a Config</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="11820">4.7.3.1</a></span>
+It is possible to create composite configs by specifying configs on a config. One might do this to forward values, or to factor out blocks of settings from very large configs into more manageable named chunks.</div>
+<div style="margin-left:63px"><span class="label"><a name="11821">4.7.3.2</a></span>
+In this case, the composite config is expanded to be the concatenation of its own values, and in order, the values from its sub-configs *before* anything else happens. This has some ramifications:</div>
+<div style="margin-left:81px"><span class="label"><a name="11822">4.7.3.2.1</a></span>
+A target has no visibility into a config's sub-configs. Target code only sees the name of the composite config. It can't remove sub-configs or opt in to only parts of it. </div>
+<div style="margin-left:81px"><span class="label"><a name="11823">4.7.3.2.2</a></span>
+You can get duplication of values if a config is listed twice, say, on a target and in a sub-config that also applies. In other cases, the configs applying to a target are de-duped. It's expected that if a config is listed as a sub-config that it is only used in that context. (Note that it's possible to fix this and de-dupe, but it's not normally relevant and complicates the implementation.)</div>
+<div style="margin-left:45px"><span class="label"><a name="11824">4.7.4</a></span>
+see <a href="#11711">Order of application:</a></div>
+<h4 style="margin-left:27px"><span class="label"><a name="11741">4.8</a></span>
+defines</h4>
+<div style="margin-left:45px"><span class="label"><a name="11759">4.8.1</a></span>
+<b>defines: string[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11742">4.8.2</a></span>
+string syntax "&lt;ident&gt; [ = &lt;value&gt; ]", so without the -D</div>
+<div style="margin-left:45px"><span class="label"><a name="11743">4.8.3</a></span>
+These strings will be passed to the C/C++ compiler as #defines. The strings may or may not include an "=" to assign a value.</div>
+<div style="margin-left:45px"><span class="label"><a name="11748">4.8.4</a></span>
+see <a href="#11711">Order of application:</a></div>
+<h4 style="margin-left:27px"><span class="label"><a name="11975">4.9</a></span>
+def_file</h4>
+<div style="margin-left:45px"><span class="label"><a name="11976">4.9.1</a></span>
+<b>def_file: path</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11977">4.9.2</a></span>
+Optionally points to the .Def file when building a DLL on Windows.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11831">4.10</a></span>
+deps</h4>
+<div style="margin-left:45px"><span class="label"><a name="11832">4.10.1</a></span>
+<b>deps: Product[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11833">4.10.2</a></span>
+Specifies (private) compile-time dependencies of a produt. Such dependencies are propagated up the dependency tree and linked to dependent products, but do not grant the ability to include headers from the dependency. Public configs are not forwarded.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11834">4.10.3</a></span>
+<a href=""><b>D</b></a><b>etails of dependency propagation</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="11835">4.10.3.1</a></span>
+Source sets, shared libraries, and non-complete static libraries will be propagated up the dependency tree across groups, non-complete static libraries and source sets.</div>
+<div style="margin-left:63px"><span class="label"><a name="11836">4.10.3.2</a></span>
+Executables, shared libraries, and complete static libraries will link all propagated targets and stop propagation. Actions and copy steps also stop propagation, allowing them to take a library as an input but not force dependents to link to it.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11825">4.11</a></span>
+frameworks</h4>
+<div style="margin-left:45px"><span class="label"><a name="11826">4.11.1</a></span>
+<b>frameworks: string[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11827">4.11.2</a></span>
+Like <a href="#11799">lib_names</a>, but the names refer to Mac frameworks instead of static or dynamic libraries. In case the framework is referenced by file path use <a href="#11782">lib_files</a> instead. Only names are used, i.e. without the ".framework" suffix</div>
+<div style="margin-left:45px"><span class="label"><a name="11828">4.11.3</a></span>
+The switch "-framework" will be prepended instead of the lib_switch. This is to support the way Mac links framework dependencies.</div>
+<div style="margin-left:45px"><span class="label"><a name="11829">4.11.4</a></span>
+NOTE: in GN this is part of the libs field.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11757">4.12</a></span>
+include_dirs</h4>
+<div style="margin-left:45px"><span class="label"><a name="11760">4.12.1</a></span>
+<b>include_dirs: path[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11758">4.12.2</a></span>
+A list of source directories.</div>
+<div style="margin-left:45px"><span class="label"><a name="11761">4.12.3</a></span>
+The directories in this list will be added to the include path for the files in the affected target.</div>
+<div style="margin-left:45px"><span class="label"><a name="11985">4.12.4</a></span>
+Relative paths are always resolved relative to the module where the object was initially declared.</div>
+<div style="margin-left:45px"><span class="label"><a name="11762">4.12.5</a></span>
+see <a href="#11711">Order of application:</a></div>
+<h4 style="margin-left:27px"><span class="label"><a name="11772">4.13</a></span>
+ldflags</h4>
+<div style="margin-left:45px"><span class="label"><a name="11773">4.13.1</a></span>
+<b>ldflags: string[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11774">4.13.2</a></span>
+These flags are passed on the command-line to the linker and generally specify various linking options. Most targets will not need these and will use <a href="#11799">lib_names</a>, <a href="#11782">lib_files</a>, <a href="#11825">frameworks</a> and <a href="#11776">lib_dirs</a> instead.</div>
+<div style="margin-left:45px"><span class="label"><a name="11775">4.13.3</a></span>
+ldflags are NOT pushed to dependents, so applying ldflags to source sets or static libraries will be a no-op. If you want to apply ldflags to dependent targets, put them in a config and set it in the <a href="#11878">all_dependent_configs</a> or <a href="#11865">public_configs</a>.</div>
+<div style="margin-left:45px"><span class="label"><a name="11777">4.13.4</a></span>
+see <a href="#11711">Order of application:</a></div>
+<h4 style="margin-left:27px"><span class="label"><a name="11776">4.14</a></span>
+<a href=""><b>l</b></a><b>ib_dirs</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11778">4.14.1</a></span>
+<a href=""><b>l</b></a><b>ib_dirs: path[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11779">4.14.2</a></span>
+Specifies additional directories passed to the linker for searching for the required libraries. If an item is not an absolute path, it will be treated as being relative to the current build file.</div>
+<div style="margin-left:45px"><span class="label"><a name="11780">4.14.3</a></span>
+<a href="#11799">lib_names</a><b>, </b><a href="#11782">lib_files</a><b>,</b> and lib_dirs work differently than other flags in two respects. First, they are inherited across static library boundaries until a shared library or executable target is reached. Second, they are uniquified so each one is only passed once (the first instance of it will be the one used).</div>
+<div style="margin-left:45px"><span class="label"><a name="11783">4.14.4</a></span>
+see <a href="#11711">Order of application:</a></div>
+<div style="margin-left:45px"><span class="label"><a name="11781">4.14.5</a></span>
+For <a href="#11799">lib_names</a>, <a href="#11782">lib_files</a>, <a href="#11825">frameworks</a> and lib_dirs only, the values propagated from dependencies (as described above) are applied last assuming they are not already in the list.</div>
+<div style="margin-left:45px"><span class="label"><a name="11986">4.14.6</a></span>
+Relative paths are always resolved relative to the module where the object was initially declared.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11799">4.15</a></span>
+<b>lib_names</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11800">4.15.1</a></span>
+<b>lib_names: string[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11801">4.15.2</a></span>
+A list of library names. NOTE: in GN both lib_names and lib_files are unified in the libs field.</div>
+<div style="margin-left:45px"><span class="label"><a name="11830">4.15.3</a></span>
+Only the plain name of the library is used, i.e. without the lib prefix or the .lib or whatever suffix.</div>
+<div style="margin-left:45px"><span class="label"><a name="11802">4.15.4</a></span>
+These libraries will be linked into the final binary (executable or shared library) containing the current target.</div>
+<div style="margin-left:45px"><span class="label"><a name="11803">4.15.5</a></span><a href="#11780">&#x21B3;</a>
+<a href="#11799">lib_names</a><b>, </b><a href="#11782">lib_files</a><b>,</b> and lib_dirs work differently than other flags in two respects. First, they are inherited across static library boundaries until a shared library or executable target is reached. Second, they are uniquified so each one is only passed once (the first instance of it will be the one used).</div>
+<div style="margin-left:45px"><span class="label"><a name="11809">4.15.6</a></span>
+The names will be passed unmodified to the linker and prefixed with the "lib_switch" attribute of the linker tool. Generally you would set the "lib_dirs" so the given library is found. Your BUSY file should not specify the switch (like "-l"): this will be encoded in the "lib_switch" of the tool. TODO</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11782">4.16</a></span>
+<b>lib_files</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11784">4.16.1</a></span>
+<b>lib_files: path[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11785">4.16.2</a></span>
+A list of library paths.</div>
+<div style="margin-left:45px"><span class="label"><a name="11786">4.16.3</a></span>
+These libraries will be linked into the final binary (executable or shared library) containing the current target.</div>
+<div style="margin-left:45px"><span class="label"><a name="11788">4.16.4</a></span><a href="#11780">&#x21B3;</a>
+<a href="#11799">lib_names</a><b>, </b><a href="#11782">lib_files</a><b>,</b> and lib_dirs work differently than other flags in two respects. First, they are inherited across static library boundaries until a shared library or executable target is reached. Second, they are uniquified so each one is only passed once (the first instance of it will be the one used).</div>
+<div style="margin-left:45px"><span class="label"><a name="11987">4.16.5</a></span>
+Relative paths are always resolved relative to the module where the object was initially declared.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11789">4.16.6</a></span>
+Types of libs</h4>
+<div style="margin-left:63px"><span class="label"><a name="11792">4.16.6.1</a></span>
+File paths</div>
+<div style="margin-left:81px"><span class="label"><a name="11793">4.16.6.1.1</a></span>
+They will be rebased to be relative to the build directory and specified in the "libs" for linker tools. This facility should be used for libraries that are checked in to the version control. For libraries that are generated by the build, use normal deps to link them.</div>
+<div style="margin-left:63px"><span class="label"><a name="11797">4.16.6.2</a></span>
+Apple frameworks</div>
+<div style="margin-left:81px"><span class="label"><a name="11798">4.16.6.2.1</a></span>
+System libraries ending in ".framework" will be special-cased: the switch "-framework" will be prepended instead of the lib_switch, and the ".framework" suffix will be trimmed. This is to support the way Mac links framework dependencies.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11962">4.17</a></span>
+lib_type</h4>
+<div style="margin-left:45px"><span class="label"><a name="11963">4.17.1</a></span>
+<b>lib_type : LibraryType</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11964">4.17.2</a></span>
+Specifies the library type, e.g. whether it is a static or dynamic library.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11978">4.18</a></span>
+<b>name</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11979">4.18.1</a></span>
+<b>name: string</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11980">4.18.2</a></span>
+An optional name to be used to generate the file name of the product. If name is empty then the name of the variable declaration is used.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11907">4.19</a></span>
+outputs</h4>
+<div style="margin-left:45px"><span class="label"><a name="11908">4.19.1</a></span>
+<b>outputs: path[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11909">4.19.2</a></span>
+Outputs is valid for <a href="#11893">Copy</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> target types and indicates the resulting files. Outputs must always refer to files in the build directory.</div>
+<div style="margin-left:45px"><span class="label"><a name="11910">4.19.3</a></span>
+<a href="#11893">Copy</a></div>
+<div style="margin-left:63px"><span class="label"><a name="11911">4.19.3.1</a></span>
+Copy targets should have exactly one entry in the outputs list. If there is exactly one source, this can be a literal file name or a source expansion. If there is more than one source, this must contain a source expansion to map a single input name to a single output name. </div>
+<h4 style="margin-left:27px"><span class="label"><a name="11901">4.20</a></span>
+script</h4>
+<div style="margin-left:45px"><span class="label"><a name="11902">4.20.1</a></span>
+<b>script: path</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11903">4.20.2</a></span>
+An absolute or buildfile-relative file name of a Lua script to run for action and action_foreach targets (see <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a>).</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11885">4.21</a></span>
+sources</h4>
+<div style="margin-left:45px"><span class="label"><a name="11886">4.21.1</a></span>
+<b>sources: path[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="11887">4.21.2</a></span>
+A list of files. Non-absolute paths will be resolved relative to the current BUSY file (i.e. if you reference sources with relative paths from another BUSY file they will likely point to the wrong place).</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11888">4.21.3</a></span>
+<a href=""><b>S</b></a><b>ources for binary targets</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="11889">4.21.3.1</a></span>
+For binary targets (source sets, executables, and libraries), the known file types will be compiled with the associated tools. Unknown file types and headers will be skipped. However, you should still list all C/C+ header files so GN knows about the existence of those files for the purposes of include checking.</div>
+<div style="margin-left:63px"><span class="label"><a name="11890">4.21.3.2</a></span>
+As a special case, a file ending in ".def" will be treated as a Windows module definition file. It will be appended to the link line with a preceding "/DEF:" string. There must be at most one .def file in a target and they do not cross dependency boundaries (so specifying a .def file in a static library or source set will have no effect on the executable or shared library they're linked into).</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11891">4.21.4</a></span>
+<b>Sources for actions</b></h4>
+<div style="margin-left:63px"><span class="label"><a name="11895">4.21.4.1</a></span>
+<a href="#11681">LuaScriptForeach</a></div>
+<div style="margin-left:81px"><span class="label"><a name="11900">4.21.4.1.1</a></span>
+The sources are the set of files that the script will be executed over. The script will run once per file.</div>
+<div style="margin-left:63px"><span class="label"><a name="11896">4.21.4.2</a></span>
+<a href="#11893">Copy</a></div>
+<div style="margin-left:81px"><span class="label"><a name="11898">4.21.4.2.1</a></span>
+The source are the source files to copy.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11951">4.22</a></span>
+<b>Fields not implemented yet (TODO)</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="11952">4.22.1</a></span>
+Wheter this is implemented at all, or only explicit config assignment is implemented, is subject to further analysis; the current assumption is that these features introduce more complexity than benefit.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11878">4.22.2</a></span>
+all_dependent_configs</h4>
+<div style="margin-left:63px"><span class="label"><a name="11879">4.22.2.1</a></span>
+<b>all_dependent_configs: Config[]</b></div>
+<div style="margin-left:63px"><span class="label"><a name="11880">4.22.2.2</a></span>
+All targets depending on this one, and recursively, all targets depending on those, will have the configs listed in this variable added to them. These configs will also apply to the current target.</div>
+<div style="margin-left:63px"><span class="label"><a name="11881">4.22.2.3</a></span>
+This addition happens in a second phase once a target and all of its dependencies have been resolved. Therefore, a target will not see these force-added configs in their "configs" variable while the script is running, and they can not be removed. As a result, this capability should generally only be used to add defines and include directories necessary to compile a target's headers.</div>
+<div style="margin-left:63px"><span class="label"><a name="11884">4.22.2.4</a></span>
+see <a href="#11711">Order of application:</a></div>
+<div style="margin-left:63px"><span class="label"><a name="11882">4.22.2.5</a></span>
+See also <a href="#11838">public_deps</a>.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11865">4.22.3</a></span>
+public_configs</h4>
+<div style="margin-left:63px"><span class="label"><a name="11866">4.22.3.1</a></span>
+<b>public_configs: Config[]</b></div>
+<div style="margin-left:63px"><span class="label"><a name="11867">4.22.3.2</a></span>
+Targets directly depending on this one will have the configs listed in this variable added to them. These configs will also apply to the current target. Generally, public configs are used to apply defines and include directories necessary to compile this target's header files.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="11868">4.22.3.3</a></span>
+<a href=""><b>P</b></a><b>ropagation of public configs</b></h4>
+<div style="margin-left:81px"><span class="label"><a name="11869">4.22.3.3.1</a></span>
+Public configs are applied to all targets that depend directly on this one. These dependant targets can further push this target's public configs higher in the dependency tree by depending on it via public_deps (see <a href="#11838">public_deps</a>).</div>
+<div style="margin-left:81px"><span class="label"><a name="11870">4.22.3.3.2</a></span>
+<pre><code>let lower: Library {</code></pre>
+<pre><code>  # This will get applied to all targets that depend on this one.</code></pre>
+<pre><code>  .public_configs = [ my_config ]</code></pre>
+<pre><code>}</code></pre>
+<pre><code>let intermediate: Library {</code></pre>
+<pre><code>  # Depending on "lower" in any way will apply "my_config" to this target.</code></pre>
+<pre><code>  # Additionall, since this target depends on "lower" via public_deps,</code></pre>
+<pre><code>  # targets that depend on this one will also get "my_config".</code></pre>
+<pre><code>  .public_deps = [ lower ]</code></pre>
+<pre><code>}</code></pre>
+<pre><code>let toplevel: Library {</code></pre>
+<pre><code>  # This target will get "my_config" applied to it. However, since this</code></pre>
+<pre><code>  # target uses "deps" and not "public_deps", targets that depend on this</code></pre>
+<pre><code>  # one won't get it.</code></pre>
+<pre><code>  .deps = [ intermediate ]</code></pre>
+<pre><code>}</code></pre></div>
+<div style="margin-left:81px"><span class="label"><a name="11871">4.22.3.3.3</a></span>
+Public config propagation happens in a second phase once a target and all of its dependencies have been resolved. Therefore, a target will not see these force-added configs in their "configs" variable while the script is running, and they can not be removed. As a result, this capability should generally only be used to add defines and include directories rather than setting complicated flags that some targets may not want.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="11873">4.22.3.4</a></span>
+<a href=""><b>A</b></a><b>voiding applying public configs to this target</b></h4>
+<div style="margin-left:81px"><span class="label"><a name="11874">4.22.3.4.1</a></span>
+If you want the config to apply to targets that depend on this one, but NOT this one, define an extra layer of indirection using a group:</div>
+<div style="margin-left:81px"><span class="label"><a name="11875">4.22.3.4.2</a></span>
+<pre><code># Internal target to actually compile the sources. Not visible from outside.</code></pre>
+<pre><code>let internal_target: Library {</code></pre>
+<pre><code>  # Force all external targets to depend on the group instead of directly</code></pre>
+<pre><code>  # on this so the "external_settings" config will get applied.</code></pre>
+<pre><code>  # ...</code></pre>
+<pre><code>}</code></pre>
+<pre><code># External targets depend on this group. Only my_target is visible from outside.</code></pre>
+<pre><code>let my_target *: Group {</code></pre>
+<pre><code>  # Config to apply to all targets that depend on this one.</code></pre>
+<pre><code>  .public_configs = [ external_settings ]</code></pre>
+<pre><code>  .deps = [ internal_target ]</code></pre>
+<pre><code>}</code></pre></div>
+<div style="margin-left:63px"><span class="label"><a name="11877">4.22.3.5</a></span>
+see <a href="#11711">Order of application:</a></div>
+<h4 style="margin-left:45px"><span class="label"><a name="11838">4.22.4</a></span>
+public_deps</h4>
+<div style="margin-left:63px"><span class="label"><a name="11839">4.22.4.1</a></span>
+<b>public_deps: Product[]</b></div>
+<div style="margin-left:63px"><span class="label"><a name="11840">4.22.4.2</a></span>
+Public dependencies are like private dependencies (see <a href="#11831">deps</a>) but additionally express that the current product exposes the listed deps as part of its public API.</div>
+<div style="margin-left:63px"><span class="label"><a name="11841">4.22.4.3</a></span>
+This has several ramifications:</div>
+<div style="margin-left:81px"><span class="label"><a name="11842">4.22.4.3.1</a></span>
+public_configs that are part of the dependency are forwarded to direct dependents.</div>
+<div style="margin-left:81px"><span class="label"><a name="11843">4.22.4.3.2</a></span>
+Public headers in the dependency are usable by dependents (includes do not require a direct dependency or visibility).</div>
+<div style="margin-left:81px"><span class="label"><a name="11844">4.22.4.3.3</a></span>
+If the current target is a shared library, other shared libraries that it publicly depends on (directly or indirectly) are propagated up the dependency tree to dependents for linking.</div>
+<div style="margin-left:63px"><span class="label"><a name="11845">4.22.4.4</a></span>
+See also "public_configs".</div>
+<h4 style="margin-left:63px"><span class="label"><a name="11846">4.22.4.5</a></span>
+Discussion</h4>
+<div style="margin-left:81px"><span class="label"><a name="11847">4.22.4.5.1</a></span>
+Say you have three targets: A -&gt; B -&gt; C. C's visibility may allow B to depend on it but not A. Normally, this would prevent A from including any headers from C, and C's public_configs would apply only to B.</div>
+<div style="margin-left:81px"><span class="label"><a name="11848">4.22.4.5.2</a></span>
+If B lists C in its public_deps instead of regular deps, A will now inherit C's public_configs and the ability to include C's public headers.</div>
+<div style="margin-left:81px"><span class="label"><a name="11849">4.22.4.5.3</a></span>
+Generally if you are writing a target B and you include C's headers as part of B's public headers, or targets depending on B should consider B and C to be part of a unit, you should use public_deps instead of deps.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11856">4.22.5</a></span>
+data</h4>
+<div style="margin-left:63px"><span class="label"><a name="11857">4.22.5.1</a></span>
+<b>data: path[]</b></div>
+<div style="margin-left:63px"><span class="label"><a name="11858">4.22.5.2</a></span>
+Lists files or directories required to run the given target. These are typically data files or directories of data files. The paths are interpreted as being relative to the current build file. Since these are runtime dependencies, they do not affect which targets are built or when. To declare input files to a script, use <a href="#11764">inputs</a>.</div>
+<div style="margin-left:63px"><span class="label"><a name="11859">4.22.5.3</a></span>
+Appearing in the "data" section does not imply any special handling such as copying them to the output directory. This is just used for declaring runtime dependencies. </div>
+<div style="margin-left:63px"><span class="label"><a name="11860">4.22.5.4</a></span>
+BUSY doesn't require data files to exist at build-time. So actions that produce files that are in turn runtime dependencies can list those generated files both in the <a href="#11907">outputs</a> list as well as the "data" list.</div>
+<div style="margin-left:63px"><span class="label"><a name="11861">4.22.5.5</a></span>
+The paths are just rebased and passed along when requested.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11850">4.22.6</a></span>
+data_deps</h4>
+<div style="margin-left:63px"><span class="label"><a name="11851">4.22.6.1</a></span>
+<b>data_deps: Product[]</b></div>
+<div style="margin-left:63px"><span class="label"><a name="11852">4.22.6.2</a></span>
+Specifies dependencies of a target that are not actually linked into the current target. Such dependencies will be built and will be available at runtime.</div>
+<div style="margin-left:63px"><span class="label"><a name="11853">4.22.6.3</a></span>
+This is normally used for things like plugins or helper programs that a target needs at runtime.</div>
+<div style="margin-left:63px"><span class="label"><a name="11855">4.22.6.4</a></span>
+See also <a href="#11831">deps</a> and <a href="#11856">data</a>.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11764">4.22.7</a></span>
+inputs</h4>
+<div style="margin-left:63px"><span class="label"><a name="11767">4.22.7.1</a></span>
+<b>inputs: Product[]</b></div>
+<div style="margin-left:63px"><span class="label"><a name="11765">4.22.7.2</a></span>
+Inputs are compile-time dependencies of the current target. This means that all inputs must be available before compiling any of the sources or executing any actions.</div>
+<div style="margin-left:63px"><span class="label"><a name="11766">4.22.7.3</a></span>
+Inputs are typically only used for <a href="#11678">Action</a> targets.</div>
+<div style="margin-left:63px"><span class="label"><a name="11771">4.22.7.4</a></span>
+TODO</div>
+<h4 style="margin-left:9px"><span class="label"><a name="11934">5</a></span>
+<b>Predeclared Enumeration Reference</b></h4>
+<div style="margin-left:27px"><span class="label"><a name="12365">5.1</a></span>
+<b>TODO</b></div>
+<div style="margin-left:27px"><span class="label"><a name="11935">5.2</a></span>
+type LibraryType = ( `static, `shared, `framework )</div>
+<div style="margin-left:27px"><span class="label"><a name="11936">5.3</a></span>
+type OsType = ( `darwin, `macos, `win32, ... )</div>
+<div style="margin-left:27px"><span class="label"><a name="11937">5.4</a></span>
+type CpuType = ( `arm, `x86, ... )</div>
+<div style="margin-left:27px"><span class="label"><a name="11938">5.5</a></span>
+type WordSize = ( `16, `32, `64, `128 )</div>
+<div style="margin-left:27px"><span class="label"><a name="11939">5.6</a></span>
+type CompilerType = ( `msvc, `gcc, `clang )</div>
+<h4 style="margin-left:9px"><span class="label"><a name="11920">6</a></span>
+<b>Predeclared Variable Reference</b></h4>
+<div style="margin-left:27px"><span class="label"><a name="12364">6.1</a></span>
+<b>TODO</b></div>
+<div style="margin-left:27px"><span class="label"><a name="11921">6.2</a></span>
+let host_cpu: CpuType</div>
+<div style="margin-left:27px"><span class="label"><a name="11922">6.3</a></span>
+let host_cpu_ver: int</div>
+<div style="margin-left:27px"><span class="label"><a name="11923">6.4</a></span>
+let host_wordsize: WordSize</div>
+<div style="margin-left:27px"><span class="label"><a name="11924">6.5</a></span>
+let host_os: OsType</div>
+<div style="margin-left:27px"><span class="label"><a name="11925">6.6</a></span>
+let host_toolchain: CompilerType</div>
+<div style="margin-left:27px"><span class="label"><a name="11926">6.7</a></span>
+let host_toolchain_ver: int</div>
+<div style="margin-left:27px"><span class="label"><a name="11933">6.8</a></span>
+let root_build_dir: path</div>
+<div style="margin-left:27px"><span class="label"><a name="12034">6.9</a></span>
+let root_source_dir: path</div>
+<div style="margin-left:27px"><span class="label"><a name="11927">6.10</a></span>
+var target_cpu: CpuType</div>
+<div style="margin-left:27px"><span class="label"><a name="11928">6.11</a></span>
+var target_cpu_ver: int</div>
+<div style="margin-left:27px"><span class="label"><a name="11929">6.12</a></span>
+var target_wordsize: WordSize</div>
+<div style="margin-left:27px"><span class="label"><a name="11930">6.13</a></span>
+var target_os: OsType</div>
+<div style="margin-left:27px"><span class="label"><a name="11931">6.14</a></span>
+var target_toolchain: CompilerType</div>
+<div style="margin-left:27px"><span class="label"><a name="11932">6.15</a></span>
+var target_toolchain_ver: int</div>
+<h4 style="margin-left:9px"><span class="label"><a name="11996">7</a></span>
+<b>Predeclared Procedure Reference</b></h4>
+<h4 style="margin-left:27px"><span class="label"><a name="12007">7.1</a></span>
+abspath</h4>
+<div style="margin-left:45px"><span class="label"><a name="12008">7.1.1</a></span>
+<b>abspath(): path</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12009">7.1.1.1</a></span>
+Returns the absolute path of the current module (i.e. the BUSY file currently analyzed)</div>
+<div style="margin-left:45px"><span class="label"><a name="12010">7.1.2</a></span>
+<b>abspath(p: path): path</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12011">7.1.2.1</a></span>
+Returns the absolute path of p relative to the current module, or p if already absolute</div>
+<div style="margin-left:45px"><span class="label"><a name="12012">7.1.3</a></span>
+<b>abspath(m: module): path</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12013">7.1.3.1</a></span>
+Returns the absolute path of the module (i.e. a subdir identifier)</div>
+<div style="margin-left:45px"><span class="label"><a name="12015">7.1.4</a></span>
+<b>abspath(m: module; p: path): path</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12016">7.1.4.1</a></span>
+Returns the absolute path of p relative to the given module.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12006">7.2</a></span>
+dump</h4>
+<div style="margin-left:45px"><span class="label"><a name="12391">7.2.1</a></span>
+This procedure is for debugging purpose. It expects one or two arguments. The first argument can be of any type; its type and value are printed to the console. The optional second argument is a string printed to the console.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12004">7.3</a></span>
+error</h4>
+<div style="margin-left:45px"><span class="label"><a name="12392">7.3.1</a></span>
+Expects one or more string arguments. Prints the concatenated arguments to the console (stderr) and halts the program.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12005">7.4</a></span>
+message</h4>
+<div style="margin-left:45px"><span class="label"><a name="12393">7.4.1</a></span>
+Expects one or more string arguments. Prints the concatenated arguments to the console (stdout).</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12050">7.5</a></span>
+<b>readstring</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12051">7.5.1</a></span>
+<b>readstring(from: path): string</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12052">7.5.1.1</a></span>
+Read the given file as UTF-8 string. Double quotes and \ are replaced by \" and \\. Line breaks and the like are replaced by space. Leading and trailing white space (blanks, line breaks) is stripped. The maximum supported file lengh is limited to 16'000 bytes.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12014">7.6</a></span>
+<b>relpath()</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12019">7.6.1</a></span>
+<b>relpath(): path</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12017">7.6.1.1</a></span>
+Returns the path relative to the root directory of the source tree</div>
+<div style="margin-left:45px"><span class="label"><a name="12020">7.6.2</a></span>
+<b>relpath(m: module): path</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12021">7.6.2.1</a></span>
+Returns the path of the module (i.e. a subdir identifier) relative to the root directory of the source tree</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11997">7.7</a></span>
+samelist</h4>
+<div style="margin-left:45px"><span class="label"><a name="12395">7.7.1</a></span>
+Expects two arguments of the same list type and compares their elements one by one in order. Returns <b>false</b>, if the elements or their number differ, and <b>true</b> otherwise.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11998">7.8</a></span>
+sameset</h4>
+<div style="margin-left:45px"><span class="label"><a name="12396">7.8.1</a></span>
+Expects two arguments of the same list type and compares their elements. The lists are treated like sets, i.e. the order of elements is insignificant and multiple copies of the same element are counted as one. Returns <b>true</b>, if both lists contain the same elements, <b>false</b> otherwise.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11999">7.9</a></span>
+toint</h4>
+<div style="margin-left:45px"><span class="label"><a name="12397">7.9.1</a></span>
+Expects one argument of real type and returns the largest int less than or equal to a given real.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12000">7.10</a></span>
+toreal</h4>
+<div style="margin-left:45px"><span class="label"><a name="12398">7.10.1</a></span>
+Expects one argument of int type and returns the same number as real type.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12001">7.11</a></span>
+tostring</h4>
+<div style="margin-left:45px"><span class="label"><a name="12399">7.11.1</a></span>
+Expects one argument of base or enumeration type und returns the string representation or the argument.</div>
+<div style="margin-left:45px"><span class="label"><a name="12400">7.11.2</a></span>
+For bool type the strings "true" or "false" are returned.</div>
+<div style="margin-left:45px"><span class="label"><a name="12401">7.11.3</a></span>
+For path types, a <code>'//'</code> prefix is changed to "/" and for a <code>// letter ':'</code> prefix is changed the two leading slashes are removed.</div>
+<div style="margin-left:45px"><span class="label"><a name="12402">7.11.4</a></span>
+For symbols only the string part without <code>`</code> prefix is returned.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12002">7.12</a></span>
+topath</h4>
+<div style="margin-left:45px"><span class="label"><a name="12403">7.12.1</a></span>
+Expects one argument of type string. Tries to convert the string into a normalized representation as specified in <a href="#12080">2.3.8 Paths</a>. If that succeeds, the path is returned, otherwise the execution halts with an error.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12003">7.13</a></span>
+warning</h4>
+<div style="margin-left:45px"><span class="label"><a name="12394">7.13.1</a></span>
+Expects one or more string arguments. Prints the concatenated arguments to the console (stderr).</div>
+</body></html>
