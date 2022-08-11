@@ -129,7 +129,7 @@ In a future version of BUSY, with the `-G` option the backend can be set, e.g. l
 
 ### Specifying builds
 
-Builds are specified using BUSY files including code written in the BUSY specification language; see [The BUSY Build System - Language and Built-ins Specification](Specification.html) for detailed information about the specification language.
+Builds are specified using BUSY files including code written in the BUSY specification language; see [The BUSY Build System - Language and Built-ins Specification](http://software.rochus-keller.ch/busy_spec.html) for detailed information about the specification language.
 
 There is a BUSY file in the root of the source tree and any subdirectory which includes files or other subdirectories relevant to the build.
 
