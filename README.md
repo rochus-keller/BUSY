@@ -1,8 +1,8 @@
 ## Welcome to the BUSY build system
 
-NOTE that this is a provisional readme and the project and documentation are work in progress.
+NOTE that this project and its documentation are work in progress.
 
-BUSY (for *BU*ild *SY*stem) is supposed to be a lean, cross-platform build system for the GCC, CLANG and MSVC toolchains, with very little system requirements and easy bootsrapping.
+BUSY (for *BU*ild *SY*stem) is a lean, cross-platform build system for the GCC, CLANG and MSVC toolchains, with very little system requirements and easy bootsrapping.
 
 Compared to other build systems like CMake, QMake, Meson or GN, BUSY is characterized by a **statically typed** build specification language, and by the possibility to build a project directly from scratch without any further requirements to the host system; BUSY is so lean that it is even suited to be directly integrated with the source tree of a project. 
 
@@ -62,7 +62,7 @@ let sources * : SourceSet {
 	]
 	.configs += ^main_config # this references the Config in the src BUSY file
 	if target_os == `linux {
-		.deps += [ gtk3.sources ]
+		.deps += gtk3.sources
 	}else if target_os == `win32 {
 		# and on and on
 	}else {
@@ -80,7 +80,7 @@ begin
 		./btext.c 
 	]
 	if target_os == `linux then
-		.deps += [ gtk3.sources ]
+		.deps += gtk3.sources
 	elsif target_os == `win32 then
 		# and on and on
 	else
@@ -123,7 +123,7 @@ With the `-T` option you can explicitly select which products should be built; e
 
 With the `-P` option parameter values can be set; the syntax is `-P x.y=value`, where value is a valid BUSY basic type literal syntax; the syntax of strings and symbols usually has to make use of command line escapes, e.g. like `-P "string_param=\"this is a string\""`. Again it is possible to set parameters of BUSY files located further down the source tree, but only if the subdirectory declarations in the designator are public.
 
-With the `-c` option only the parser and analyzer is run to check the BUSY files.
+With the `-c` option only the parser/analyzer is run to check the BUSY files. No build is run, no files or directories are generated.
 
 In a future version of BUSY, with the `-G` option the backend can be set, e.g. like `-G ninja`.
 
