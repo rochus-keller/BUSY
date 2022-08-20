@@ -176,7 +176,7 @@ The current BUSY version so far has been used with the NAppGUI framework (see ht
 - BUSY is not and doesn't want to be a full programming language
 - BUSY is no package generator or manager
 - BUSY is not a Git client
-- BUSY doesn't search for libraries or toolchains; it uses what you give it
+- BUSY doesn't search for libraries or toolchains and doesn't download anything; it uses what you give it
 - BUSY is not a C preprocessor and doesn't check #include directives
 - BUSY is no test framework, generator or manager; though it can run external scripts
 - BUSY is no replacement for Ninja; it can directly run builds to make it easier to deploy buildable code bases; for fast edit-compile-run cycles Ninja files can be generated

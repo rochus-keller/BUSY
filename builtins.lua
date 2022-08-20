@@ -219,6 +219,7 @@ proc("dump",11)
 proc("abspath",12)
 proc("relpath",13)
 proc("readstring",14)
+proc("trycompile",15)
 
 ---- built-in vars
 local function variable(name, type, ro)

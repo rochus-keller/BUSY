@@ -1388,6 +1388,166 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
     BS_END_LUA_FUNC(ctx);
 }
 
+static int checkListType(BSParserContext* ctx, int n, int t)
+{
+    lua_getfield(ctx->L,-1,"#kind");
+    const int k = lua_tointeger(ctx->L,n);
+    lua_pop(ctx->L,1);
+    if( k != BS_ListType )
+        return 0;
+    lua_getfield(ctx->L,n,"#type");
+    lua_getfield(ctx->L,-1,"#kind");
+    lua_getfield(ctx->L,-2,"#type");
+    const int err = lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != t;
+    lua_pop(ctx->L,3);
+    return !err;
+}
+
+static void trycompile(BSParserContext* ctx, int n, int row, int col)
+{
+    BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
+    if( n < 1 )
+        error2(ctx, row, col,"expecting at least one argument" );
+    lua_getfield(ctx->L,-1,"#kind");
+    lua_getfield(ctx->L,-2,"#type");
+    if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_string )
+        error2(ctx, row, col,"expecting at least one argument of string type" );
+    lua_pop(ctx->L,2);
+    const int first = lua_gettop(ctx->L) - 2 * n + 1;
+
+    lua_getfield(ctx->L,ctx->builtins,"#inst");
+    const int binst = lua_gettop(ctx->L);
+
+    lua_getfield(ctx->L,binst,"root_build_dir");
+    const int rootOutDir = lua_gettop(ctx->L);
+
+    lua_pushstring(ctx->L,"./_trycompile_.c");
+    const int tmppath = lua_gettop(ctx->L);
+    const int res = bs_add_path(ctx->L,rootOutDir,tmppath);
+    assert(res==0);
+    lua_replace(ctx->L,tmppath);
+
+    if( !bs_exists(lua_tostring(ctx->L,rootOutDir)) )
+    {
+        if( bs_mkdir(lua_tostring(ctx->L,rootOutDir)) != 0 )
+            error2(ctx, row, col,"error creating directory %s", lua_tostring(ctx->L,rootOutDir));
+    }
+
+    FILE* tmp = bs_fopen(bs_denormalize_path(lua_tostring(ctx->L,tmppath)),"w");
+    if( tmp == NULL )
+        error2(ctx, row, col,"cannot create temporary file %s", lua_tostring(ctx->L,tmppath) );
+    const int codelen = lua_objlen(ctx->L,first);
+    fwrite(lua_tostring(ctx->L,first),1,codelen,tmp);
+    fclose(tmp);
+
+    lua_getfield(ctx->L,binst,"target_toolchain");
+    const int ts = lua_gettop(ctx->L);
+
+    lua_getfield(ctx->L,binst,"host_os");
+    const int os = lua_gettop(ctx->L);
+
+    lua_pushstring(ctx->L,"");
+    const int cflags = lua_gettop(ctx->L);
+    lua_pushstring(ctx->L,"");
+    const int defines = lua_gettop(ctx->L);
+    lua_pushstring(ctx->L,"");
+    const int includes = lua_gettop(ctx->L);
+
+    lua_getfield(ctx->L,ctx->module.table, "#dir");
+    const int dir = lua_gettop(ctx->L);
+
+    if( n >= 2 )
+    {
+        // TODO: unify the following code with bsrunner addAll
+        size_t i;
+        if( !checkListType(ctx,first+1+1,BS_string) )
+            error2(ctx, row, col,"expecting argument 2 of string list type" );
+        for( i = 1; i <= lua_objlen(ctx->L,first+1); i++ )
+        {
+            lua_rawgeti(ctx->L,first+1,i);
+            lua_pushvalue(ctx->L,defines);
+            if( strstr(lua_tostring(ctx->L,-2),"\\\"") != NULL )
+                lua_pushfstring(ctx->L," \"-D%s\" ", lua_tostring(ctx->L,-2)); // strings can potentially include whitespace, thus quotes
+            else
+                lua_pushfstring(ctx->L," -D%s ", lua_tostring(ctx->L,-2));
+            lua_concat(ctx->L,2);
+            lua_replace(ctx->L,defines);
+            lua_pop(ctx->L,1); // def
+        }
+        if( n >= 3 )
+        {
+            if( !checkListType(ctx,first+2+1,BS_path) )
+                error2(ctx, row, col,"expecting argument 3 of path list type" );
+            for( i = 1; i <= lua_objlen(ctx->L,first+2); i++ )
+            {
+                lua_rawgeti(ctx->L,first+2,i);
+                const int path = lua_gettop(ctx->L);
+                if( *lua_tostring(ctx->L,-1) != '/' )
+                {
+                    // relative path
+                    if( bs_add_path(ctx->L,dir,path) != 0 )
+                        error2(ctx, row, col,"error converting to absolute path" );
+                    lua_replace(ctx->L,path);
+                }
+                lua_pushvalue(ctx->L,includes);
+                lua_pushfstring(ctx->L," -I\"%s\" ", bs_denormalize_path(lua_tostring(ctx->L,path)) );
+                lua_concat(ctx->L,2);
+                lua_replace(ctx->L,includes);
+                lua_pop(ctx->L,1); // path
+            }
+            if( n == 4 )
+            {
+                if( !checkListType(ctx,first+3+1,BS_string) )
+                    error2(ctx, row, col,"expecting argument 3 of string list type" );
+                for( i = 1; i <= lua_objlen(ctx->L,first+3); i++ )
+                {
+                    lua_pushvalue(ctx->L,cflags);
+                    lua_pushstring(ctx->L," ");
+                    lua_rawgeti(ctx->L,first+3,i);
+                    lua_concat(ctx->L,3);
+                    lua_replace(ctx->L,cflags);
+                }
+            }else if( n > 4)
+                error2(ctx, row, col,"expecting one to four arguments" );
+        }
+    }
+
+    if( strcmp( lua_tostring(ctx->L,ts), "msvc") == 0 )
+        lua_pushstring(ctx->L,"cl /nologo /c ");
+    else
+    {
+        lua_pushvalue(ctx->L,ts); // RISK
+        lua_pushstring(ctx->L," -c ");
+        lua_concat(ctx->L,2);
+    }
+    const int cmd = lua_gettop(ctx->L);
+
+    lua_pushvalue(ctx->L,cmd);
+    lua_pushvalue(ctx->L,cflags);
+    lua_pushvalue(ctx->L,includes);
+    lua_pushvalue(ctx->L,defines);
+    lua_pushfstring(ctx->L," %s",bs_denormalize_path(lua_tostring(ctx->L,tmppath)));
+    if( strcmp(lua_tostring(ctx->L,os),"win32")==0 ||
+            strcmp(lua_tostring(ctx->L,os),"msdos")==0 ||
+            strcmp(lua_tostring(ctx->L,os),"winrt")==0 )
+        lua_pushstring(ctx->L," 2> nul");
+    else
+        lua_pushstring(ctx->L," 2>/dev/null");
+    lua_concat(ctx->L,6);
+    lua_replace(ctx->L,cmd);
+
+    //fprintf(stdout,"%s\n", lua_tostring(ctx->L,cmd));fflush(stdout); // TEST
+
+    const int res2 = !bs_exec(lua_tostring(ctx->L,cmd)); // works for all gcc, clang and cl
+
+    lua_pop(ctx->L,10); // binst, rootOutDir, tmppath, ts, os, cflags, defines, includes, dir, cmd
+
+    lua_pushboolean(ctx->L,res2);
+    lua_getfield(ctx->L,ctx->builtins,"bool");
+
+    BS_END_LUA_FUNC(ctx);
+}
+
 static int expression(BSParserContext* ctx, BSScope* scope, int lhsType);
 
 static void evalCall(BSParserContext* ctx, BSScope* scope)
@@ -1481,6 +1641,9 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
         break;
     case 14:
         readstring(ctx,n,lpar.loc.row, lpar.loc.col);
+        break;
+    case 15:
+        trycompile(ctx,n,lpar.loc.row, lpar.loc.col);
         break;
     default:
         error2(ctx, lpar.loc.row, lpar.loc.col,"procedure not yet implemented" );

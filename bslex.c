@@ -61,7 +61,6 @@ static void readchar(BSLexer* l)
     }else
     {
         l->ch = unicode_decode_utf8(l->pos, &l->n);
-        const char tmp = l->ch;
         if( l->n == 0 || l->n > (l->end - l->pos) )
         {
             fprintf(stderr, "file has invalid utf-8 format: %s\n", l->filepath);
@@ -733,7 +732,11 @@ static BSToken string(BSLexer* l)
     while( l->pos < l->end )
     {
         readchar(l);
-        if( l->ch == '\\' )
+        if( l->ch == '\n' )
+        {
+            l->loc.row++;
+            l->loc.col = 0;
+        }else if( l->ch == '\\' )
         {
             if( l->pos[1] == '"' || l->pos[1] == '\\' ) // valid escapes are \\ and \"
                 readchar(l);
