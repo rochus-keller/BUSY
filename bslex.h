@@ -36,8 +36,10 @@ typedef enum BSTokType {
     Tok_Bang,
     Tok_BangEq,
     Tok_Hash,
+    Tok_2Hash,
     Tok_Dlr,
     Tok_Percent,
+    Tok_Amp,
     Tok_2Amp,
     Tok_Lpar,
     Tok_Rpar,
@@ -74,12 +76,15 @@ typedef enum BSTokType {
     TT_Keywords,
     Tok_begin,
     Tok_class,
+    Tok_define,
     Tok_else,
     Tok_elsif,
     Tok_end,
     Tok_false,
     Tok_if,
+    Tok_import,
     Tok_in,
+    Tok_include,
     Tok_let,
     Tok_param,
     Tok_subdir,
@@ -107,15 +112,30 @@ typedef struct BSToken {
     unsigned int len: 24; // bytelen of val
     const char* val;
     BSRowCol loc;
+    const char* source;
 } BSToken;
 
-extern BSLexer* bslex_open(const char* filepath); // filepath is utf-8 and denormalized
-extern BSLexer* bslex_openFromString(const char* str, const char* sourceName);
+extern BSLexer* bslex_open(const char* filepath, const char* sourceName); // filepath is utf-8 and denormalized
+extern BSLexer* bslex_openFromString(const char* str, int len, const char* sourceName);
 extern void bslex_free(BSLexer*);
 extern BSToken bslex_next(BSLexer*);
 extern BSToken bslex_peek(BSLexer*, int off); // off = 1..
+extern const char* bslex_filepath(BSLexer*);
 extern void bslex_dump(BSToken*);
 extern const char* bslex_tostring(int tok);
+
+typedef struct BSHiLex BSHiLex; // hierarchic lexer
+
+extern BSHiLex* bslex_createhilex(const char* filepath, const char* sourceName);
+extern void bslex_freehilex(BSHiLex*);
+extern BSToken bslex_hnext(BSHiLex*);
+extern void bslex_cursetref(BSHiLex*);
+extern BSToken bslex_hpeek(BSHiLex*, int off); // off = 1..
+extern int bslex_hopen(BSHiLex*, const char* str, int len, const char* sourceName, BSRowCol orig);
+extern void bslex_addarg(BSHiLex*, const char* name, BSToken what);
+extern const char* bslex_hfilepath(BSHiLex*);
+extern int bslex_hlevelcount(BSHiLex*);
+extern BSToken bslex_hlevel(BSHiLex*, unsigned int level);
 
 
 #endif // BSLEX_H

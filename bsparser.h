@@ -32,7 +32,8 @@ typedef enum BSNodeType { // #kind
     BS_VarDecl,
     BS_FieldDecl,
     BS_BlockDef,
-    BS_ProcDef
+    BS_ProcDef,
+    BS_MacroDef
 } BSNodeType;
 
 typedef enum BSBaseType { // #type

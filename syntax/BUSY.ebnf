@@ -15,7 +15,7 @@
 // http://www.fsf.org/licensing/licenses/info/GPLv2.html and
 // http://www.gnu.org/copyleft/gpl.html.
 
-Busy ::=  { ( subdirectory | declaration | statement ) [';'] }
+Busy ::=  { ( subdirectory | declaration | statement | macrodef ) [';'] }
 
 typeref ::= designator [ '[]' ]
 // desig instead of ident because type could be an enum or class declared in some other module
@@ -34,6 +34,21 @@ subdirectory ::= subdir identdef [ ( '=' | ':=' ) ( path | ident ) ]
 //paramValue ::= ident '=' expression
 
 declaration ::= vardecl | typedecl
+
+macrodef ::= define identdef (   // rather "macro instruction"; similarities with templates; terminology is inconsistent
+	// '='  expression  ';' // NOTE the semicolon is required to indicate the end of expression without parsing everything
+	// | '(' [ ident { [','] ident } ] ')' ( body | expression ';' )
+	// | body
+	[ '(' [ ident { [','] ident } ] ')' ] body
+	)
+	// macros are regular syntax, there is no preprocessor; macros are a sequence of tokens which is
+	// inserted wherever the macro is referenced; the expressions of a macro reference are inserted
+	// into the token stream where the argument is referenced.
+body ::= '{' { ( subdirectory | declaration | statement ) [';'] } '}'
+
+// TODO: include directives, only on top-level, not in a macro
+// the include just inlines text, whereas import is a separate module and namespace;
+// what does a separate module with relative paths?
 
 vardecl ::= ( var | let | param ) identdef [ ':' typeref ] initializer
 // for all types
@@ -56,12 +71,13 @@ fielddecl ::= ident ':' typeref // typeref cannot directly be class; so we avoid
 
 identdef ::= ident ['*'|'-'|'!']
 // *..public, -..protected, !..public and default
+// TODO: allow ident concat to support macro expansion, i.e. ident { '+' ident }
 
 designator ::= ['^'|'.'] ident { \LL:2\ '.' ident  }
 // '^' points to an ident in the outer directory which is only visible if public or protected
 // use .ident in initializer block to access the object which is initialized
 
-ExpList ::= expression {',' expression}
+ExpList ::= expression { [','] expression}
 
 expression ::= SimpleExpression [ relation SimpleExpression ]
 
@@ -93,16 +109,18 @@ constructor ::= '{' block '}' | begin block end
 
 block ::= { ( declaration | \LL:2\ statement ) [';'] } 
 
-statement ::= condition | assignment | \LL:2\ call
+statement ::= condition | assigOrCall
 
 condition ::= if expression 
 	( '{' block '}' [ else ( condition | '{' block '}' ) ] // also supports if(expression){}
 	| then block { elsif expression then block } [ else block ] end
 	)
 
-assignment ::= designator ( '=' | ':=' | '+=' | '-=' | '*=' ) expression
+assigOrCall ::= designator ( assignment | call )
 
-call ::= ident '(' ExpList ')' // only built-in procedures or functions
+assignment ::= ( '=' | ':=' | '+=' | '-=' | '*=' ) expression
+
+call ::= '(' ExpList ')' // only built-in procedures or functions, or template expansion
 
 // lexer:
 ident ::=
@@ -119,5 +137,5 @@ path ::= // conceptually ['../' | './' | '//'] fsname { '/' fsname }, but no ws 
 symbol ::= // an ident prefixed with '`', or maybe '$'
 // $ is unicode category Symbol_Currency
 
-tokens- ::= '$' '#' '`' '/*' '*/' begin end then elsif ':=' 
+tokens- ::= '$' '#' '`' '/*' '*/' include import '##' '&'
 // line comments start with #, block comments framed with /* */

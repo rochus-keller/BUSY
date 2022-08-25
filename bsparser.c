@@ -39,7 +39,7 @@ typedef struct BSScope {
 } BSScope;
 
 typedef struct BSParserContext {
-    BSLexer* lex;
+    BSHiLex* lex;
     BSScope module;
     const char* dirpath;  // normalized absolute path to current dir
     const char* label; // pointer to internal of dirpath to display in error messages
@@ -51,12 +51,12 @@ typedef struct BSParserContext {
 
 static BSToken nextToken(BSParserContext* ctx)
 {
-    return bslex_next(ctx->lex);
+    return bslex_hnext(ctx->lex);
 }
 
 static BSToken peekToken(BSParserContext* ctx, int off ) // off = 1..
 {
-    return bslex_peek(ctx->lex,off);
+    return bslex_hpeek(ctx->lex,off);
 }
 
 typedef struct BSIdentDef {
@@ -66,14 +66,26 @@ typedef struct BSIdentDef {
     BSRowCol loc;
 } BSIdentDef;
 
-static void error2(BSParserContext* ctx, int row, int col, const char* format, ... )
+static void printLexerStack(BSParserContext* ctx)
 {
-    fprintf(stderr,"%s:%d:%d:ERR: ", ctx->label, row, col);
+    int i = bslex_hlevelcount(ctx->lex) - 2;
+    while(i >= 0)
+    {
+        BSToken level = bslex_hlevel(ctx->lex,i);
+        fprintf(stderr,"    instantiated from: %s:%d:%d\n", level.source, level.loc.row, level.loc.col );
+        i--;
+    }
+}
+
+static void error(BSParserContext* ctx, int row, int col, const char* format, ... )
+{
+    fprintf(stderr,"%s:%d:%d:ERR: ", bslex_hfilepath(ctx->lex), row, col);
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
     fprintf(stderr,"\n");
+    printLexerStack(ctx);
     fflush(stderr);
     lua_pushnil(ctx->L);
     lua_error(ctx->L);
@@ -81,31 +93,19 @@ static void error2(BSParserContext* ctx, int row, int col, const char* format, .
 
 static void warning(BSParserContext* ctx, int row, int col, const char* format, ... )
 {
-    fprintf(stderr,"%s:%d:%d:WRN: ", ctx->label, row, col);
+    fprintf(stderr,"%s:%d:%d:WRN: ", bslex_hfilepath(ctx->lex), row, col);
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
     fprintf(stderr,"\n");
+    printLexerStack(ctx);
     fflush(stderr);
-}
-
-static void error3(BSParserContext* ctx, BSToken* t, const char* format, ... )
-{
-    fprintf(stderr,"%s:%d:%d:ERR: ", ctx->label, t->loc.row, t->loc.col);
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    fprintf(stderr,"\n");
-    fflush(stderr);
-    lua_pushnil(ctx->L);
-    lua_error(ctx->L);
 }
 
 static void unexpectedToken(BSParserContext* ctx, BSToken* t)
 {
-    error3(ctx,t,"unexpected token: %s", bslex_tostring(t->tok) );
+    error(ctx,t->loc.row, t->loc.col,"unexpected token: %s", bslex_tostring(t->tok) );
 }
 
 #define BS_BEGIN_LUA_FUNC(ctx,diff) const int $stack = lua_gettop((ctx)->L) + diff
@@ -206,14 +206,14 @@ static void checkUnique(BSParserContext* ctx, BSScope* scope, BSIdentDef* id )
     const int isnil = lua_isnil(ctx->L,-1);
     lua_pop(ctx->L,1);
     if( !isnil )
-        error2(ctx,id->loc.row, id->loc.col,"name is not unique in scope: '%s'", name );
+        error(ctx,id->loc.row, id->loc.col,"name is not unique in scope: '%s'", name );
 }
 
 static BSIdentDef identdef(BSParserContext* ctx, BSScope* scope)
 {
     BSToken t = nextToken(ctx);
     if( t.tok != Tok_ident )
-        error2(ctx, t.loc.row, t.loc.col , "expecting an ident");
+        error(ctx, t.loc.row, t.loc.col , "expecting an ident");
     BSIdentDef res;
     res.name = t.val;
     res.len = t.len;
@@ -273,7 +273,7 @@ static void subdirectory(BSParserContext* ctx)
     const char* subdirname = id.name;
     int len = id.len;
     if( id.visi == BS_PublicDefault )
-        error2(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
+        error(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
     BSToken t = peekToken(ctx,1);
     if( t.tok == Tok_Eq || t.tok == Tok_ColonEq )
     {
@@ -292,7 +292,7 @@ static void subdirectory(BSParserContext* ctx)
                     len -= 2;
                 }
                 if( strncmp(subdirname,"//",2) == 0 || strncmp(subdirname,"..",2) == 0)
-                    error2(ctx, t.loc.row, t.loc.col,"this path is not supported here" );
+                    error(ctx, t.loc.row, t.loc.col,"this path is not supported here" );
                 if( strncmp(subdirname,".",1) == 0 )
                 {
                     subdirname += 2;
@@ -302,11 +302,11 @@ static void subdirectory(BSParserContext* ctx)
                 for( i = 0; i < len; i++ )
                 {
                     if( subdirname[i] == '/' )
-                        error2(ctx, t.loc.row, t.loc.col,"expecting an immediate subdirectory" );
+                        error(ctx, t.loc.row, t.loc.col,"expecting an immediate subdirectory" );
                 }
             }
         }else
-            error2(ctx, t.loc.row, t.loc.col,"expecting a path or an ident" );
+            error(ctx, t.loc.row, t.loc.col,"expecting a path or an ident" );
     }
 
     lua_createtable(ctx->L,0,0); // module definition
@@ -345,6 +345,96 @@ static void subdirectory(BSParserContext* ctx)
     lua_rawset(ctx->L, -3 ); // outer inst points to nested inst by name
 
     lua_pop(ctx->L,2); // module, outer inst
+
+    BS_END_LUA_FUNC(ctx);
+}
+
+static void macrodef(BSParserContext* ctx)
+{
+    BS_BEGIN_LUA_FUNC(ctx,0);
+    nextToken(ctx); // keyword
+    BSIdentDef id = identdef(ctx,&ctx->module);
+
+    lua_createtable(ctx->L,0,0);
+    const int decl = lua_gettop(ctx->L);
+    lua_pushinteger(ctx->L,BS_MacroDef);
+    lua_setfield(ctx->L,decl,"#kind");
+    lua_pushstring(ctx->L,ctx->label);
+    lua_setfield(ctx->L,decl,"#source");
+    addToScope(ctx, &ctx->module, &id, decl );
+
+    BSToken t = nextToken(ctx);
+    if( t.tok == Tok_Lpar )
+    {
+        // args
+        BSToken lpar = t;
+        t = nextToken(ctx);
+        int n = 0;
+        while( t.tok != Tok_Rpar )
+        {
+            if( t.tok == Tok_Eof )
+                error(ctx, lpar.loc.row, lpar.loc.col,"non-terminated argument list" );
+            if( t.tok == Tok_ident )
+            {
+                lua_pushlstring(ctx->L, t.val, t.len);
+                const int name = lua_gettop(ctx->L);
+                lua_getfield(ctx->L,decl,lua_tostring(ctx->L,name));
+                // check for duplicates
+                if( !lua_isnil(ctx->L,-1) )
+                    error(ctx, t.loc.row, t.loc.col,"duplicate argument name" );
+                else
+                    lua_pop(ctx->L,1);
+
+                lua_pushvalue(ctx->L,name);
+                lua_pushinteger(ctx->L,++n);
+                lua_rawset(ctx->L,decl);
+
+                lua_pushvalue(ctx->L,name);
+                lua_rawseti(ctx->L,decl,n);
+
+                lua_pop(ctx->L,1); // name
+            }else if( t.tok == Tok_Comma )
+                ; // ignore
+            else
+                error(ctx, t.loc.row, t.loc.col,"expecting an identifier or ')'" );
+
+            t = nextToken(ctx);
+        }
+        t = nextToken(ctx);
+    }
+    if( t.tok != Tok_Lbrace )
+        error(ctx, t.loc.row, t.loc.col,"expecting '{'" );
+    BSToken lbrace = t;
+    lua_pushinteger(ctx->L,lbrace.loc.row);
+    lua_setfield(ctx->L,decl,"#row");
+    lua_pushinteger(ctx->L,lbrace.loc.col);
+    lua_setfield(ctx->L,decl,"#col");
+    int n = 0;
+    while(1)
+    {
+        // TODO: should check syntax already here?
+        // i.e. that only { ( subdirectory | declaration | statement ) [';'] } appears
+        t = nextToken(ctx);
+        if( t.tok == Tok_Lbrace )
+            n++;
+        else if( t.tok == Tok_Rbrace )
+        {
+            if( n == 0 )
+                break;
+            n--;
+        }else if( t.tok == Tok_Eof )
+            error(ctx, lbrace.loc.row, lbrace.loc.col,"non-terminated macro body" );
+        else if( t.tok == Tok_Invalid )
+        {
+            lua_pushnil(ctx->L);
+            lua_error(ctx->L);
+        }
+    }
+    assert( t.tok == Tok_Rbrace );
+    lua_pushlstring(ctx->L, lbrace.val, t.val-lbrace.val+1); // include { and } in code fragment
+    lua_setfield(ctx->L,decl,"#code");
+
+    lua_pop(ctx->L,1); // decl
 
     BS_END_LUA_FUNC(ctx);
 }
@@ -394,7 +484,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         goforthis(ctx,scope);
 
         if( lua_isnil(ctx->L,-1) )
-            error2(ctx, t.loc.row, t.loc.col,"designator cannot start with '.' here" );
+            error(ctx, t.loc.row, t.loc.col,"designator cannot start with '.' here" );
         // from here we have the instance on the stack
         ret = 2;
         t = nextToken(ctx);
@@ -413,12 +503,12 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         // from here we have the module or block instance on the stack
         break;
     default:
-        error2(ctx, t.loc.row, t.loc.col, "designator must start with a '^', '.' or identifier" );
+        error(ctx, t.loc.row, t.loc.col, "designator must start with a '^', '.' or identifier" );
         break;
     }
     // here we have the first scope on stack from where we resolve the ident
     if( t.tok != Tok_ident )
-        error2(ctx, t.loc.row, t.loc.col, "expecting an identifier here" );
+        error(ctx, t.loc.row, t.loc.col, "expecting an identifier here" );
 
     // now resolve the first ident of the desig
     if( method == LocalOuter )
@@ -436,7 +526,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
                 const int visi = lua_tointeger(ctx->L,-1);
                 lua_pop(ctx->L,1);
                 if( visi == BS_Private )
-                    error2(ctx, t.loc.row, t.loc.col, "the identifier is not visible from here" );
+                    error(ctx, t.loc.row, t.loc.col, "the identifier is not visible from here" );
                 else
                 {
                     // stack: module def, decl
@@ -510,7 +600,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         }
     }
     if( lua_isnil(ctx->L,-1) )
-        error2(ctx, t.loc.row, t.loc.col,
+        error(ctx, t.loc.row, t.loc.col,
                "identifier doesn't reference a declaration; check spelling and declaration order" );
     if( method != Field )
     {
@@ -549,7 +639,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         case BS_ClassDecl:
         case BS_EnumDecl:
         case BS_ProcDef:
-            error2(ctx, t.loc.row, t.loc.col, "cannot dereference a type declaration or procedure" );
+            error(ctx, t.loc.row, t.loc.col, "cannot dereference a type declaration or procedure" );
             break;
         case BS_FieldDecl:
         case BS_VarDecl:
@@ -560,7 +650,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
 
             lua_getfield(ctx->L,-1,"#kind");
             if( lua_tointeger(ctx->L,-1) != BS_ClassDecl )
-                error2(ctx, t.loc.row, t.loc.col, "can only dereference fields or variables of class type" );
+                error(ctx, t.loc.row, t.loc.col, "can only dereference fields or variables of class type" );
             lua_pop(ctx->L,1); // kind
 
             lua_replace(ctx->L,-3); // remove the field or var decl; top is now a classdecl
@@ -574,11 +664,11 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
 
         // stack: old instance, classdecl or module decl (in case of subdir), new instance
         if( lua_isnil(ctx->L,-3) )
-            error2(ctx, t.loc.row, t.loc.col, "dereferencing a nil value" );
+            error(ctx, t.loc.row, t.loc.col, "dereferencing a nil value" );
 
         t = nextToken(ctx); // ident
         if( t.tok != Tok_ident )
-            error2(ctx, t.loc.row, t.loc.col, "expecting an ident" );
+            error(ctx, t.loc.row, t.loc.col, "expecting an ident" );
 
         if( t.loc.row != line )
         {
@@ -592,7 +682,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         // stack: old instance, derefed decl or nil, new instance
 
         if( lua_isnil(ctx->L,-2) )
-            error2(ctx, t.loc.row, t.loc.col, "unknown identifier" );
+            error(ctx, t.loc.row, t.loc.col, "unknown identifier" );
 
         lua_replace(ctx->L, -3);
         // stack: new instance, derefed decl
@@ -607,7 +697,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         case BS_VarDecl:
             lua_getfield(ctx->L,-1,"#visi");
             if( lua_tointeger(ctx->L,-1) < BS_Public )
-                error2(ctx, t.loc.row, t.loc.col, "the identifier is not visible from here" );
+                error(ctx, t.loc.row, t.loc.col, "the identifier is not visible from here" );
             lua_pop(ctx->L,1);
             break;
         }
@@ -646,7 +736,7 @@ static void enumdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
     while( t.tok != Tok_Rpar )
     {
         if( t.tok == Tok_Eof )
-            error2(ctx, lpar.loc.row, lpar.loc.col,"non-terminated enum type declaration" );
+            error(ctx, lpar.loc.row, lpar.loc.col,"non-terminated enum type declaration" );
         if( t.tok == Tok_symbol )
         {
             lua_pushlstring(ctx->L, t.val+1, t.len-1); // remove leading `
@@ -654,7 +744,7 @@ static void enumdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
             lua_getfield(ctx->L,decl,lua_tostring(ctx->L,name));
             // check for duplicates
             if( !lua_isnil(ctx->L,-1) )
-                error2(ctx, t.loc.row, t.loc.col,"duplicate field name" );
+                error(ctx, t.loc.row, t.loc.col,"duplicate field name" );
             else
                 lua_pop(ctx->L,1);
 
@@ -672,12 +762,12 @@ static void enumdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
         }else if( t.tok == Tok_Comma )
             ; // ignore
         else
-            error2(ctx, t.loc.row, t.loc.col,"%d:%d: expecting a symbol or ')'" );
+            error(ctx, t.loc.row, t.loc.col,"expecting a symbol or ')'" );
 
         t = nextToken(ctx);
     }
     if( n == 0 )
-        error2(ctx, t.loc.row, t.loc.col,"enum type cannot be empty" );
+        error(ctx, t.loc.row, t.loc.col,"enum type cannot be empty" );
 
     lua_pop(ctx->L,1); // decl
     BS_END_LUA_FUNC(ctx);
@@ -695,7 +785,7 @@ static void typeref(BSParserContext* ctx, BSScope* scope)
     const int kind = lua_tointeger(ctx->L,-1);
     lua_pop(ctx->L,1);
     if( kind != BS_BaseType && kind != BS_ClassDecl && kind != BS_EnumDecl ) // we don't support lists of lists
-        error2(ctx, t.loc.row, t.loc.col,"designator doesn't point to a valid type" );
+        error(ctx, t.loc.row, t.loc.col,"designator doesn't point to a valid type" );
 
     t = peekToken(ctx,1);
     if( t.tok == Tok_LbrackRbrack )
@@ -740,7 +830,7 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
         assert( !lua_isnil(ctx->L,-1) );
         lua_getfield(ctx->L,-1,"#kind");
         if( lua_tointeger(ctx->L,-1) != BS_ClassDecl )
-            error2(ctx, t.loc.row, t.loc.col,"invalid superclass" );
+            error(ctx, t.loc.row, t.loc.col,"invalid superclass" );
         lua_pop(ctx->L,1); // kind
         const int super = lua_gettop(ctx->L);
 
@@ -762,7 +852,7 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
 
         t = nextToken(ctx);
         if( t.tok != Tok_Rpar )
-            error2(ctx, t.loc.row, t.loc.col ,"expecting ')'");
+            error(ctx, t.loc.row, t.loc.col ,"expecting ')'");
         t = peekToken(ctx,1);
 
         lua_pop(ctx->L,1); // super
@@ -778,9 +868,9 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
     while( !endOfBlock(&t,pascal) )
     {
         if( t.tok == Tok_Eof )
-            error2(ctx, cls.loc.row, cls.loc.col,"non-terminated class declaration" );
+            error(ctx, cls.loc.row, cls.loc.col,"non-terminated class declaration" );
         if( t.tok != Tok_ident )
-            error2(ctx, t.loc.row, t.loc.col,"expecting identifier" );
+            error(ctx, t.loc.row, t.loc.col,"expecting identifier" );
 
         lua_pushlstring(ctx->L,t.val,t.len);
         const int name = lua_gettop(ctx->L);
@@ -788,7 +878,7 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
         lua_getfield(ctx->L,clsDecl,lua_tostring(ctx->L,name));
         // check for duplicates
         if( !lua_isnil(ctx->L,-1) )
-            error2(ctx, t.loc.row, t.loc.col,"duplicate field name" );
+            error(ctx, t.loc.row, t.loc.col,"duplicate field name" );
         else
             lua_pop(ctx->L,1);
 
@@ -814,7 +904,7 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
 
         t = nextToken(ctx);
         if( t.tok != Tok_Colon )
-            error2(ctx, t.loc.row, t.loc.col,"expecting ':'" );
+            error(ctx, t.loc.row, t.loc.col,"expecting ':'" );
 
         t = peekToken(ctx,1);
         typeref(ctx,scope);
@@ -823,7 +913,7 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
         const int kind = lua_tointeger(ctx->L, -1);
         lua_pop(ctx->L,1);
         if( kind == BS_ClassDecl )
-            error2(ctx, t.loc.row, t.loc.col,"fields cannot be of class type; use a list instead" );
+            error(ctx, t.loc.row, t.loc.col,"fields cannot be of class type; use a list instead" );
             // otherwise we have no default initializer; the default initializer of enum is its first item
 
         lua_setfield(ctx->L,field,"#type"); // field points to its type
@@ -844,10 +934,10 @@ static void typedecl(BSParserContext* ctx, BSScope* scope)
     nextToken(ctx); // keyword
     BSIdentDef id = identdef(ctx, scope);
     if( id.visi == BS_PublicDefault )
-        error2(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
+        error(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
     BSToken t = nextToken(ctx);
     if( t.tok != Tok_Eq )
-        error2(ctx, t.loc.row, t.loc.col,"expecting '='" );
+        error(ctx, t.loc.row, t.loc.col,"expecting '='" );
     t = peekToken(ctx,1);
     switch( t.tok )
     {
@@ -858,7 +948,7 @@ static void typedecl(BSParserContext* ctx, BSScope* scope)
         classdecl(ctx,scope,&id);
         break;
     default:
-        error2(ctx, t.loc.row, t.loc.col,"invalid type declaration" );
+        error(ctx, t.loc.row, t.loc.col,"invalid type declaration" );
     }
 
     BS_END_LUA_FUNC(ctx);
@@ -975,18 +1065,18 @@ static void samelist(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n != 2 )
-        error2(ctx, row, col,"expecting two arguments" );
+        error(ctx, row, col,"expecting two arguments" );
     const int arg1 = lua_gettop(ctx->L) - 4 + 1;
     const int arg2 = arg1 + 2;
     lua_getfield(ctx->L,arg1+1,"#kind");
     lua_getfield(ctx->L,arg2+1,"#kind");
     if( lua_tointeger(ctx->L,-1) != BS_ListType || lua_tointeger(ctx->L,-2) != BS_ListType )
-        error2(ctx, row, col,"expecting two arguments of list type");
+        error(ctx, row, col,"expecting two arguments of list type");
     lua_pop(ctx->L,2);
     lua_getfield(ctx->L,arg1+1,"#type");
     lua_getfield(ctx->L,arg2+1,"#type");
     if( !sameType(ctx,-2,-1) )
-        error2(ctx, row, col,"expecting two arguments of same list type" );
+        error(ctx, row, col,"expecting two arguments of same list type" );
     lua_pop(ctx->L,2);
 
     const int nl = lua_objlen(ctx->L,arg1);
@@ -1015,18 +1105,18 @@ static void sameset(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n != 2 )
-        error2(ctx, row, col,"expecting two arguments" );
+        error(ctx, row, col,"expecting two arguments" );
     const int arg1 = lua_gettop(ctx->L) - 4 + 1;
     const int arg2 = arg1 + 2;
     lua_getfield(ctx->L,arg1+1,"#kind");
     lua_getfield(ctx->L,arg2+1,"#kind");
     if( lua_tointeger(ctx->L,-1) != BS_ListType || lua_tointeger(ctx->L,-2) != BS_ListType )
-        error2(ctx, row, col,"expecting two arguments of list type" );
+        error(ctx, row, col,"expecting two arguments of list type" );
     lua_pop(ctx->L,2);
     lua_getfield(ctx->L,arg1+1,"#type");
     lua_getfield(ctx->L,arg2+1,"#type");
     if( !sameType(ctx,-2,-1) )
-        error2(ctx, row, col,"expecting two arguments of same list type" );
+        error(ctx, row, col,"expecting two arguments of same list type" );
     lua_pop(ctx->L,2);
 
     const int nl = lua_objlen(ctx->L,arg1);
@@ -1072,7 +1162,7 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
             lua_getmetatable(ctx->L,-2);
             lua_getfield(ctx->L,-1,"#kind");
             if( lua_tointeger(ctx->L,-1) != BS_ModuleDef )
-                error2(ctx, row, col,"invalid argument type" );
+                error(ctx, row, col,"invalid argument type" );
             lua_pop(ctx->L,1);
             lua_getfield(ctx->L,-1,"#dir");
             lua_replace(ctx->L,-2);
@@ -1081,7 +1171,7 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
             lua_getfield(ctx->L,-1,"#kind");
             lua_getfield(ctx->L,-2,"#type");
             if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_path )
-                error2(ctx, row, col,"expecting argument of type path" );
+                error(ctx, row, col,"expecting argument of type path" );
             lua_pop(ctx->L,2);
             if( *lua_tostring(ctx->L,-2) == '/' )
                 lua_pushvalue(ctx->L,-2);
@@ -1089,7 +1179,7 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
             {
                 lua_getfield(ctx->L,ctx->module.table,"#dir");
                 if( bs_add_path(ctx->L,-1,-3) != 0 )
-                    error2(ctx, row, col,"cannot convert this path" );
+                    error(ctx, row, col,"cannot convert this path" );
             }
             lua_replace(ctx->L,-2);
         }
@@ -1099,10 +1189,10 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
         lua_getfield(ctx->L,-1,"#kind");
         lua_getfield(ctx->L,-2,"#type");
         if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_path )
-            error2(ctx, row, col,"expecting second argument of type path" );
+            error(ctx, row, col,"expecting second argument of type path" );
         lua_pop(ctx->L,2);
         if( !lua_isnil(ctx->L,-3) || !lua_istable(ctx->L,-4) )
-            error2(ctx, row, col,"expecting first argument of module type" );
+            error(ctx, row, col,"expecting first argument of module type" );
         if( *lua_tostring(ctx->L,-2) == '/' )
             lua_pushvalue(ctx->L,-2);
             // stack: v1, m, v2, t2, v2
@@ -1115,7 +1205,7 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
             lua_replace(ctx->L,-2);
             // v1, t1, v2, t2, dir
             if( bs_add_path(ctx->L,-1,-3) != 0 )
-                error2(ctx, row, col,"cannot convert this path" );
+                error(ctx, row, col,"cannot convert this path" );
             // v1, t1, v2, t2, dir, path
             lua_replace(ctx->L,-2);
             // v1, t1, v2, t2, path
@@ -1123,7 +1213,7 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
         lua_getfield(ctx->L,ctx->builtins, "path");
         // dir, t
     }else
-        error2(ctx, row, col,"expecting zero, one or two arguments" );
+        error(ctx, row, col,"expecting zero, one or two arguments" );
     BS_END_LUA_FUNC(ctx);
 }
 
@@ -1131,11 +1221,11 @@ static void readstring(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n != 1 )
-        error2(ctx, row, col,"expecting one argument" );
+        error(ctx, row, col,"expecting one argument" );
     lua_getfield(ctx->L,-1,"#kind");
     lua_getfield(ctx->L,-2,"#type");
     if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_path )
-        error2(ctx, row, col,"expecting one argument of type path" );
+        error(ctx, row, col,"expecting one argument of type path" );
     lua_pop(ctx->L,2);
 
     // stack: value, type
@@ -1143,7 +1233,7 @@ static void readstring(BSParserContext* ctx, int n, int row, int col)
     {
         lua_getfield(ctx->L,ctx->module.table,"#dir");
         if( bs_add_path(ctx->L,-1,-3) != 0 )
-            error2(ctx, row, col,"cannot convert this path" );
+            error(ctx, row, col,"cannot convert this path" );
         // stack: rel, type, field, abs
         lua_replace(ctx->L,-4);
         lua_pop(ctx->L,1);
@@ -1151,23 +1241,23 @@ static void readstring(BSParserContext* ctx, int n, int row, int col)
 
     FILE* f = bs_fopen(bs_denormalize_path(lua_tostring(ctx->L,-2)),"r");
     if( f == NULL )
-        error2(ctx, row, col,"cannot open file for reading: %s", lua_tostring(ctx->L,-2) );
+        error(ctx, row, col,"cannot open file for reading: %s", lua_tostring(ctx->L,-2) );
     fseek(f, 0L, SEEK_END);
     int sz = ftell(f);
     if( sz < 0 )
-        error2(ctx, row, col,"cannot determine file size: %s", lua_tostring(ctx->L,-2) );
+        error(ctx, row, col,"cannot determine file size: %s", lua_tostring(ctx->L,-2) );
     rewind(f);
     if( sz > 16000 )
-        error2(ctx, row, col,"file is too big to be read: %s", lua_tostring(ctx->L,-2) );
+        error(ctx, row, col,"file is too big to be read: %s", lua_tostring(ctx->L,-2) );
     char* tmp1 = (char*) malloc(sz+1);
     char* tmp2 = (char*) malloc(2*sz+1);
     if( tmp1 == NULL || tmp2 == NULL )
-        error2(ctx, row, col,"not enough memory to read file: %s", lua_tostring(ctx->L,-2) );
+        error(ctx, row, col,"not enough memory to read file: %s", lua_tostring(ctx->L,-2) );
     if( fread(tmp1,1,sz,f) != (size_t)sz )
     {
         free(tmp1);
         free(tmp2);
-        error2(ctx, row, col,"error reading file: %s", lua_tostring(ctx->L,-2) );
+        error(ctx, row, col,"error reading file: %s", lua_tostring(ctx->L,-2) );
     }
     tmp1[sz] = 0;
     char* p = tmp1;
@@ -1181,7 +1271,7 @@ static void readstring(BSParserContext* ctx, int n, int row, int col)
         {
             free(tmp1);
             free(tmp2);
-            error2(ctx, row, col,"invalid utf-8 format: %s", lua_tostring(ctx->L,-2) );
+            error(ctx, row, col,"invalid utf-8 format: %s", lua_tostring(ctx->L,-2) );
         }
         if( unicode_isspace(ch) && q == tmp2 )
             ; // swallow leading white space
@@ -1239,15 +1329,15 @@ static void relpath(BSParserContext* ctx, int n, int row, int col)
             lua_getmetatable(ctx->L,-2);
             lua_getfield(ctx->L,-1,"#kind");
             if( lua_tointeger(ctx->L,-1) != BS_ModuleDef )
-                error2(ctx, row, col,"invalid argument type" );
+                error(ctx, row, col,"invalid argument type" );
             lua_pop(ctx->L,1);
             lua_getfield(ctx->L,-1,"#rdir");
             lua_replace(ctx->L,-2);
             lua_getfield(ctx->L,ctx->builtins, "path");
         }else
-            error2(ctx, row, col,"invalid argument type" );
+            error(ctx, row, col,"invalid argument type" );
     }else
-        error2(ctx, row, col,"expecting zero or one arguments" );
+        error(ctx, row, col,"expecting zero or one arguments" );
     BS_END_LUA_FUNC(ctx);
 }
 
@@ -1255,11 +1345,11 @@ static void toint(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n != 1 )
-        error2(ctx, row, col,"expecting one argument" );
+        error(ctx, row, col,"expecting one argument" );
     lua_getfield(ctx->L,-1,"#kind");
     lua_getfield(ctx->L,-2,"#type");
     if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_real )
-        error2(ctx, row, col,"expecting one argument of type real" );
+        error(ctx, row, col,"expecting one argument of type real" );
     lua_pop(ctx->L,2);
     lua_pushinteger(ctx->L, lua_tonumber(ctx->L,-2));
     lua_getfield(ctx->L,ctx->builtins, "int");
@@ -1270,11 +1360,11 @@ static void toreal(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n != 1 )
-        error2(ctx, row, col,"expecting one argument" );
+        error(ctx, row, col,"expecting one argument" );
     lua_getfield(ctx->L,-1,"#kind");
     lua_getfield(ctx->L,-2,"#type");
     if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_integer )
-        error2(ctx, row, col,"expecting one argument of type integer" );
+        error(ctx, row, col,"expecting one argument of type integer" );
     lua_pop(ctx->L,2);
     lua_pushnumber(ctx->L, lua_tointeger(ctx->L,-2));
     lua_getfield(ctx->L,ctx->builtins, "real");
@@ -1285,12 +1375,12 @@ static void tostring(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n != 1 )
-        error2(ctx, row, col,"expecting one argument" );
+        error(ctx, row, col,"expecting one argument" );
     lua_getfield(ctx->L,-1,"#kind");
     lua_getfield(ctx->L,-2,"#type");
     const int k = lua_tointeger(ctx->L,-2);
     if( k != BS_BaseType && k != BS_EnumDecl )
-        error2(ctx, row, col,"expecting one argument of a base type" );
+        error(ctx, row, col,"expecting one argument of a base type" );
     const int type = lua_tointeger(ctx->L,-1);
     lua_pop(ctx->L,2);
     switch(type)
@@ -1313,11 +1403,11 @@ static void topath(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n != 1 )
-        error2(ctx, row, col,"expecting one argument" );
+        error(ctx, row, col,"expecting one argument" );
     lua_getfield(ctx->L,-1,"#kind");
     lua_getfield(ctx->L,-2,"#type");
     if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_string )
-        error2(ctx, row, col,"expecting one argument of string type" );
+        error(ctx, row, col,"expecting one argument of string type" );
     lua_pop(ctx->L,2);
     const char* str = lua_tostring(ctx->L,-2);
 
@@ -1327,13 +1417,13 @@ static void topath(BSParserContext* ctx, int n, int row, int col)
     case BS_OK:
         break;
     case BS_NotSupported:
-        error2(ctx, row, col,"this path format is not supported" );
+        error(ctx, row, col,"this path format is not supported" );
         break;
     case BS_InvalidFormat:
-        error2(ctx, row, col,"this path format is invalid" );
+        error(ctx, row, col,"this path format is invalid" );
         break;
     case BS_OutOfSpace:
-        error2(ctx, row, col,"this path is too long to be handled" );
+        error(ctx, row, col,"this path is too long to be handled" );
         break;
     case BS_NOP:
         assert(0);
@@ -1350,7 +1440,7 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n < 1 )
-        error2(ctx, row, col,"expecting at least one argument" );
+        error(ctx, row, col,"expecting at least one argument" );
     int i;
     const int first = lua_gettop(ctx->L) - 2 * n + 1;
     for( i = 0; i < n; i++ )
@@ -1359,7 +1449,7 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
         lua_getfield(ctx->L,value+1,"#kind");
         lua_getfield(ctx->L,value+1,"#type");
         if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_string )
-            error2(ctx, row, col,"expecting one or more arguments of type string" );
+            error(ctx, row, col,"expecting one or more arguments of type string" );
         lua_pop(ctx->L,2);
         lua_pushvalue(ctx->L,value);
     }
@@ -1407,11 +1497,11 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
     if( n < 1 )
-        error2(ctx, row, col,"expecting at least one argument" );
+        error(ctx, row, col,"expecting at least one argument" );
     lua_getfield(ctx->L,-1,"#kind");
     lua_getfield(ctx->L,-2,"#type");
     if( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_string )
-        error2(ctx, row, col,"expecting at least one argument of string type" );
+        error(ctx, row, col,"expecting at least one argument of string type" );
     lua_pop(ctx->L,2);
     const int first = lua_gettop(ctx->L) - 2 * n + 1;
 
@@ -1430,12 +1520,12 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
     if( !bs_exists(lua_tostring(ctx->L,rootOutDir)) )
     {
         if( bs_mkdir(lua_tostring(ctx->L,rootOutDir)) != 0 )
-            error2(ctx, row, col,"error creating directory %s", lua_tostring(ctx->L,rootOutDir));
+            error(ctx, row, col,"error creating directory %s", lua_tostring(ctx->L,rootOutDir));
     }
 
     FILE* tmp = bs_fopen(bs_denormalize_path(lua_tostring(ctx->L,tmppath)),"w");
     if( tmp == NULL )
-        error2(ctx, row, col,"cannot create temporary file %s", lua_tostring(ctx->L,tmppath) );
+        error(ctx, row, col,"cannot create temporary file %s", lua_tostring(ctx->L,tmppath) );
     const int codelen = lua_objlen(ctx->L,first);
     fwrite(lua_tostring(ctx->L,first),1,codelen,tmp);
     fclose(tmp);
@@ -1461,7 +1551,7 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
         // TODO: unify the following code with bsrunner addAll
         size_t i;
         if( !checkListType(ctx,first+1+1,BS_string) )
-            error2(ctx, row, col,"expecting argument 2 of string list type" );
+            error(ctx, row, col,"expecting argument 2 of string list type" );
         for( i = 1; i <= lua_objlen(ctx->L,first+1); i++ )
         {
             lua_rawgeti(ctx->L,first+1,i);
@@ -1477,7 +1567,7 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
         if( n >= 3 )
         {
             if( !checkListType(ctx,first+2+1,BS_path) )
-                error2(ctx, row, col,"expecting argument 3 of path list type" );
+                error(ctx, row, col,"expecting argument 3 of path list type" );
             for( i = 1; i <= lua_objlen(ctx->L,first+2); i++ )
             {
                 lua_rawgeti(ctx->L,first+2,i);
@@ -1486,7 +1576,7 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
                 {
                     // relative path
                     if( bs_add_path(ctx->L,dir,path) != 0 )
-                        error2(ctx, row, col,"error converting to absolute path" );
+                        error(ctx, row, col,"error converting to absolute path" );
                     lua_replace(ctx->L,path);
                 }
                 lua_pushvalue(ctx->L,includes);
@@ -1498,7 +1588,7 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
             if( n == 4 )
             {
                 if( !checkListType(ctx,first+3+1,BS_string) )
-                    error2(ctx, row, col,"expecting argument 3 of string list type" );
+                    error(ctx, row, col,"expecting argument 3 of string list type" );
                 for( i = 1; i <= lua_objlen(ctx->L,first+3); i++ )
                 {
                     lua_pushvalue(ctx->L,cflags);
@@ -1508,7 +1598,7 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
                     lua_replace(ctx->L,cflags);
                 }
             }else if( n > 4)
-                error2(ctx, row, col,"expecting one to four arguments" );
+                error(ctx, row, col,"expecting one to four arguments" );
         }
     }
 
@@ -1549,6 +1639,128 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
 }
 
 static int expression(BSParserContext* ctx, BSScope* scope, int lhsType);
+static void vardecl(BSParserContext* ctx, BSScope* scope);
+static void condition(BSParserContext* ctx, BSScope* scope);
+static void assigOrCall(BSParserContext* ctx, BSScope* scope);
+
+static int isempty(const char* str, int len)
+{
+    int i;
+    for( i = 0; i < len; i++ )
+        if( !isspace(str[i]) )
+            return 0;
+    return 1;
+}
+
+static void evalInst(BSParserContext* ctx, BSScope* scope)
+{
+    // in: declaration
+    BS_BEGIN_LUA_FUNC(ctx,0);
+    const int templ = lua_gettop(ctx->L);
+
+    BSToken t = nextToken(ctx);
+    if( t.tok != Tok_Lpar)
+        error(ctx, t.loc.row, t.loc.col,"expecting '('" );
+    BSToken lpar = t;
+    bslex_cursetref(ctx->lex); // lpar will be the pos shown in lexer stack
+
+    size_t n = 0;
+    BSToken start;
+    start.tok = 0;
+    while( 1 )
+    {
+        t = nextToken(ctx);
+        if( start.tok == 0 )
+            start = t;
+        if( t.tok == Tok_Rpar || t.tok == Tok_Comma )
+        {
+            if( n > 0 || !isempty(start.val, t.val - start.val) )
+            {
+                n++;
+                BSToken* u = (BSToken*)lua_newuserdata(ctx->L, sizeof(BSToken));
+                *u = start;
+                u->len = t.val - start.val;
+                start.tok = 0;
+            }
+            if( t.tok == Tok_Rpar )
+                break;
+        }else if( t.tok == Tok_Eof )
+            break;
+    }
+    if( t.tok != Tok_Rpar )
+        error(ctx, lpar.loc.row, lpar.loc.col,"argument list not terminated" );
+    if( n != lua_objlen(ctx->L,templ) )
+        error(ctx, t.loc.row, t.loc.col,"number of actual doesn't fit number of formal arguments" );
+
+    lua_getfield(ctx->L,templ,"#code");
+    const int code = lua_gettop(ctx->L);
+
+    lua_getfield(ctx->L,templ,"#row");
+    lua_getfield(ctx->L,templ,"#col");
+    const BSRowCol orig = { lua_tointeger(ctx->L,-2), lua_tointeger(ctx->L,-1) };
+    lua_pop(ctx->L,2);
+    lua_getfield(ctx->L,templ,"#source");
+    const int source = lua_gettop(ctx->L);
+
+    bslex_hopen(ctx->lex,lua_tostring(ctx->L,code), lua_objlen(ctx->L,code),lua_tostring(ctx->L,source), orig);
+    t = nextToken(ctx);
+    if( t.tok != Tok_Lbrace )
+        error(ctx, t.loc.row, t.loc.col,"internal error" );
+
+    size_t i;
+    for( i = 1; i <= n; i++ )
+    {
+        lua_rawgeti(ctx->L,templ,i);
+        const BSToken* arg = (const BSToken*)lua_touserdata(ctx->L,templ+i);
+        bslex_addarg(ctx->lex,lua_tostring(ctx->L,-1), *arg);
+        lua_pop(ctx->L,1);
+    }
+    if( n )
+        lua_pop(ctx->L, n);
+
+    t = peekToken(ctx,1);
+    while( !endOfBlock(&t,0) && t.tok != Tok_Eof )
+    {
+        if( t.tok == Tok_subdir && &ctx->module == scope )
+            subdirectory(ctx);
+        else
+            switch( t.tok )
+            {
+            case Tok_var:
+            case Tok_let:
+            case Tok_param:
+                vardecl(ctx, scope);
+                break;
+            case Tok_type:
+                typedecl(ctx, scope);
+                break;
+            case Tok_if:
+                condition(ctx, scope);
+                break;
+            case Tok_Hat:
+            case Tok_Dot:
+            case Tok_ident:
+                assigOrCall(ctx,scope);
+                break;
+            default:
+                unexpectedToken(ctx, &t);
+                break;
+            }
+
+        t = peekToken(ctx,1);
+        if( t.tok == Tok_Semi )
+        {
+            nextToken(ctx); // eat it
+            t = peekToken(ctx,1);
+        }
+    }
+    t = nextToken(ctx);
+    if( t.tok != Tok_Rbrace )
+        error(ctx, t.loc.row, t.loc.col,"internal error" );
+
+    lua_pop(ctx->L,2); // code, source
+    BS_END_LUA_FUNC(ctx);
+}
 
 static void evalCall(BSParserContext* ctx, BSScope* scope)
 {
@@ -1559,14 +1771,14 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
 
     BSToken t = nextToken(ctx);
     if( t.tok != Tok_Lpar)
-        error2(ctx, t.loc.row, t.loc.col,"expecting '('" );
+        error(ctx, t.loc.row, t.loc.col,"expecting '('" );
     BSToken lpar = t;
 
     lua_getfield(ctx->L,proc,"#kind");
     const int kind = lua_tointeger(ctx->L,-1);
     lua_pop(ctx->L,1);
     if( kind != BS_ProcDef )
-        error2(ctx, lpar.loc.row, lpar.loc.col,"the designated object is not callable" );
+        error(ctx, lpar.loc.row, lpar.loc.col,"the designated object is not callable" );
 
     t = peekToken(ctx,1);
     int n = 0;
@@ -1584,7 +1796,7 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
     if( t.tok == Tok_Rpar )
         nextToken(ctx);
     else
-        error2(ctx, lpar.loc.row, lpar.loc.col,"argument list not terminated" );
+        error(ctx, lpar.loc.row, lpar.loc.col,"argument list not terminated" );
 
     lua_getfield(ctx->L,proc,"#id");
     const int id = lua_tointeger(ctx->L,-1);
@@ -1619,7 +1831,7 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
     case 11: // dump
         {
             if( n == 0 || n > 2 )
-                error2(ctx, lpar.loc.row, lpar.loc.col,"expecting one or two arguments" );
+                error(ctx, lpar.loc.row, lpar.loc.col,"expecting one or two arguments" );
             if( n == 2 )
             {
                 fprintf(stdout,"%s: ", lua_tostring(ctx->L,lua_gettop(ctx->L)-2+1));
@@ -1646,7 +1858,7 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
         trycompile(ctx,n,lpar.loc.row, lpar.loc.col);
         break;
     default:
-        error2(ctx, lpar.loc.row, lpar.loc.col,"procedure not yet implemented" );
+        error(ctx, lpar.loc.row, lpar.loc.col,"procedure not yet implemented" );
     }
 
     lua_replace(ctx->L,proc+1);
@@ -1701,7 +1913,7 @@ static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark, int
     BS_BEGIN_LUA_FUNC(ctx,0); // out: value, type
     lua_getfield(ctx->L,-1,"#type");
     if( lua_tointeger(ctx->L,-1) != BS_boolean )
-        error2(ctx, qmark->loc.row, qmark->loc.col,"expecting a boolean expression left of '?'" );
+        error(ctx, qmark->loc.row, qmark->loc.col,"expecting a boolean expression left of '?'" );
     lua_pop(ctx->L,1);
 
     if( ctx->skipMode )
@@ -1710,11 +1922,11 @@ static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark, int
         expression(ctx,scope,lhsType);
         BSToken t = nextToken(ctx);
         if( t.tok != Tok_Colon )
-            error2(ctx, t.loc.row, t.loc.col,"expecting ':'" );
+            error(ctx, t.loc.row, t.loc.col,"expecting ':'" );
         expression(ctx,scope,lhsType);
         // stack: value, type, value, type
         if( !sameType(ctx, -1,-3) )
-            error2(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
+            error(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
         lua_pop(ctx->L,2); // value, type
         // here the value, type of the first expression survives
     }else
@@ -1726,12 +1938,12 @@ static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark, int
             expression(ctx,scope,lhsType);
             BSToken t = nextToken(ctx);
             if( t.tok != Tok_Colon )
-                error2(ctx, t.loc.row, t.loc.col,"expecting ':'" );
+                error(ctx, t.loc.row, t.loc.col,"expecting ':'" );
             ctx->skipMode = 1;
             expression(ctx,scope,lhsType);
             ctx->skipMode = 0;
             if( !sameType(ctx, -1,-3) )
-                error2(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
+                error(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
             lua_pop(ctx->L,2); // value, type
         }else
         {
@@ -1740,10 +1952,10 @@ static void evalIfExpr(BSParserContext* ctx, BSScope* scope, BSToken* qmark, int
             ctx->skipMode = 0;
             BSToken t = nextToken(ctx);
             if( t.tok != Tok_Colon )
-                error2(ctx, t.loc.row, t.loc.col,"expecting ':'" );
+                error(ctx, t.loc.row, t.loc.col,"expecting ':'" );
             expression(ctx,scope,lhsType);
             if( !sameType(ctx, -1,-3) )
-                error2(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
+                error(ctx, t.loc.row, t.loc.col,"expression left and right of ':' must be of same type" );
             lua_remove(ctx->L,-3);
             lua_remove(ctx->L,-3);
         }
@@ -1768,11 +1980,11 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
             lua_getfield(ctx->L,lhsType,"#kind");
             const int k = lua_tointeger(ctx->L,-1);
             if( k != BS_ListType )
-                error2(ctx, lbrack->loc.row, lbrack->loc.col,"incompatible type" );
+                error(ctx, lbrack->loc.row, lbrack->loc.col,"incompatible type" );
             lua_pop(ctx->L,1);
             lua_pushvalue(ctx->L,lhsType);
         }else
-            error2(ctx, lbrack->loc.row, lbrack->loc.col,"cannot determine list type" );
+            error(ctx, lbrack->loc.row, lbrack->loc.col,"cannot determine list type" );
     }else
     {
         int n = 0;
@@ -1793,7 +2005,7 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
             {
                 lua_getfield(ctx->L,lhsType,"#type");
                 if( !isSameOrSubclass(ctx,-1,-2) )
-                    error2(ctx, t.loc.row, t.loc.col,"the element is not compatible with the class" );
+                    error(ctx, t.loc.row, t.loc.col,"the element is not compatible with the class" );
                 // replace the type of the first expression by lhsType
                 lua_replace(ctx->L,-2);
             }// else: the assignment type check produces the error
@@ -1816,7 +2028,7 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
         {
             expression(ctx,scope,0);
             if( !sameType(ctx,type,-1) && !isSameOrSubclass(ctx,type,-1) )
-                error2(ctx, t.loc.row, t.loc.col,"all elements of the list literal must have compatible types" );
+                error(ctx, t.loc.row, t.loc.col,"all elements of the list literal must have compatible types" );
             lua_pushvalue(ctx->L,-2);
             lua_rawseti(ctx->L,list,++n);
             lua_pop(ctx->L,2);
@@ -1829,7 +2041,7 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
             }
         }
         if( t.tok == Tok_Eof )
-            error2(ctx, lbrack->loc.row, lbrack->loc.col,"non terminated array literal" );
+            error(ctx, lbrack->loc.row, lbrack->loc.col,"non terminated array literal" );
         else
             nextToken(ctx); // eat rbrack
         // stack: list, element type
@@ -1968,7 +2180,7 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
                 // stack: derefed declaration
                 evalCall(ctx,scope);
                 if( lua_isnil(ctx->L,-1) )
-                    error2(ctx, t.loc.row, t.loc.col,"cannot call this procedure like a function" );
+                    error(ctx, t.loc.row, t.loc.col,"cannot call this procedure like a function" );
             }else
             {
                 // resolved container instance + derefed declaration
@@ -1997,7 +2209,7 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
         }
         t = nextToken(ctx);
         if( t.tok != Tok_Rpar )
-            error2(ctx, t.loc.row, t.loc.col,"expecting ')' here" );
+            error(ctx, t.loc.row, t.loc.col,"expecting ')' here" );
         break;
     case Tok_Plus:
     case Tok_Minus:
@@ -2013,7 +2225,7 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
             const int b = lua_tointeger(ctx->L,-1);
             lua_pop(ctx->L,1);
             if( k != BS_BaseType || ( b != BS_integer && b != BS_real ) )
-                error2(ctx, t.loc.row, t.loc.col,"unary operator only applicable to integer or real types" );
+                error(ctx, t.loc.row, t.loc.col,"unary operator only applicable to integer or real types" );
             if( t.tok == Tok_Minus )
             {
                 lua_pushnumber(ctx->L, -lua_tonumber(ctx->L, -2));
@@ -2028,7 +2240,7 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
             const int b = lua_tointeger(ctx->L,-1);
             lua_pop(ctx->L,1);
             if( k != BS_BaseType || b != BS_boolean )
-                error2(ctx, t.loc.row, t.loc.col,"unary operator only applicable to boolean types" );
+                error(ctx, t.loc.row, t.loc.col,"unary operator only applicable to boolean types" );
             lua_pushboolean(ctx->L, !lua_toboolean(ctx->L, -2));
             lua_replace(ctx->L, -3);
         }
@@ -2061,7 +2273,7 @@ static void evalMulOp(BSParserContext* ctx, BSToken* tok)
         if( tok->tok == Tok_Star )
         {
             if( l != 1 && l != 2 )
-                error2(ctx, tok->loc.row, tok->loc.col,"only list * list or list * element supported" );
+                error(ctx, tok->loc.row, tok->loc.col,"only list * list or list * element supported" );
             lua_createtable(ctx->L,nl,0);
             const int res = lua_gettop(ctx->L);
             int i = 0, n = 0;
@@ -2109,16 +2321,16 @@ static void evalMulOp(BSParserContext* ctx, BSToken* tok)
             lua_replace(ctx->L,lhs);
             lua_pop(ctx->L,2);
         }else
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to list operand type" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to list operand type" );
     }else if( !sameType(ctx,lhs+1, rhs+1) )
-        error2(ctx, tok->loc.row, tok->loc.col,"operator requires the same type on both sides" );
+        error(ctx, tok->loc.row, tok->loc.col,"operator requires the same type on both sides" );
     else
     {
         lua_getfield(ctx->L,-1,"#kind");
         const int k = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
         if( k != BS_BaseType )
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
         lua_getfield(ctx->L,-1,"#type");
         const int t = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
@@ -2128,7 +2340,7 @@ static void evalMulOp(BSParserContext* ctx, BSToken* tok)
             if( tok->tok == Tok_2Amp )
                 lua_pushboolean(ctx->L, lua_toboolean(ctx->L,lhs) && lua_toboolean(ctx->L,rhs) );
             else
-                error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to boolean operands" );
+                error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to boolean operands" );
             lua_replace(ctx->L,lhs);
             lua_pop(ctx->L,2);
             break;
@@ -2146,14 +2358,14 @@ static void evalMulOp(BSParserContext* ctx, BSToken* tok)
                 lua_pushnumber(ctx->L, lua_tointeger(ctx->L,lhs) % lua_tointeger(ctx->L,rhs));
                 break;
             default:
-                error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to number operands" );
+                error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to number operands" );
                 break;
             }
             lua_replace(ctx->L,lhs);
             lua_pop(ctx->L,2);
             break;
         default:
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
             break;
         }
     }
@@ -2184,10 +2396,10 @@ static void addPath(BSParserContext* ctx, BSToken* tok, int lhs, int rhs)
     switch( res )
     {
     case 1:
-        error2(ctx, tok->loc.row, tok->loc.col,"right side cannot be an absolute path");
+        error(ctx, tok->loc.row, tok->loc.col,"right side cannot be an absolute path");
         break;
     case 2:
-        error2(ctx, tok->loc.row, tok->loc.col,"right side cannot be appended to given left side" );
+        error(ctx, tok->loc.row, tok->loc.col,"right side cannot be appended to given left side" );
         break;
     }
     BS_END_LUA_FUNC(ctx);
@@ -2288,7 +2500,7 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
         }else if( tok->tok == Tok_Minus )
         {
             if( l != 1 && l != 2 )
-                error2(ctx, tok->loc.row, tok->loc.col,"only list minus list or list minus element supported" );
+                error(ctx, tok->loc.row, tok->loc.col,"only list minus list or list minus element supported" );
             lua_createtable(ctx->L,nl,0);
             const int res = lua_gettop(ctx->L);
             int i = 0, n = 0;
@@ -2322,17 +2534,17 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
             lua_replace(ctx->L,lhs);
             lua_pop(ctx->L,2);
         }else
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to list operand type" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to list operand type" );
     }else if( !sameType(ctx,lhs+1, rhs+1) )
     {
-        error2(ctx, tok->loc.row, tok->loc.col,"operator requires the same type on both sides" );
+        error(ctx, tok->loc.row, tok->loc.col,"operator requires the same type on both sides" );
     }else
     {
         lua_getfield(ctx->L,lhs+1,"#kind");
         const int k = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
         if( k != BS_BaseType )
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
         lua_getfield(ctx->L,lhs+1,"#type");
         const int t = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
@@ -2343,7 +2555,7 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
             {
                 lua_pushboolean(ctx->L, lua_toboolean(ctx->L,lhs) || lua_toboolean(ctx->L,rhs) );
             }else
-                error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to boolean operands" );
+                error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to boolean operands" );
             lua_replace(ctx->L,lhs);
             lua_pop(ctx->L,2);
             break;
@@ -2358,7 +2570,7 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
                 lua_pushnumber(ctx->L, lua_tonumber(ctx->L,lhs) - lua_tonumber(ctx->L,rhs));
                 break;
             default:
-                error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to number operands" );
+                error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to number operands" );
                 break;
             }
             lua_replace(ctx->L,lhs);
@@ -2373,7 +2585,7 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
                 lua_replace(ctx->L,lhs);
                 lua_pop(ctx->L,2);
             }else
-                error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to string operands" );
+                error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to string operands" );
             break;
         case BS_path:
             if( tok->tok == Tok_Plus )
@@ -2382,10 +2594,10 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
                 lua_replace(ctx->L,lhs);
                 lua_pop(ctx->L,2);
             }else
-                error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to path operands" );
+                error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to path operands" );
             break;
         default:
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
             break;
         }
     }
@@ -2414,7 +2626,7 @@ static void checkAscii(BSParserContext* ctx, const char* str, BSToken* tok)
     while( *str != 0 )
     {
         if( *str & 0x80 )
-            error2(ctx, tok->loc.row, tok->loc.col,"comparison operator only applicable to ASCII strings");
+            error(ctx, tok->loc.row, tok->loc.col,"comparison operator only applicable to ASCII strings");
         str++;
     }
 }
@@ -2458,10 +2670,10 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
             lua_pop(ctx->L,3);
             lua_getfield(ctx->L,ctx->builtins,"bool");
         }else
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to operand types" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to operand types" );
     }else if( !sameType(ctx,lhs+1, rhs+1) && !isInEnum(ctx,lhs+1,rhs) && !isInEnum(ctx,rhs+1,lhs) )
     {
-        error2(ctx, tok->loc.row, tok->loc.col,"operator requires the same base type on both sides" );
+        error(ctx, tok->loc.row, tok->loc.col,"operator requires the same base type on both sides" );
     }else
     {
         lua_getfield(ctx->L,-1,"#kind");
@@ -2473,7 +2685,7 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
             const int eq = lua_equal(ctx->L,lhs,rhs);
             lua_pushboolean(ctx->L, tok->tok == Tok_2Eq ? eq : !eq );
         }else if( k != BS_BaseType )
-            error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
+            error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
         else
         {
             lua_getfield(ctx->L,-1,"#type");
@@ -2492,7 +2704,7 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
                     lua_pushboolean(ctx->L, !lua_equal(ctx->L,lhs,rhs));
                     break;
                 default:
-                    error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to operand type" );
+                    error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to operand type" );
                     break;
                 }
                 break;
@@ -2519,7 +2731,7 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
                     lua_pushboolean(ctx->L, lua_tonumber(ctx->L,lhs) >= lua_tonumber(ctx->L,rhs));
                     break;
                 default:
-                    error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to number type" );
+                    error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to number type" );
                     break;
                 }
                 break;
@@ -2553,7 +2765,7 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
                     lua_pushboolean(ctx->L, strcmp(lua_tostring(ctx->L,lhs),lua_tostring(ctx->L,rhs)) >= 0);
                     break;
                 default:
-                    error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to string type" );
+                    error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to string type" );
                     break;
                 }
                 break;
@@ -2563,10 +2775,10 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
                     const int eq = lua_equal(ctx->L,lhs,rhs);
                     lua_pushboolean(ctx->L, tok->tok == Tok_2Eq ? eq : !eq );
                 }else
-                    error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to path type" );
+                    error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to path type" );
                 break;
             default:
-                error2(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
+                error(ctx, tok->loc.row, tok->loc.col,"operator is not applicable to given operand type" );
                 break;
             }
             lua_replace(ctx->L,lhs);
@@ -2678,13 +2890,13 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
     BSToken t = nextToken(ctx);
     int kind = t.tok;
     if( kind != Tok_var && kind != Tok_let && kind != Tok_param )
-        error2(ctx, t.loc.row, t.loc.col,"expecting 'var', 'let' or 'param'");
+        error(ctx, t.loc.row, t.loc.col,"expecting 'var', 'let' or 'param'");
     BSIdentDef id = identdef(ctx, scope);
 
     if( kind == Tok_param && id.visi != BS_Private )
-        error2(ctx, id.loc.row, id.loc.col,"visibility cannot be set for parameters (assumed to be public)");
+        error(ctx, id.loc.row, id.loc.col,"visibility cannot be set for parameters (assumed to be public)");
     if( kind == Tok_param && scope != &ctx->module )
-        error2(ctx, t.loc.row, t.loc.col,"parameters are only supported on module level");
+        error(ctx, t.loc.row, t.loc.col,"parameters are only supported on module level");
 
     lua_createtable(ctx->L,0,0);
     const int var = lua_gettop(ctx->L);
@@ -2714,15 +2926,15 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         // constructor
         const int pascal = t.tok == Tok_begin;
         if( explicitType == 0 )
-            error2(ctx, t.loc.row, t.loc.col,"class instance variables require an explicit type" );
+            error(ctx, t.loc.row, t.loc.col,"class instance variables require an explicit type" );
         lua_getfield(ctx->L,explicitType,"#kind");
         if( lua_tointeger(ctx->L,-1) != BS_ClassDecl )
-            error2(ctx, t.loc.row, t.loc.col,"constructors are only supported for class instances" );
+            error(ctx, t.loc.row, t.loc.col,"constructors are only supported for class instances" );
         lua_pop(ctx->L,1);
         if( scope != &ctx->module )
-            error2(ctx, t.loc.row, t.loc.col,"class instance variables only supported on module level");
+            error(ctx, t.loc.row, t.loc.col,"class instance variables only supported on module level");
         if( kind == Tok_param )
-            error2(ctx, t.loc.row, t.loc.col,"parameter can only be of basic type" );
+            error(ctx, t.loc.row, t.loc.col,"parameter can only be of basic type" );
 
         lua_createtable(ctx->L,0,0);
         const int classInst = lua_gettop(ctx->L);
@@ -2820,7 +3032,7 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         {
             t = nextToken(ctx);
             if( t.tok != Tok_end )
-                error2(ctx, id.loc.row, id.loc.col,"expecting 'end'" );
+                error(ctx, id.loc.row, id.loc.col,"expecting 'end'" );
         }
         lua_pop(ctx->L,1); // instance
     }else if( t.tok == Tok_Eq || t.tok == Tok_ColonEq )
@@ -2832,12 +3044,12 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
             // check type compatibility with explicit type
             if( !sameType(ctx,explicitType,type) && !isSameOrSubclass(ctx,explicitType,type)
                     && !isInEnum(ctx,explicitType,type-1) )
-                error2(ctx, t.loc.row, t.loc.col,"type of the right hand expression is not compatible" );
+                error(ctx, t.loc.row, t.loc.col,"type of the right hand expression is not compatible" );
         }else
         {
             // use the expression type as the var type
             if( lua_isnil(ctx->L,type) )
-                error2(ctx, t.loc.row, t.loc.col,"type of the right hand expression cannot be infered" );
+                error(ctx, t.loc.row, t.loc.col,"type of the right hand expression cannot be infered" );
             lua_pushvalue(ctx->L,type);
             lua_setfield(ctx->L,var,"#type");
         }
@@ -2849,13 +3061,13 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         if( klt == BS_ClassDecl || klt == BS_ListType )
         {
             if( kind == Tok_param )
-                error2(ctx, t.loc.row, t.loc.col,"parameter can only be of basic type" );
+                error(ctx, t.loc.row, t.loc.col,"parameter can only be of basic type" );
 
             if( kind == Tok_var && ro > 0 )
-                error2(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to var" );
+                error(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to var" );
         }
         if( klt != BS_ClassDecl && id.visi == BS_PublicDefault )
-            error2(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
+            error(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
 
         // store the value to the var instance
         lua_getfield(ctx->L, scope->table, "#inst" );
@@ -2877,7 +3089,7 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
             if( !lua_isnil(ctx->L,-1) )
             {
                 if( !accessible )
-                    error2(ctx, id.loc.row, id.loc.col,
+                    error(ctx, id.loc.row, id.loc.col,
                            "the parameter %s cannot be set because it is not visible from the root directory",
                            lua_tostring(ctx->L,desig));
                 // remove the used param from the table
@@ -2889,14 +3101,14 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
                 uchar len;
                 const uint ch = unicode_decode_utf8((const uchar*)val, &len );
                 if( len == 0 )
-                    error2(ctx, id.loc.row, id.loc.col,"passing invalid value to parameter %s: %s",
+                    error(ctx, id.loc.row, id.loc.col,"passing invalid value to parameter %s: %s",
                            lua_tostring(ctx->L,desig), lua_tostring(ctx->L,desig+1));
                 if( unicode_isdigit(ch) || ch == '`' || ch == '$' || ch == '/' || ch == '.'
                         || ch == '\'' || ch == '"' )
                 {
                     lua_pushfstring(ctx->L, "parameter '%s': %s", lua_tostring(ctx->L,desig),
                                     lua_tostring(ctx->L,desig+1) );
-                    BSLexer* l = bslex_openFromString(lua_tostring(ctx->L,desig+1),lua_tostring(ctx->L,-1));
+                    BSLexer* l = bslex_openFromString(lua_tostring(ctx->L,desig+1),lua_objlen(ctx->L,desig+1),lua_tostring(ctx->L,-1));
                     if( l == 0 ) exit(0);
                     BSToken t = bslex_next(l);
                     bslex_free(l);
@@ -2932,7 +3144,7 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
                         push_unescaped(ctx->L,t.val+1,t.len-2); // remove ""
                         break;
                     default:
-                        error2(ctx, id.loc.row, id.loc.col,"unexpected parameter value type %s: %s",
+                        error(ctx, id.loc.row, id.loc.col,"unexpected parameter value type %s: %s",
                                lua_tostring(ctx->L,desig), lua_tostring(ctx->L,desig+1));
                         break;
                     }
@@ -2956,7 +3168,7 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
                 lua_getfield(ctx->L,var,"#type");
                 // stack: desig, valstr, valtype, val, reftype
                 if( !sameType(ctx,-1,-3) && !isInEnum(ctx,-1,-2) )
-                    error2(ctx, t.loc.row, t.loc.col,"value passed in for parameter '%s' is incompatible",
+                    error(ctx, t.loc.row, t.loc.col,"value passed in for parameter '%s' is incompatible",
                            lua_tostring(ctx->L,desig));
                 // the param value is ok, assign it
                 lua_pushlstring(ctx->L,id.name, id.len);
@@ -2970,35 +3182,19 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         lua_pop(ctx->L,3); // the value and type slot returned by expression, and inst
 
     }else
-        error2(ctx, t.loc.row, t.loc.col,"expecting '{' or '='" );
+        error(ctx, t.loc.row, t.loc.col,"expecting '{' or '='" );
 
     lua_pop(ctx->L,2); // vardecl, explicitType
     BS_END_LUA_FUNC(ctx);
 }
 
-static void call(BSParserContext* ctx, BSScope* scope)
+static void assignment(BSParserContext* ctx, BSScope* scope, int lro)
 {
-    BS_BEGIN_LUA_FUNC(ctx,0);
-    resolveInstance(ctx,scope);
-    lua_remove(ctx->L,-2);
-    // stack: derefed declaration
-    evalCall(ctx,scope);
-    lua_pop(ctx->L,2); // not using return value
-    BS_END_LUA_FUNC(ctx);
-}
-
-static void assignment(BSParserContext* ctx, BSScope* scope)
-{
-    BS_BEGIN_LUA_FUNC(ctx,0);
-    BSToken t = peekToken(ctx,1);
-    const int lro = resolveInstance(ctx,scope);
-    // resolved container instance + derefed declaration
+    BS_BEGIN_LUA_FUNC(ctx,-2);
+    // stack: resolved container instance + derefed declaration
     const int lhs = lua_gettop(ctx->L) - 1;
 
-    if( lro == 1 )
-        error2(ctx, t.loc.row, t.loc.col,"cannot modify immutable object" );
-
-    t = nextToken(ctx);
+    BSToken t = nextToken(ctx);
     switch(t.tok)
     {
     case Tok_Eq:
@@ -3008,7 +3204,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
     case Tok_StarEq:
         break;
     default:
-        error2(ctx, t.loc.row, t.loc.col,"expecting '=', '+=', '-=' or '*='" );
+        error(ctx, t.loc.row, t.loc.col,"expecting '=', '+=', '-=' or '*='" );
         break;
     }
 
@@ -3024,9 +3220,9 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
     const int same = sameType(ctx,lt,rhs+1);
     const int inenum = isInEnum(ctx,lt,rhs);
     if( !same && !(l == 1 || l == 2) && !sub  && !inenum )
-        error2(ctx, t.loc.row, t.loc.col,"left and right side are not assignment compatible" );
+        error(ctx, t.loc.row, t.loc.col,"left and right side are not assignment compatible" );
     if( l == 2 && t.tok == Tok_Eq )
-        error2(ctx, t.loc.row, t.loc.col,"cannot assign an element to a list; use += instead" );
+        error(ctx, t.loc.row, t.loc.col,"cannot assign an element to a list; use += instead" );
 
     lua_getfield(ctx->L,lt,"#kind");
     const int klt = lua_tointeger(ctx->L,-1);
@@ -3035,7 +3231,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
     if( klt == BS_ClassDecl || klt == BS_ListType )
     {
         if( lro == 0 && rro != 0 && ( t.tok == Tok_Eq || t.tok == Tok_ColonEq ) )
-            error2(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to var" );
+            error(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to var" );
     }
 
     lua_getfield(ctx->L,lt,"#type");
@@ -3111,7 +3307,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
                 lua_rawset(ctx->L,lhs);
                 break;
             default:
-                error2(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
+                error(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
                 break;
             }
             break;
@@ -3180,7 +3376,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
                 lua_rawset(ctx->L,lhs);
                 break;
             default:
-                error2(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
+                error(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
                 break;
             }
             break;
@@ -3266,7 +3462,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
                 lua_rawset(ctx->L,lhs);
                 break;
             default:
-                error2(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
+                error(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
                 break;
             }
             break;
@@ -3287,7 +3483,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
             case BS_path:
                 break;
             default:
-                error2(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
+                error(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
                 break;
             }
             break;
@@ -3301,7 +3497,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope)
             case BS_real:
                 break;
             default:
-                error2(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
+                error(ctx, t.loc.row, t.loc.col,"operator is not applicable to given operand type" );
                 break;
             }
         }
@@ -3321,7 +3517,7 @@ static void condition(BSParserContext* ctx, BSScope* scope)
     expression(ctx,scope,0);
     lua_getfield(ctx->L,-1,"#type");
     if( lua_tointeger(ctx->L,-1) != BS_boolean )
-        error2(ctx, t.loc.row, t.loc.col,"expecting a boolean if expression" );
+        error(ctx, t.loc.row, t.loc.col,"expecting a boolean if expression" );
     lua_pop(ctx->L,1); // type
     int cond = lua_toboolean(ctx->L,-2);
     lua_pop(ctx->L,2); // value, type
@@ -3343,13 +3539,13 @@ static void condition(BSParserContext* ctx, BSScope* scope)
             expression(ctx,scope,0);
             lua_getfield(ctx->L,-1,"#type");
             if( lua_tointeger(ctx->L,-1) != BS_boolean )
-                error2(ctx, t.loc.row, t.loc.col,"expecting a boolean if expression" );
+                error(ctx, t.loc.row, t.loc.col,"expecting a boolean if expression" );
             lua_pop(ctx->L,1); // type
             cond = lua_toboolean(ctx->L,-2);
             lua_pop(ctx->L,2); // value, type
             t = nextToken(ctx);
             if( t.tok != Tok_then )
-                error2(ctx, t.loc.row, t.loc.col,"expecting 'then'" );
+                error(ctx, t.loc.row, t.loc.col,"expecting 'then'" );
             if( !skipping )
                 ctx->skipMode = !( cond && !done );
             nestedblock(ctx,scope,0,&t,1);
@@ -3369,11 +3565,11 @@ static void condition(BSParserContext* ctx, BSScope* scope)
             t = nextToken(ctx);
         }
         if( t.tok != Tok_end )
-            error2(ctx, t.loc.row, t.loc.col,"expecting 'end'" );
+            error(ctx, t.loc.row, t.loc.col,"expecting 'end'" );
     }else
     {
         if( t.tok != Tok_Lbrace )
-            error2(ctx, t.loc.row, t.loc.col,"expecting '{'" );
+            error(ctx, t.loc.row, t.loc.col,"expecting '{'" );
         nestedblock(ctx,scope,0,&t,0);
         if( !skipping )
             ctx->skipMode = 0;
@@ -3394,7 +3590,7 @@ static void condition(BSParserContext* ctx, BSScope* scope)
                 nestedblock(ctx,scope,0,&t,0);
                 break;
             default:
-                error2(ctx, t.loc.row, t.loc.col,"expecting 'if' or '{'" );
+                error(ctx, t.loc.row, t.loc.col,"expecting 'if' or '{'" );
                 break;
             }
             if( !skipping )
@@ -3402,6 +3598,49 @@ static void condition(BSParserContext* ctx, BSScope* scope)
         }
     }
 
+    BS_END_LUA_FUNC(ctx);
+}
+
+static void assigOrCall(BSParserContext* ctx, BSScope* scope)
+{
+    BS_BEGIN_LUA_FUNC(ctx,0);
+    BSToken t = peekToken(ctx,1);
+    const int lro = resolveInstance(ctx,scope);
+    // stack: resolved container instance + derefed declaration
+
+    BSToken t2 = peekToken(ctx,1);
+    switch( t2.tok )
+    {
+    case Tok_Eq:
+    case Tok_ColonEq:
+    case Tok_PlusEq:
+    case Tok_MinusEq:
+    case Tok_StarEq:
+        if( lro == 1 )
+            error(ctx, t.loc.row, t.loc.col,"cannot modify immutable object" );
+        assignment(ctx, scope, lro);
+        break;
+    case Tok_Lpar:
+        lua_remove(ctx->L,-2);
+        // stack: derefed declaration
+        lua_getfield(ctx->L,-1,"#kind");
+        if( lua_tointeger(ctx->L,-1) == BS_MacroDef )
+        {
+            lua_pop(ctx->L,1);
+            evalInst(ctx,scope);
+            lua_pop(ctx->L,1);
+            // stack: --
+        }else
+        {
+            lua_pop(ctx->L,1);
+            evalCall(ctx,scope);
+            lua_pop(ctx->L,2); // not using return value
+        }
+        break;
+    default:
+        error(ctx, t.loc.row, t.loc.col,"looks like an assignment or a call, but next token doesn't fit" );
+        break;
+    }
     BS_END_LUA_FUNC(ctx);
 }
 
@@ -3413,12 +3652,16 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
     {
         if( t.tok == Tok_subdir && &ctx->module == scope )
             subdirectory(ctx);
+        else if( t.tok == Tok_define && &ctx->module == scope )
+            macrodef(ctx);
         else
             switch( t.tok )
             {
+#if 0
             case Tok_subdir:
                 subdirectory(ctx);
                 break;
+#endif
             case Tok_var:
             case Tok_let:
             case Tok_param:
@@ -3427,35 +3670,14 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
             case Tok_type:
                 typedecl(ctx, scope);
                 break;
-            case Tok_Hat:
-            case Tok_Dot:
-                // start of a designator
-                assignment(ctx, scope);
-                break;
             case Tok_if:
                 condition(ctx, scope);
                 break;
+            case Tok_Hat:
+            case Tok_Dot:
             case Tok_ident:
-                {
-                    BSToken t2 = peekToken(ctx,2);
-                    switch( t2.tok )
-                    {
-                    case Tok_Eq:
-                    case Tok_ColonEq:
-                    case Tok_PlusEq:
-                    case Tok_MinusEq:
-                    case Tok_StarEq:
-                    case Tok_Dot:
-                        assignment(ctx, scope);
-                        break;
-                    case Tok_Lpar:
-                        call(ctx, scope);
-                        break;
-                    default:
-                        error2(ctx, t.loc.row, t.loc.col,"looks like an assignment or a call, but next token doesn't fit" );
-                        break;
-                    }
-                }
+                // start of a designator
+                assigOrCall(ctx,scope);
                 break;
             default:
                 unexpectedToken(ctx, &t);
@@ -3472,11 +3694,11 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
     if( endOfBlock( &t,pascal) )
     {
         if( !inLbrace )
-            error2(ctx, t.loc.row, t.loc.col,"unexpected '%s'", bslex_tostring(t.tok) );
+            error(ctx, t.loc.row, t.loc.col,"unexpected '%s'", bslex_tostring(t.tok) );
         else if( !pascal )
             nextToken(ctx); // eat rbrace
     }else if( t.tok == Tok_Eof && inLbrace )
-        error2(ctx, inLbrace->loc.row, inLbrace->loc.col,"non-terminated block" );
+        error(ctx, inLbrace->loc.row, inLbrace->loc.col,"non-terminated block" );
     BS_END_LUA_FUNC(ctx);
 }
 
@@ -3565,7 +3787,7 @@ int bs_parse(lua_State* L)
     lua_setfield(L,BS_NewModule,"#file");
     fprintf(stdout,"# analyzing %s\n",ctx.filepath);
     fflush(stdout);
-    ctx.lex = bslex_open(bs_denormalize_path(ctx.filepath));
+    ctx.lex = bslex_createhilex(bs_denormalize_path(ctx.filepath), ctx.label);
     if( ctx.lex == 0 )
     {
         lua_pop(L,1);
@@ -3576,7 +3798,7 @@ int bs_parse(lua_State* L)
     block(&ctx,&ctx.module,0,0);
     lua_pushvalue(L,BS_NewModule);
 
-    bslex_free(ctx.lex);
+    bslex_freehilex(ctx.lex);
     BS_END_LUA_FUNC(&ctx);
     return 1;
 }
