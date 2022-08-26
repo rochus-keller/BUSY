@@ -103,9 +103,9 @@ static void warning(BSParserContext* ctx, int row, int col, const char* format, 
     fflush(stderr);
 }
 
-static void unexpectedToken(BSParserContext* ctx, BSToken* t)
+static void unexpectedToken(BSParserContext* ctx, BSToken* t, const char* where)
 {
-    error(ctx,t->loc.row, t->loc.col,"unexpected token: %s", bslex_tostring(t->tok) );
+    error(ctx,t->loc.row, t->loc.col,"unexpected token %s: %s", where, bslex_tostring(t->tok) );
 }
 
 #define BS_BEGIN_LUA_FUNC(ctx,diff) const int $stack = lua_gettop((ctx)->L) + diff
@@ -414,7 +414,7 @@ static void macrodef(BSParserContext* ctx)
     {
         // TODO: should check syntax already here?
         // i.e. that only { ( subdirectory | declaration | statement ) [';'] } appears
-        t = nextToken(ctx);
+        t = bslex_hnext(ctx->lex);
         if( t.tok == Tok_Lbrace )
             n++;
         else if( t.tok == Tok_Rbrace )
@@ -1643,15 +1643,6 @@ static void vardecl(BSParserContext* ctx, BSScope* scope);
 static void condition(BSParserContext* ctx, BSScope* scope);
 static void assigOrCall(BSParserContext* ctx, BSScope* scope);
 
-static int isempty(const char* str, int len)
-{
-    int i;
-    for( i = 0; i < len; i++ )
-        if( !isspace(str[i]) )
-            return 0;
-    return 1;
-}
-
 static void evalInst(BSParserContext* ctx, BSScope* scope)
 {
     // in: declaration
@@ -1665,25 +1656,47 @@ static void evalInst(BSParserContext* ctx, BSScope* scope)
     bslex_cursetref(ctx->lex); // lpar will be the pos shown in lexer stack
 
     size_t n = 0;
-    BSToken start;
-    start.tok = 0;
+    BSTokChain* start = 0;
+    BSTokChain* last = 0;
+    int parLevel = 1;
+    BSToken loc = lpar;
     while( 1 )
     {
-        t = nextToken(ctx);
-        if( start.tok == 0 )
-            start = t;
-        if( t.tok == Tok_Rpar || t.tok == Tok_Comma )
+        t = bslex_hnext(ctx->lex); // NOTE that these tokens come from different strings;
+                                   // we cannot simply take the string between the first and last token
+        if( t.tok == Tok_Lpar )
+            parLevel++;
+        else if( t.tok == Tok_Rpar )
+            parLevel--;
+        // NOTE parser will report error in case of unbalanced ')', so parLevel is never < 0
+        if( !(parLevel == 0 && t.tok == Tok_Rpar) && t.tok != Tok_Comma )
         {
-            if( n > 0 || !isempty(start.val, t.val - start.val) )
+            BSTokChain* ts = (BSTokChain*)malloc(sizeof(BSTokChain));
+            ts->tok = t;
+            ts->next = 0;
+            if( start == 0 )
+                start = last = ts;
+            else
+            {
+                last->next = ts;
+                last = ts;
+            }
+        }
+        if( ( parLevel == 0 && t.tok == Tok_Rpar ) || t.tok == Tok_Comma )
+        {
+            if( start )
             {
                 n++;
-                BSToken* u = (BSToken*)lua_newuserdata(ctx->L, sizeof(BSToken));
-                *u = start;
-                u->len = t.val - start.val;
-                start.tok = 0;
+                BSTokChain* ts = (BSTokChain*)malloc(sizeof(BSTokChain));
+                ts->tok = loc;
+                ts->tok.tok = 0;
+                ts->next = start;
+                lua_pushlightuserdata(ctx->L,ts);
+                start = last = 0;
             }
             if( t.tok == Tok_Rpar )
                 break;
+            loc = t;
         }else if( t.tok == Tok_Eof )
             break;
     }
@@ -1702,61 +1715,65 @@ static void evalInst(BSParserContext* ctx, BSScope* scope)
     lua_getfield(ctx->L,templ,"#source");
     const int source = lua_gettop(ctx->L);
 
-    bslex_hopen(ctx->lex,lua_tostring(ctx->L,code), lua_objlen(ctx->L,code),lua_tostring(ctx->L,source), orig);
-    t = nextToken(ctx);
-    if( t.tok != Tok_Lbrace )
-        error(ctx, t.loc.row, t.loc.col,"internal error" );
-
-    size_t i;
-    for( i = 1; i <= n; i++ )
+    if( !ctx->skipMode )
     {
-        lua_rawgeti(ctx->L,templ,i);
-        const BSToken* arg = (const BSToken*)lua_touserdata(ctx->L,templ+i);
-        bslex_addarg(ctx->lex,lua_tostring(ctx->L,-1), *arg);
-        lua_pop(ctx->L,1);
-    }
-    if( n )
-        lua_pop(ctx->L, n);
+        bslex_hopen(ctx->lex,lua_tostring(ctx->L,code), lua_objlen(ctx->L,code), lua_tostring(ctx->L,source), orig);
+        t = nextToken(ctx);
+        if( t.tok != Tok_Lbrace )
+            error(ctx, t.loc.row, t.loc.col,"internal error" );
 
-    t = peekToken(ctx,1);
-    while( !endOfBlock(&t,0) && t.tok != Tok_Eof )
-    {
-        if( t.tok == Tok_subdir && &ctx->module == scope )
-            subdirectory(ctx);
-        else
-            switch( t.tok )
-            {
-            case Tok_var:
-            case Tok_let:
-            case Tok_param:
-                vardecl(ctx, scope);
-                break;
-            case Tok_type:
-                typedecl(ctx, scope);
-                break;
-            case Tok_if:
-                condition(ctx, scope);
-                break;
-            case Tok_Hat:
-            case Tok_Dot:
-            case Tok_ident:
-                assigOrCall(ctx,scope);
-                break;
-            default:
-                unexpectedToken(ctx, &t);
-                break;
-            }
+        size_t i;
+        for( i = 1; i <= n; i++ )
+        {
+            lua_rawgeti(ctx->L,templ,i); // name
+            BSTokChain* arg = (BSTokChain*)lua_topointer(ctx->L,templ+i);
+            bslex_addarg(ctx->lex,lua_tostring(ctx->L,-1), arg);
+            lua_pop(ctx->L,1); // name
+        }
+        if( n )
+            lua_pop(ctx->L, n);
 
         t = peekToken(ctx,1);
-        if( t.tok == Tok_Semi )
+        while( !endOfBlock(&t,0) && t.tok != Tok_Eof )
         {
-            nextToken(ctx); // eat it
+            if( t.tok == Tok_subdir && &ctx->module == scope )
+                subdirectory(ctx);
+            else
+                switch( t.tok )
+                {
+                case Tok_var:
+                case Tok_let:
+                case Tok_param:
+                    vardecl(ctx, scope);
+                    break;
+                case Tok_type:
+                    typedecl(ctx, scope);
+                    break;
+                case Tok_if:
+                    condition(ctx, scope);
+                    break;
+                case Tok_Hat:
+                case Tok_Dot:
+                case Tok_ident:
+                    assigOrCall(ctx,scope);
+                    break;
+                default:
+                    unexpectedToken(ctx, &t,"in macro body");
+                    break;
+                }
+
             t = peekToken(ctx,1);
+            if( t.tok == Tok_Semi )
+            {
+                nextToken(ctx); // eat it
+                t = peekToken(ctx,1);
+            }
         }
-    }
-    t = nextToken(ctx);
-    if( t.tok != Tok_Rbrace )
-        error(ctx, t.loc.row, t.loc.col,"internal error" );
+        t = nextToken(ctx);
+        if( t.tok != Tok_Rbrace )
+            error(ctx, t.loc.row, t.loc.col,"internal error" );
+    }else if( n )
+        lua_pop(ctx->L, n);
 
     lua_pop(ctx->L,2); // code, source
     BS_END_LUA_FUNC(ctx);
@@ -1832,12 +1849,15 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
         {
             if( n == 0 || n > 2 )
                 error(ctx, lpar.loc.row, lpar.loc.col,"expecting one or two arguments" );
-            if( n == 2 )
+            if( !ctx->skipMode )
             {
-                fprintf(stdout,"%s: ", lua_tostring(ctx->L,lua_gettop(ctx->L)-2+1));
-                dump(ctx,lua_gettop(ctx->L)-4+1);
-            }else
-                dump(ctx,lua_gettop(ctx->L)-2+1);
+                if( n == 2 )
+                {
+                    fprintf(stdout,"%s: ", lua_tostring(ctx->L,lua_gettop(ctx->L)-2+1));
+                    dump(ctx,lua_gettop(ctx->L)-4+1);
+                }else
+                    dump(ctx,lua_gettop(ctx->L)-2+1);
+            }
             lua_pushnil(ctx->L);
             lua_pushnil(ctx->L);
         }
@@ -2251,7 +2271,7 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
         evalListLiteral(ctx,scope,&t,lhsType);
         break;
     default:
-        unexpectedToken(ctx,&t);
+        unexpectedToken(ctx,&t,"in factor");
         break;
     }
 
@@ -3680,7 +3700,7 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
                 assigOrCall(ctx,scope);
                 break;
             default:
-                unexpectedToken(ctx, &t);
+                unexpectedToken(ctx, &t,"in block body");
                 break;
             }
 

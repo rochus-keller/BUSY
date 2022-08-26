@@ -115,13 +115,18 @@ typedef struct BSToken {
     const char* source;
 } BSToken;
 
+typedef struct BSTokChain {
+    BSToken tok;
+    struct BSTokChain* next;
+} BSTokChain;
+
 extern BSLexer* bslex_open(const char* filepath, const char* sourceName); // filepath is utf-8 and denormalized
 extern BSLexer* bslex_openFromString(const char* str, int len, const char* sourceName);
 extern void bslex_free(BSLexer*);
 extern BSToken bslex_next(BSLexer*);
 extern BSToken bslex_peek(BSLexer*, int off); // off = 1..
 extern const char* bslex_filepath(BSLexer*);
-extern void bslex_dump(BSToken*);
+extern void bslex_dump(const BSToken*);
 extern const char* bslex_tostring(int tok);
 
 typedef struct BSHiLex BSHiLex; // hierarchic lexer
@@ -132,10 +137,11 @@ extern BSToken bslex_hnext(BSHiLex*);
 extern void bslex_cursetref(BSHiLex*);
 extern BSToken bslex_hpeek(BSHiLex*, int off); // off = 1..
 extern int bslex_hopen(BSHiLex*, const char* str, int len, const char* sourceName, BSRowCol orig);
-extern void bslex_addarg(BSHiLex*, const char* name, BSToken what);
+extern void bslex_addarg(BSHiLex*, const char* name, BSTokChain* what); // ownership of what is transferred
 extern const char* bslex_hfilepath(BSHiLex*);
 extern int bslex_hlevelcount(BSHiLex*);
 extern BSToken bslex_hlevel(BSHiLex*, unsigned int level);
+extern char* bslex_allocstr(BSHiLex*,int len);
 
 
 #endif // BSLEX_H

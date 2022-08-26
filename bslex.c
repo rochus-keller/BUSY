@@ -688,7 +688,7 @@ BSToken bslex_peek(BSLexer* l, int off )
     return tmp->tok;
 }
 
-void bslex_dump(BSToken* t)
+void bslex_dump(const BSToken* t)
 {
     char buf[16];
     int i;
@@ -711,7 +711,7 @@ const char*bslex_filepath(BSLexer* lex)
 
 typedef struct BSTemplArg
 {
-    BSToken what;
+    BSTokChain* what;
     const char* name;
     struct BSTemplArg* next;
 } BSTemplArg;
@@ -724,6 +724,12 @@ typedef struct BSHiLexLevel
     BSTemplArg* args;
 }BSHiLexLevel;
 
+typedef struct BSHiLexMemSlot
+{
+    struct BSHiLexMemSlot* next;
+    char str[sizeof(void*)];
+} BSHiLexMemSlot;
+
 typedef struct BSHiLex
 {
 #define BS_MAX_LEVEL  20
@@ -732,6 +738,7 @@ typedef struct BSHiLex
     BSTokenQueue* first;
     BSTokenQueue* last;
     BSToken cur;
+    BSHiLexMemSlot* mem;
 } BSHiLex;
 
 BSHiLex*bslex_createhilex(const char* filepath, const char* sourceName)
@@ -755,6 +762,12 @@ static void freeLevel(BSHiLexLevel* l)
     while( l->args )
     {
         BSTemplArg* tmp = l->args;
+        while(tmp->what)
+        {
+            BSTokChain* tmp2 = tmp->what;
+            tmp->what = tmp->what->next;
+            free(tmp2);
+        }
         l->args = l->args->next;
         free(tmp);
     }
@@ -770,6 +783,12 @@ void bslex_freehilex(BSHiLex* l)
     {
         freeLevel(&l->lex[i]);
     }
+    while( l->mem )
+    {
+        BSHiLexMemSlot* tmp = l->mem;
+        l->mem = l->mem->next;
+        free(tmp);
+    }
     free(l);
 }
 
@@ -783,6 +802,37 @@ static int isequal( const char* lhs, const char* rhs, int len)
         i++;
     }
     return i == len;
+}
+
+static char* chainToStr(BSHiLex* l, BSTokChain* ts)
+{
+    assert(ts);
+    BSTokChain* p = ts;
+    int len = 0;
+    while(p)
+    {
+        len += p->tok.len + 1; // +1 for space
+        p = p->next;
+    }
+    char* res = bslex_allocstr(l,len+1);
+    if( res == 0 )
+    {
+        fprintf(stderr,"%s:%d:%d:ERR: not enough memory to make string of token chain\n",
+                ts->tok.source, ts->tok.loc.row, ts->tok.loc.col );
+        exit(1);
+    }
+    p = ts;
+    char* s = res;
+    while(p)
+    {
+        strncpy(s,p->tok.val,p->tok.len);
+        s += p->tok.len;
+        *s = ' ';
+        s++;
+        p = p->next;
+    }
+    *s = 0;
+    return res;
 }
 
 static BSToken hnext(BSHiLex* l)
@@ -810,7 +860,10 @@ static BSToken hnext(BSHiLex* l)
             // TODO: should that be more efficient?
             if( isequal(a->name, t.val, t.len) )
             {
-                bslex_hopen(l,a->what.val, a->what.len,a->what.source, a->what.loc);
+                // the first is just to transport loc and source if tok == 0
+                char* str = chainToStr(l,a->what->tok.tok == 0 ? a->what->next : a->what);
+                // TODO: support directly lexing token streams instead of strings
+                bslex_hopen(l,str, strlen(str), a->what->tok.source, a->what->tok.loc);
                 lev = &l->lex[l->level];
                 t = bslex_next(lev->lex);
                 break;
@@ -818,9 +871,6 @@ static BSToken hnext(BSHiLex* l)
             a = a->next;
         }
     }
-
-    // TODO: concat ident with ##
-
 
     if( lev->orig.col )
         t.loc.col += t.loc.row==1 ? lev->orig.col:0;
@@ -849,6 +899,7 @@ BSToken bslex_hnext(BSHiLex* l)
         l->last = tmp;
         tmp->next = 0; // necessary because of deleteQueue
     }
+
     return l->cur;
 }
 
@@ -920,7 +971,14 @@ BSToken bslex_hpeek(BSHiLex* l, int off)
                 BSToken b = hnext(l);
                 if( b.tok == Tok_ident )
                 {
-                    char* str = (char*)malloc(tmp->tok.len + b.len); // TODO: use memory pool
+                    // TODO: this simply makes a new copy even if same ident
+                    char* str = bslex_allocstr(l,tmp->tok.len + b.len);
+                    if( str == 0 )
+                    {
+                        fprintf(stderr,"%s:%d:%d:ERR: not enough memory to copy identifier\n",
+                                a.source, a.loc.row, a.loc.col );
+                        exit(1);
+                    }
                     strncpy(str,tmp->tok.val,tmp->tok.len);
                     strncpy(str+tmp->tok.len,b.val,b.len);
                     tmp->tok.val = str;
@@ -966,7 +1024,7 @@ int bslex_hopen(BSHiLex* l, const char* str, int len, const char* sourceName, BS
     if( l->lex[l->level].ref.tok == Tok_Invalid )
         l->lex[l->level].ref = l->cur;
     l->level++;
-    l->lex[l->level].lex = bslex_openFromString(str, len,sourceName);
+    l->lex[l->level].lex = bslex_openFromString(str, len, sourceName);
     l->lex[l->level].orig = orig;
     return 1;
 }
@@ -991,7 +1049,7 @@ void bslex_cursetref(BSHiLex* l)
     l->lex[l->level].ref = l->cur;
 }
 
-void bslex_addarg(BSHiLex* l, const char* name, BSToken what)
+void bslex_addarg(BSHiLex* l, const char* name, BSTokChain* what)
 {
     BSTemplArg* arg = (BSTemplArg*)malloc(sizeof(BSTemplArg));
     arg->next = l->lex[l->level].args;
@@ -999,7 +1057,6 @@ void bslex_addarg(BSHiLex* l, const char* name, BSToken what)
     arg->what = what;
     l->lex[l->level].args = arg;
 }
-
 
 const char*bslex_tostring(int tok)
 {
@@ -1383,4 +1440,15 @@ static BSTokType tokenTypeFromString( const char* str, int* pos )
     }
     if(pos) *pos = i;
     return res;
+}
+
+
+char*bslex_allocstr(BSHiLex* l, int len)
+{
+    BSHiLexMemSlot* mem = (BSHiLexMemSlot*)malloc(sizeof(BSHiLexMemSlot)+ len - sizeof(void*));
+    if( mem == 0 )
+        return 0; // delegate error handling to caller
+    mem->next = l->mem;
+    l->mem = mem;
+    return mem->str;
 }
