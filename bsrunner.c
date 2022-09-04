@@ -745,6 +745,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
                             bs_denormalize_path(lua_tostring(L,out)) );
             break;
         case BS_DynamicLib:
+            // TODO: should we use -rpath=path ?
             lua_pushfstring(L,"link /nologo /dll @\"%s\" /out:\"%s\" /implib:\"%s.lib\"",
                             bs_denormalize_path(lua_tostring(L,rsp)),
                             bs_denormalize_path(lua_tostring(L,out)),
@@ -764,9 +765,9 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     const int outlist = lua_gettop(L);
     lua_pushinteger(L,kind);
     lua_setfield(L,outlist,"#kind");
-    // TODO: outlist for msvc should include the .lib instead of the .dll
     lua_pushvalue(L,out);
     lua_rawseti(L,outlist,1);
+    // TODO: for dynlibs also store libname and libpath
     lua_pushvalue(L,outlist);
     lua_setfield(L,inst,"#out");
     lua_pop(L,1); // outlist

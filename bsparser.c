@@ -1389,7 +1389,28 @@ static void tostring(BSParserContext* ctx, int n, int row, int col)
         lua_pushstring(ctx->L, lua_toboolean(ctx->L,-2) ? "true" : "false" );
         break;
     case BS_path:
-        lua_pushstring(ctx->L, bs_denormalize_path(lua_tostring(ctx->L,-2)) );
+        {
+            lua_getfield(ctx->L,ctx->builtins,"#inst");
+            lua_getfield(ctx->L,-1,"host_os");
+            const int iswin32 = strcmp(lua_tostring(ctx->L,-1),"win32") == 0;
+            lua_pop(ctx->L,2);
+            lua_pushstring(ctx->L, bs_denormalize_path(lua_tostring(ctx->L,-2)) );
+            if( iswin32 )
+            {
+                // TODO: not sure whether this is necessary; there is still an error with nrc on windows,
+                // so apparently the '/' path wasn't the causing issue
+                char* str = (char*)lua_tostring(ctx->L,-1);
+                char* p = str;
+                while(*p != 0)
+                {
+                    if(*p == '/')
+                        *p = '\\';
+                    p++;
+                }
+                lua_pushstring(ctx->L,str);
+                lua_replace(ctx->L,-2);
+            }
+        }
         break;
     default:
         lua_pushstring(ctx->L, lua_tostring(ctx->L,-2) );
