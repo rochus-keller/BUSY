@@ -559,30 +559,27 @@ static void renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int is
         break;
     case BS_StaticLib:
     case BS_DynamicLib:
-        lua_rawgeti(L,list,1);
-        if(0) // apparently this is wrong: if(ismsvc)
-              // but TODO we have to link to the .lib even for .dlls: ismsvc)
         {
+            lua_rawgeti(L,list,1);
+            const int path = lua_gettop(L);
+
+            if(ismsvc && k == BS_DynamicLib)
+            {
+                // add .lib because msvc requires an import library to use the dll
+                lua_pushstring(L,".lib");
+                lua_concat(L,2); // the name of the import library is xyz.dll.lib
+            }
+
             if( buf )
             {
                 lua_pushvalue(L,buf);
-                lua_pushfstring(L,"/implib:\"%s\" ", bs_denormalize_path(lua_tostring(L,-1)) );
+                lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,path)) );
                 lua_concat(L,2);
                 lua_replace(L,buf);
             }else
-                fprintf(out,"/implib:\"%s\" ", bs_denormalize_path(lua_tostring(L,-1)) );
-        }else
-        {
-            if( buf )
-            {
-                lua_pushvalue(L,buf);
-                lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,-1)) );
-                lua_concat(L,2);
-                lua_replace(L,buf);
-            }else
-                fprintf(out,"\"%s\" ", bs_denormalize_path(lua_tostring(L,-1)) );
+                fprintf(out,"\"%s\" ", bs_denormalize_path(lua_tostring(L,path)) );
+            lua_pop(L,1); // path
         }
-        lua_pop(L,1); // path
         break;
     default:
         // ignore
@@ -748,10 +745,10 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
                             bs_denormalize_path(lua_tostring(L,out)) );
             break;
         case BS_DynamicLib:
-            lua_pushfstring(L,"link /nologo /dll %s @\"%s\" /out:\"%s\"",
-                            (mac ? "-dynamiclib " : "-shared "),
+            lua_pushfstring(L,"link /nologo /dll @\"%s\" /out:\"%s\" /implib:\"%s.lib\"",
                             bs_denormalize_path(lua_tostring(L,rsp)),
-                            bs_denormalize_path(lua_tostring(L,out)) );
+                            bs_denormalize_path(lua_tostring(L,out)),
+                            bs_denormalize_path(lua_tostring(L,out)) ); // the importlib is called xyz.dll.lib
             break;
         case BS_StaticLib:
             lua_pushfstring(L,"lib /nologo /out:\"%s\" @\"%s\"",

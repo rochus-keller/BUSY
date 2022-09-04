@@ -800,6 +800,7 @@ static int isequal( const char* lhs, const char* rhs, int len)
         if( *lhs != rhs[i] )
             return 0;
         i++;
+        lhs++;
     }
     return i == len;
 }
