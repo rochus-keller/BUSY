@@ -316,17 +316,22 @@ static void compilesources(lua_State* L, int inst, int builtins)
             continue;
         }
 
-        addPath(L,absDir,file);
+        if( *lua_tostring(L,file) != '/' )
+            addPath(L,absDir,file); // path could be absolute!
+        else
+            lua_pushvalue(L,file);
         const int src = lua_gettop(L);
 
         addPath(L,rootOutDir,relDir);
-        addPath(L,-1,file);
+        lua_pushfstring(L,"/%d_%s",i,bs_filename(lua_tostring(L,file)));
+        // only use the filename and suffix here, strip all path segments; otherwise subdirs have to be created;
+        // the name is actually not relevant, so we just prefix it with a number to reduce name collisions (possible
+        // when collecting  files from different directories in the same module)
         if( toolchain == BS_msvc )
             lua_pushstring(L,".obj");
         else
             lua_pushstring(L,".o");
-        lua_concat(L,2);
-        lua_replace(L,-2);
+        lua_concat(L,3);
         const int out = lua_gettop(L);
 
         lua_pushvalue(L,out);

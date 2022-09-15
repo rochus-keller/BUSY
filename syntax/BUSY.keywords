@@ -17,3 +17,6 @@ elsif
 define
 include
 import
+module
+submodule
+submod

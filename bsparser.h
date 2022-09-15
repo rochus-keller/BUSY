@@ -52,7 +52,7 @@ typedef enum BSVisibility { // #visi
 
 
 /* Expects
- * 1. a path to the source root directory,
+ * 1. an absolute, normalized path to the directory in which BUSY is present,
  * 2. the new module def table which is filled by bs_parser, kind and outer already set,
  * 3. and the parameter table.
  * Returns a module definition as a Lua table on the Lua stack.

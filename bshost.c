@@ -515,3 +515,12 @@ int bs_exec(const char* cmd)
     // TODO convert from utf-8
     return system(cmd);
 }
+
+const char*bs_filename(const char* path)
+{
+    const int len = strlen(path);
+    const char* p = path + len - 1;
+    while( *p != '/' )
+        p--;
+    return p+1;
+}

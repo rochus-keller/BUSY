@@ -36,6 +36,7 @@ extern BSPathStatus bs_normalize_path2(const char* in);
 extern BSPathStatus bs_cwd();
 extern BSPathStatus bs_thisapp();
 extern const char* bs_denormalize_path(const char* path);
+extern const char* bs_filename(const char* path);
 extern int bs_forbidden_fschar(unsigned int ch);
 extern int bs_little_endian(); // 1..little, 0..big
 extern int bs_wordsize(); // number of bytes

@@ -88,6 +88,8 @@ typedef enum BSTokType {
     Tok_let,
     Tok_param,
     Tok_subdir,
+    Tok_submod,
+    Tok_submodule,
     Tok_then,
     Tok_true,
     Tok_type,

@@ -227,6 +227,7 @@ local function variable(name, type, ro)
 	globals[name] = c
 end
 
+variable("busy_version", globals.string, true)
 variable("host_cpu", globals.CpuType, true)
 variable("host_cpu_ver", globals.int, true)
 variable("host_wordsize", globals.WordSize, true )
@@ -243,6 +244,7 @@ variable("target_toolchain", globals.CompilerType, false)
 variable("target_toolchain_ver", globals.int, false)
 
 B = require("BUSY")
+inst.busy_version = B.version()
 inst.host_cpu, inst.host_cpu_ver = B.cpu()
 inst.target_cpu, inst.target_cpu_ver = inst.host_cpu, inst.host_cpu_ver
 inst.host_wordsize = tostring(B.wordsize() * 8)

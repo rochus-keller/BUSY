@@ -265,13 +265,13 @@ static void addToScope(BSParserContext* ctx, BSScope* scope, BSIdentDef* id, int
     BS_END_LUA_FUNC(ctx);
 }
 
-static void subdirectory(BSParserContext* ctx)
+static void submodule(BSParserContext* ctx, int subdir)
 {
     BS_BEGIN_LUA_FUNC(ctx,0);
     nextToken(ctx); // keyword
     BSIdentDef id = identdef(ctx,&ctx->module);
-    const char* subdirname = id.name;
-    int len = id.len;
+    const char* path = id.name;
+    int pathlen = id.len;
     if( id.visi == BS_PublicDefault )
         error(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
     BSToken t = peekToken(ctx,1);
@@ -281,28 +281,35 @@ static void subdirectory(BSParserContext* ctx)
         t = nextToken(ctx);
         if( t.tok == Tok_path || t.tok == Tok_ident )
         {
-            subdirname = t.val;
-            len = t.len;
-            if( t.tok == Tok_path )
+            path = t.val;
+            pathlen = t.len;
+
+            // We now support all paths (no necessity of source-tree and dir-tree correspondence)
+            // #rdir is made of idents, not dir names
+            // the following code is only for backward compatibility
+            if( subdir )
             {
-                // check path is relative and only one level
-                if( *subdirname == '\'' )
+                if( t.tok == Tok_path )
                 {
-                    subdirname++;
-                    len -= 2;
-                }
-                if( strncmp(subdirname,"//",2) == 0 || strncmp(subdirname,"..",2) == 0)
-                    error(ctx, t.loc.row, t.loc.col,"this path is not supported here" );
-                if( strncmp(subdirname,".",1) == 0 )
-                {
-                    subdirname += 2;
-                    len -= 2;
-                }
-                int i;
-                for( i = 0; i < len; i++ )
-                {
-                    if( subdirname[i] == '/' )
-                        error(ctx, t.loc.row, t.loc.col,"expecting an immediate subdirectory" );
+                    // check path is relative and only one level
+                    if( *path == '\'' )
+                    {
+                        path++;
+                        pathlen -= 2;
+                    }
+                    if( strncmp(path,"//",2) == 0 || strncmp(path,"..",2) == 0)
+                        error(ctx, t.loc.row, t.loc.col,"this path is not supported here" );
+                    if( strncmp(path,".",1) == 0 )
+                    {
+                        path += 2;
+                        pathlen -= 2;
+                    }
+                    int i;
+                    for( i = 0; i < pathlen; i++ )
+                    {
+                        if( path[i] == '/' )
+                            error(ctx, t.loc.row, t.loc.col,"expecting an immediate subdirectory" );
+                    }
                 }
             }
         }else
@@ -319,18 +326,49 @@ static void subdirectory(BSParserContext* ctx)
 
     lua_getfield(ctx->L,ctx->module.table,"#rdir");
     lua_pushstring(ctx->L,"/");
-    lua_pushlstring(ctx->L,subdirname,len);
+    lua_pushlstring(ctx->L,id.name,id.len);
     lua_pushvalue(ctx->L,-1);
     lua_setfield(ctx->L,module,"#dirname");
     lua_concat(ctx->L,3);
-    lua_setfield(ctx->L,module,"#rdir");
+    lua_setfield(ctx->L,module,"#rdir"); // construct rdir from root by concatenating the subdir identdefs
 
     lua_pushcfunction(ctx->L, bs_parse);
 
-    lua_pushstring(ctx->L,ctx->dirpath);
-    lua_pushstring(ctx->L,"/");
-    lua_pushlstring(ctx->L,subdirname,len);
-    lua_concat(ctx->L,3);
+    if( *path == '/' )
+    {
+        lua_pushlstring(ctx->L,path,pathlen); // this is already an absolute path
+    }else
+    {
+        if( *path == '.' )
+        {
+            // already normalized
+            lua_getfield(ctx->L,ctx->module.table,"#dir");
+            lua_pushlstring(ctx->L,path,pathlen);
+            if( bs_add_path(ctx->L, -2, -1) != 0 )
+                error(ctx, t.loc.row, t.loc.col,"cannot convert this path" );
+            lua_replace(ctx->L,-3);
+            lua_pop(ctx->L,1);
+        }else
+        {
+            lua_pushstring(ctx->L,ctx->dirpath);
+            lua_pushstring(ctx->L,"/");
+            lua_pushlstring(ctx->L,path,pathlen);
+            lua_concat(ctx->L,3);
+        }
+    }
+    const int newPath = lua_gettop(ctx->L);
+    lua_pushvalue(ctx->L,ctx->module.table);
+    while( !lua_isnil(ctx->L,-1) )
+    {
+        // if path is already present then this module is called recursively, i.e. indefinitely
+        lua_getfield(ctx->L,-1,"#dir");
+        if( lua_equal(ctx->L,newPath,-1) )
+            error(ctx, t.loc.row, t.loc.col,"path points to the same directory as current or outer module" );
+        lua_pop(ctx->L,1);
+        lua_getfield(ctx->L,-1,"^");
+        lua_replace(ctx->L,-2);
+    }
+    lua_pop(ctx->L,1);
 
     lua_pushvalue(ctx->L,module);
 
@@ -1397,8 +1435,7 @@ static void tostring(BSParserContext* ctx, int n, int row, int col)
             lua_pushstring(ctx->L, bs_denormalize_path(lua_tostring(ctx->L,-2)) );
             if( iswin32 )
             {
-                // TODO: not sure whether this is necessary; there is still an error with nrc on windows,
-                // so apparently the '/' path wasn't the causing issue
+                // TODO: not sure whether this is really necessary
                 char* str = (char*)lua_tostring(ctx->L,-1);
                 char* p = str;
                 while(*p != 0)
@@ -1757,8 +1794,9 @@ static void evalInst(BSParserContext* ctx, BSScope* scope)
         t = peekToken(ctx,1);
         while( !endOfBlock(&t,0) && t.tok != Tok_Eof )
         {
-            if( t.tok == Tok_subdir && &ctx->module == scope )
-                subdirectory(ctx);
+            if( ( t.tok == Tok_subdir || t.tok == Tok_submod || t.tok == Tok_submodule ) && &ctx->module == scope )
+                // Tok_subdir is deprecated
+                submodule(ctx,t.tok == Tok_subdir);
             else
                 switch( t.tok )
                 {
@@ -2934,8 +2972,12 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         error(ctx, t.loc.row, t.loc.col,"expecting 'var', 'let' or 'param'");
     BSIdentDef id = identdef(ctx, scope);
 
-    if( kind == Tok_param && id.visi != BS_Private )
-        error(ctx, id.loc.row, id.loc.col,"visibility cannot be set for parameters (assumed to be public)");
+    if( kind == Tok_param )
+    {
+        if( id.visi != BS_Private )
+            error(ctx, id.loc.row, id.loc.col,"visibility cannot be set for parameters (assumed to be public)");
+        id.visi = BS_Public;
+    }
     if( kind == Tok_param && scope != &ctx->module )
         error(ctx, t.loc.row, t.loc.col,"parameters are only supported on module level");
 
@@ -3138,7 +3180,24 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
                 lua_pushnil(ctx->L);
                 lua_rawset(ctx->L,BS_Params);
                 // stack: desig, val
-                const char* val = lua_tostring(ctx->L,desig+1);
+                const char* val = "";
+                switch(lua_type(ctx->L,desig+1))
+                {
+                case LUA_TNIL:
+                    assert(0);
+                case LUA_TNUMBER:
+                case LUA_TSTRING:
+                    val = lua_tostring(ctx->L,desig+1);
+                    break;
+                case LUA_TBOOLEAN:
+                    if( lua_toboolean(ctx->L,desig+1) )
+                        val = "true";
+                    else
+                        val = "false";
+                    break;
+                default:
+                    break;
+                }
                 uchar len;
                 const uint ch = unicode_decode_utf8((const uchar*)val, &len );
                 if( len == 0 )
@@ -3191,18 +3250,18 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
                     }
                 }else
                 {
-                    if( strcmp(lua_tostring(ctx->L,desig+1),"true") == 0 )
+                    if( strcmp(val,"true") == 0 )
                     {
                         lua_getfield(ctx->L,ctx->builtins,"bool");
                         lua_pushboolean(ctx->L,1);
-                    }else if( strcmp(lua_tostring(ctx->L,desig+1),"false") == 0 )
+                    }else if( strcmp(val,"false") == 0 )
                     {
                         lua_getfield(ctx->L,ctx->builtins,"bool");
                         lua_pushboolean(ctx->L,0);
                     }else
                     {
                         lua_getfield(ctx->L,ctx->builtins,"string"); // assume string
-                        lua_pushvalue(ctx->L,desig+1);
+                        lua_pushstring(ctx->L,val);
                     }
                 }
                 // stack: desig, valstr, valtype, val
@@ -3691,18 +3750,13 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
     BSToken t = peekToken(ctx,1);
     while( !endOfBlock(&t,pascal) && t.tok != Tok_Eof )
     {
-        if( t.tok == Tok_subdir && &ctx->module == scope )
-            subdirectory(ctx);
+        if( ( t.tok == Tok_subdir || t.tok == Tok_submod || t.tok == Tok_submodule ) && &ctx->module == scope )
+            submodule(ctx,t.tok == Tok_subdir);
         else if( t.tok == Tok_define && &ctx->module == scope )
             macrodef(ctx);
         else
             switch( t.tok )
             {
-#if 0
-            case Tok_subdir:
-                subdirectory(ctx);
-                break;
-#endif
             case Tok_var:
             case Tok_let:
             case Tok_param:
@@ -3790,7 +3844,7 @@ int bs_parse(lua_State* L)
         lua_pushinteger(L, BS_ModuleDef);
         lua_setfield(L,module,"#kind");
         lua_replace(L,BS_NewModule);
-        lua_pushstring(L,".");
+        lua_pushstring(L,"."); // start rdir from '.'
         lua_setfield(L,BS_NewModule,"#rdir"); // relative directory
     }
 

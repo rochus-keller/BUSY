@@ -22,12 +22,14 @@ typeref ::= designator [ '[]' ]
 
 // basic type is integer | real | string | boolean | path | symbol
 
-subdirectory ::= subdir identdef [ ( '=' | ':=' ) ( path | ident ) ]
-// path may only be one relative subdirectory; '//' and '../' forbidden
-// maybe set params here, or better from toplevel via desig [ '(' paramList ')' ]
-// the directory structure is static; only what we do with it (i.e. dependencies) is dynamic
-// do we need an explicit subdir decl at all? Yes, it controls what status the system has before entering the subdir
-// and it makes it explicit, which subdir belong to the build and which don't
+subdirectory ::= ( submodule | submod | subdir ) identdef [ ( '=' | ':=' ) ( path | ident ) ]
+// subdir is deprecated
+// path can be any absolute or relative path; a relative path is interpreted relative to the current module;
+// the subdirectory structure is static; only what we do with it (i.e. dependencies) is dynamic;
+// the subdirectory structure is virual with directory names given by identdef; there is no need for 
+// a correspondence with a physical structure.
+// The subdir decl controls what status the system has before entering the directory
+// and it makes it explicit, which directories belong to the build and which don't.
 
 //paramList ::= paramValue { ',' paramValue }
 
@@ -74,7 +76,7 @@ identdef ::= ident ['*'|'-'|'!']
 // TODO: allow ident concat to support macro expansion, i.e. ident { '+' ident }
 
 designator ::= ['^'|'.'] ident { \LL:2\ '.' ident  }
-// '^' points to an ident in the outer directory which is only visible if public or protected
+// '^' points to an ident in the outer module which is only visible if public or protected
 // use .ident in initializer block to access the object which is initialized
 
 ExpList ::= expression { [','] expression}

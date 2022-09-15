@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
 <html><META http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<head><title>2022-07-17 BUSY Manual</title>
+<head><title>2022-07-17 The BUSY Build System - Language and Built-ins Specification</title>
 <style type="text/css" media="screen, projection, print">
 body{font-family:Arial,sans-serif;font-size:small;orphans:2;widows:2;}
 h1,h2,h3,h4{background-color:#F5F5F5;padding:0.3em;page-break-after:avoid;margin:0;border-style:solid;border-color:white #F5F5F5 #F5F5F5 #F5F5F5;border-width:thin;}
@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-08-11, Work in progress</div>
+2022-09-15, Work in progress</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -89,10 +89,12 @@ A lot of text is derived from the Oberon+ language specification, <a href="https
 <a href="#12230">2.7.3.7 Function Call</a></div>
 <div style="margin-left:63px"><span class="label"><a name="12287">1.5.1.8</a></span>
 <a href="#12168">2.8 Statements</a></div>
-<div style="margin-left:63px"><span class="label"><a name="12288">1.5.1.9</a></span>
-<a href="#12169">2.9 Modules</a></div>
-<div style="margin-left:63px"><span class="label"><a name="12289">1.5.1.10</a></span>
-<a href="#12241">2.10 Alternative Syntax</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12575">1.5.1.9</a></span>
+<a href="#12570">2.9 Macros</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12288">1.5.1.10</a></span>
+<a href="#12169">2.10 Modules</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12289">1.5.1.11</a></span>
+<a href="#12241">2.11 Alternative Syntax</a></div>
 <div style="margin-left:45px"><span class="label"><a name="12290">1.5.2</a></span>
 <a href="#11631">3 Predeclared Class Reference</a></div>
 <div style="margin-left:63px"><span class="label"><a name="12291">1.5.2.1</a></span>
@@ -218,7 +220,7 @@ A real number always contains a decimal point and at least one digit before the 
 <h4 style="margin-left:45px"><span class="label"><a name="12074">2.3.6</a></span>
 Strings</h4>
 <div style="margin-left:63px"><span class="label"><a name="12075">2.3.6.1</a></span>
-Strings are sequences of printable unicode characters enclosed in <b>"</b> (quote marks). A string must not extend over the end of a line. Strings use backslash as the escape character. The only escape sequences supported are: </div>
+Strings are sequences of printable unicode characters enclosed in <b>"</b> (quote marks). A string may extend over the end of a line; the enclosed end of line characters are part of the string. Strings use backslash as the escape character. The only escape sequences supported are: </div>
 <div style="margin-left:81px"><span class="label"><a name="12076">2.3.6.1.1</a></span>
 <b>\"</b> (for literal quote)</div>
 <div style="margin-left:81px"><span class="label"><a name="12077">2.3.6.1.2</a></span>
@@ -230,15 +232,15 @@ Symbols are interned strings consisting of unicode letters, unicode digits and u
 <h4 style="margin-left:45px"><span class="label"><a name="12080">2.3.8</a></span>
 Paths</h4>
 <div style="margin-left:63px"><span class="label"><a name="12083">2.3.8.1</a></span>
-A path is an abstraction of a file system absolute or relative file or directory path. A path is a sequence of zero or more name segments, separated by the <b>/</b> (slash) character, with a path prefix. Paths are relative to the current module (see <a href="#12169">2.9 Modules</a>). The following path prefixes are supported:</div>
+A path is an abstraction of a file system absolute or relative file or directory path. A path is a sequence of zero or more name segments, separated by the <b>/</b> (slash) character, with a path prefix. The current module is the reference for relative path resolution (see <a href="#12169">2.10 Modules</a>). The following path prefixes are supported:</div>
 <div style="margin-left:81px"><span class="label"><a name="12084">2.3.8.1.1</a></span>
 <b>//</b> (for an absolute path in Unix file systems)</div>
 <div style="margin-left:81px"><span class="label"><a name="12097">2.3.8.1.2</a></span>
 a <b>//</b> followed by one ASCII letter followed by one <b>:</b> (colon, for an absolute path in Windows file systems)</div>
 <div style="margin-left:81px"><span class="label"><a name="12085">2.3.8.1.3</a></span>
-<b>./</b> (for a path relative to the current module)</div>
+<b>./</b> (for a path relative to the directory represented by the current module)</div>
 <div style="margin-left:81px"><span class="label"><a name="12086">2.3.8.1.4</a></span>
-<b>../</b> (for a path relative to the directory immediately above the current module)</div>
+<b>../</b> (for a path relative to the directory immediately above the directory represented by the current module)</div>
 <div style="margin-left:81px"><span class="label"><a name="12095">2.3.8.1.5</a></span>
 a sequence of two or more <b>../</b></div>
 <div style="margin-left:63px"><span class="label"><a name="12088">2.3.8.2</a></span>
@@ -254,13 +256,11 @@ As a special case, a path may consist only of one of the following character com
 <div style="margin-left:81px"><span class="label"><a name="12098">2.3.8.5.2</a></span>
 a <b>//</b> followed by one ASCII letter followed by one <b>:</b> (colon, for the absolute root in a Windows file system)</div>
 <div style="margin-left:81px"><span class="label"><a name="12093">2.3.8.5.3</a></span>
-<b>.</b> (for the current module)</div>
+<b>.</b> (for the directory represented by the current module)</div>
 <div style="margin-left:81px"><span class="label"><a name="12094">2.3.8.5.4</a></span>
-<b>..</b> (for the directory immediately above the current module)</div>
+<b>..</b> (for the directory immediately above directory represented by the current module)</div>
 <div style="margin-left:81px"><span class="label"><a name="12096">2.3.8.5.5</a></span>
 a sequence of one or more <b>../</b> followed by <b>..</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12390">2.3.8.6</a></span>
-Relative paths </div>
 <h4 style="margin-left:45px"><span class="label"><a name="12099">2.3.9</a></span>
 <a href=""><b>O</b></a><b>perators and Delimiters</b></h4>
 <div style="margin-left:63px"><span class="label"><a name="12100">2.3.9.1</a></span>
@@ -272,11 +272,15 @@ Operators and delimiters are the special characters, or character pairs listed h
 <div style="margin-left:63px"><span class="label"><a name="12102">2.3.10.1</a></span>
 The reserved words (keywords) consist of all lower case letters and cannot be used as identifiers. All words listed here are reserved:</div>
 <div style="margin-left:81px"><span class="label"><a name="12104">2.3.10.1.1</a></span>
-<b>begin class else elsif end false if in let param subdir then true type var </b></div>
+<b>begin class else elsif end false if in let param submod submodule then true type var </b></div>
 <div style="margin-left:63px"><span class="label"><a name="12105">2.3.10.2</a></span>
 In addition the following words are reserved for future extensions:</div>
 <div style="margin-left:81px"><span class="label"><a name="12106">2.3.10.2.1</a></span>
-<b>import is</b></div>
+<b>include import is module</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12566">2.3.10.3</a></span>
+Deprecated:</div>
+<div style="margin-left:81px"><span class="label"><a name="12567">2.3.10.3.1</a></span>
+<b>subdir</b></div>
 <h4 style="margin-left:45px"><span class="label"><a name="12107">2.3.11</a></span>
 <a href=""><b>C</b></a><b>omments</b></h4>
 <div style="margin-left:63px"><span class="label"><a name="12108">2.3.11.1</a></span>
@@ -294,7 +298,7 @@ An object may only be referenced within its scope</div>
 <div style="margin-left:63px"><span class="label"><a name="12114">2.4.2.3</a></span>
 Identifiers denoting class fields are valid in class designators only</div>
 <div style="margin-left:45px"><span class="label"><a name="12193">2.4.3</a></span>
-If a module N declares the subdirectory M using the <b>subdir</b> keyword (see <a href="#12169">2.9 Modules</a>), the BUSY file in the corresponding subdirectory becomes a nested module of N.</div>
+If a module N constitutes module M using a <b>submod</b> declaration (see <a href="#12169">2.10 Modules</a>), the BUSY file in the file system directory of M becomes a nested module of N; this relation is recursive.</div>
 <div style="margin-left:45px"><span class="label"><a name="12116">2.4.4</a></span>
 An identifier declared in a module may be followed by an export mark (<b>*</b>, <b>-</b> or <b>!</b>) in its declaration to indicate that it is visible to either both outer and nested modules (<b>*</b> and <b>!</b>), or only to nested modules (<b>-</b>).</div>
 <div style="margin-left:45px"><span class="label"><a name="12163">2.4.5</a></span>
@@ -306,9 +310,9 @@ Syntax:</div>
 <div style="margin-left:63px"><span class="label"><a name="12378">2.4.5.3</a></span>
 <code>designator ::= ['^'|'.'] ident { '.' ident }</code></div>
 <div style="margin-left:45px"><span class="label"><a name="12117">2.4.6</a></span>
-A nested module M can access a visible identifier x declared in an outer module N by <b>^</b>x, if it was declared before the <b>subdir</b> M declaration in N (<b>^</b> is the outer module operator). A module N can access an identifier y declared in a nested module by M<b>.</b>x, but only after the <b>subdir</b> M declaration</div>
+A nested module M can access a visible identifier x declared in an outer module N by <b>^</b>x, if it was declared before the <b>submod</b> M declaration in N (<b>^</b> is the outer module operator). A module N can access an identifier y declared in a nested module by M<b>.</b>x, but only after the <b>submod</b> M declaration</div>
 <div style="margin-left:45px"><span class="label"><a name="12115">2.4.7</a></span><span class="ident">NOTE</span>
-This implies that a nested module cannot reference objects declared after the subdir declaration in the outer modules which (directly or indirectly) references the nested module.</div>
+This implies that a nested module cannot reference objects declared after the <b>submod</b> declaration in the outer modules which (directly or indirectly) references the nested module.</div>
 <div style="margin-left:45px"><span class="label"><a name="12118">2.4.8</a></span>
 The identifiers in section <a href="#11631">3 Predeclared Class Reference</a>, <a href="#11697">4 Predeclared  Field Reference</a>, <a href="#11934">5 Predeclared Enumeration Reference</a>, <a href="#11920">6 Predeclared  Variable Reference</a>, and <a href="#11996">7 Predeclared  Procedure Reference</a> are predeclared; their meaning is defined in the indicated sections.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12048">2.5</a></span>
@@ -436,13 +440,13 @@ Expressions are constructs denoting rules of computation whereby constants and c
 <h4 style="margin-left:45px"><span class="label"><a name="12196">2.7.2</a></span>
 Operands</h4>
 <div style="margin-left:63px"><span class="label"><a name="12197">2.7.2.1</a></span>
-With the exception of literal constants (numbers, strings, paths, symbols, or lists), operands are denoted by designators. A designator consists of an identifier referring to a variable, type, or predeclared procedure. This identifier may possibly be qualified by one or more module identifier, an outer module operator or local instance operator (see <a href="#12109">2.4 Declarations and scope rules</a>, <a href="#12151">2.6 Variable declarations</a> and <a href="#12169">2.9 Modules</a>), and may be followed by selectors if the designated object is a class field.</div>
+With the exception of literal constants (numbers, strings, paths, symbols, or lists), operands are denoted by designators. A designator consists of an identifier referring to a variable, type, or predeclared procedure. This identifier may possibly be qualified by one or more module identifier, an outer module operator or local instance operator (see <a href="#12109">2.4 Declarations and scope rules</a>, <a href="#12151">2.6 Variable declarations</a> and <a href="#12169">2.10 Modules</a>), and may be followed by selectors if the designated object is a class field.</div>
 <div style="margin-left:63px"><span class="label"><a name="12198">2.7.2.2</a></span>
 Syntax:</div>
 <div style="margin-left:81px"><span class="label"><a name="12199">2.7.2.2.1</a></span>
 <code>designator ::= ['^'|'.'] ident { '.' ident }</code></div>
 <div style="margin-left:81px"><span class="label"><a name="12200">2.7.2.2.2</a></span>
-<code>ExpList ::= expression {',' expression}</code></div>
+<code>ExpList ::= expression {[','] expression}</code></div>
 <div style="margin-left:63px"><span class="label"><a name="12201">2.7.2.3</a></span>
 If <i>r</i> designates a class, then <i>r.f</i> denotes the field <i>f</i> of <i>r</i>. </div>
 <div style="margin-left:63px"><span class="label"><a name="12202">2.7.2.4</a></span>
@@ -609,7 +613,7 @@ Statements denote actions. There are elementary and structured statements. Eleme
 <div style="margin-left:45px"><span class="label"><a name="12235">2.8.2</a></span>
 Syntax:</div>
 <div style="margin-left:63px"><span class="label"><a name="12236">2.8.2.1</a></span>
-<code>statement ::= condition | assignment | call</code></div>
+<code>statement ::= condition | assignment | call | macrouse</code></div>
 <div style="margin-left:63px"><span class="label"><a name="12237">2.8.2.2</a></span>
 <code>assignment ::= designator ( '=' | '+=' | '-=' | '*=' ) expression</code></div>
 <div style="margin-left:63px"><span class="label"><a name="12238">2.8.2.3</a></span>
@@ -648,38 +652,66 @@ Calls</h4>
 A procedure call activates a predeclared procedure. It has a (possibly empty) a list of actual parameters. The correspondence is established by the positions. </div>
 <div style="margin-left:63px"><span class="label"><a name="12357">2.8.5.2</a></span>
 Each actual parameter must be an expression. This expression is evaluated before the procedure activation, and the resulting value is assigned to the formal parameter.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12169">2.9</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12570">2.9</a></span>
+Macros</h4>
+<div style="margin-left:45px"><span class="label"><a name="12576">2.9.1</a></span>
+Macros are suitable for combining a sequence of declarations and statements into a single command. Macros work at the level of lexical tokens. The tokens that make up the macro definition are inserted into the place where the macro is used, either one-to-one, or modified in accordance with the arguments, if any. </div>
+<div style="margin-left:45px"><span class="label"><a name="12571">2.9.2</a></span>
+Syntax:</div>
+<div style="margin-left:63px"><span class="label"><a name="12572">2.9.2.1</a></span>
+<code>macrodef ::= </code><b><code>define</code></b><code> identdef [ '(' [ ident { [','] ident } ] ')' ] body</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12573">2.9.2.2</a></span>
+<code>body ::= '{' { ( subdirectory | declaration | statement ) [';'] } '}'</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12578">2.9.2.3</a></span>
+<code>macrouse ::= designator '(' ExpList ')'</code></div>
+<div style="margin-left:45px"><span class="label"><a name="12580">2.9.3</a></span>
+A macro definition associates an identifier with a sequence of tokens and optional arguments. Macros can only be defined on module level. Macro definitions belong to the regular name space of a module and can be dereferenced using a designator; the regular rules apply (see <a href="#12109">2.4 Declarations and scope rules</a>).</div>
+<div style="margin-left:45px"><span class="label"><a name="12577">2.9.4</a></span>
+A macro use syntactically looks like a procedure call. Arguments - if any - are not evaluated at the call site like they are for procedure calls; instead the tokens passed as arguments are inserted in the macro body wherever the arument is referenced; only the resulting token stream is passed to the parser and validated. In contrast to procedure calls, the commas in the argument list are mandatory for macro uses. In the macro body it is possible to concatenate identifiers using the '&amp;' operator.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12169">2.10</a></span>
 Modules</h4>
-<div style="margin-left:45px"><span class="label"><a name="12194">2.9.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12194">2.10.1</a></span>
 A module is a collection of declarations of types and variables, together with a sequence of statements for the purpose of assigning values to the variables. </div>
-<div style="margin-left:45px"><span class="label"><a name="12375">2.9.2</a></span>
-A module is equivalent to a directory in the source tree, and to a file in that directory named "BUSY"; each such file is either empty or includes source code as specified herein.</div>
-<div style="margin-left:45px"><span class="label"><a name="12358">2.9.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12375">2.10.2</a></span>
+A module is associated with a directory in the file system, and specifically with a file in that directory called "BUSY"; each such file is either empty or includes source code as specified herein.</div>
+<div style="margin-left:45px"><span class="label"><a name="12358">2.10.3</a></span>
 Syntax:</div>
-<div style="margin-left:63px"><span class="label"><a name="12359">2.9.3.1</a></span>
-<code>Module ::= { ( subdirectory | declaration | statement ) [';'] }</code></div>
-<div style="margin-left:63px"><span class="label"><a name="12360">2.9.3.2</a></span>
-<code>subdirectory ::= subdir identdef [ '=' ( path | ident ) ]</code></div>
-<div style="margin-left:45px"><span class="label"><a name="12374">2.9.4</a></span>
-Modules are in a hierarchical relationship to each other. This relationship is explicit. Each module declares, which other modules (i.e. subdirectories) belong to the build using the <b>subdir</b> declaration. A <b>subdir</b> declaration associates a relative path with an identifier in the module; it the trivial case the identifier directly corresponds to the subdirectory name; a path must not be <b>.</b> or <b>..</b> and must have exactly one name segment (see <a href="#12080">2.3.8 Paths</a>). If a module N references a module M using a <b>subdir</b> declaration, the module M can reference identifiers in N (see <a href="#12109">2.4 Declarations and scope rules</a>); this relation is recursive.</div>
-<div style="margin-left:45px"><span class="label"><a name="12376">2.9.5</a></span>
-Modules are parsed and executed depth-first; when the parser meets a <b>subdir</b> declaration, it parses the referenced module before it continues with the present module.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12241">2.10</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12359">2.10.3.1</a></span>
+<code>Module ::= { ( submodule | declaration | statement | macrodef ) [';'] }</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12360">2.10.3.2</a></span>
+<code>submodule ::= </code><b><code>submod</code></b><code> identdef [ '=' ( path | ident ) ]</code></div>
+<div style="margin-left:45px"><span class="label"><a name="12374">2.10.4</a></span>
+Modules are in a hierarchical relationship to each other. This relationship is explicit. Each module - starting from the module which represents the root directory of the source tree - declares which other modules belong to the build using the <b>submod</b> declaration. A <b>submod</b> declaration references the file system directory the module is associated with, and makes the submodule accessible to the current module by the given identifier. </div>
+<div style="margin-left:45px"><span class="label"><a name="12551">2.10.5</a></span>
+In the simple case, the identifier directly corresponds to the name of a subdirectory of the directory associated with the current module.</div>
+<div style="margin-left:45px"><span class="label"><a name="12552">2.10.6</a></span>
+In the general case, the path given in the <b>submod</b> declaration can point to any file system directory, as long as it doesn't point to a file system directory already associated with the current or any of its outer modules (see <a href="#12080">2.3.8 Paths</a> and <a href="#12109">2.4 Declarations and scope rules</a>). </div>
+<div style="margin-left:45px"><span class="label"><a name="12556">2.10.7</a></span><span class="ident">NOTE</span>
+In other words: the module hierarchy is a logical hierarchy which can, but doesn't have to be congruent with the file system  hierarchy.</div>
+<div style="margin-left:45px"><span class="label"><a name="12554">2.10.8</a></span>
+Each <b>submod</b> declaration constitutes a separate instance of a module, even if two or more modules in the module hierarchy are associated with the same file system directory.</div>
+<div style="margin-left:45px"><span class="label"><a name="12376">2.10.9</a></span>
+Modules are parsed and executed depth-first; when the parser meets a <b>submod</b> declaration, it parses the submodule before it continues with the current module.</div>
+<div style="margin-left:45px"><span class="label"><a name="12569">2.10.10</a></span>
+Implementations are expected to also support the <b>submodule</b> keyword as a synonym of <b>submod</b>.</div>
+<div style="margin-left:45px"><span class="label"><a name="12568">2.10.11</a></span><span class="ident">NOTE</span>
+In an earlier version of this specification the keyword <b>subdir</b> was used instead of <b>submod</b>. Implementations might want to continue <b>subdir</b> as a synonym and true functional subset of <b>submod</b>.  </div>
+<h4 style="margin-left:27px"><span class="label"><a name="12241">2.11</a></span>
 Alternative Syntax</h4>
-<div style="margin-left:45px"><span class="label"><a name="12251">2.10.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12251">2.11.1</a></span>
 The syntax version so far has a C flair. For people preferring a Pascal flair syntax, BUSY makes the following alternatives available.</div>
-<div style="margin-left:45px"><span class="label"><a name="12252">2.10.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12252">2.11.2</a></span>
 Syntax:</div>
-<div style="margin-left:63px"><span class="label"><a name="12247">2.10.2.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12247">2.11.2.1</a></span>
 <code>condition ::= if expression then block { elsif expression then block } [ else block ] end</code></div>
-<div style="margin-left:63px"><span class="label"><a name="12242">2.10.2.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12242">2.11.2.2</a></span>
 <code>initializer ::= constructor | ':=' expression</code></div>
-<div style="margin-left:63px"><span class="label"><a name="12249">2.10.2.3</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12249">2.11.2.3</a></span>
 <code>constructor ::= begin block end</code></div>
-<div style="margin-left:63px"><span class="label"><a name="12250">2.10.2.4</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12250">2.11.2.4</a></span>
 <code>assignment ::= designator ':=' expression</code></div>
-<div style="margin-left:63px"><span class="label"><a name="12361">2.10.2.5</a></span>
-<code>subdirectory ::= subdir identdef [ ':=' ( path | ident ) ]</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12361">2.11.2.5</a></span>
+<code>submodule ::= submod identdef [ ':=' ( path | ident ) ]</code></div>
 <h4 style="margin-left:9px"><span class="label"><a name="11631">3</a></span>
 <b>Predeclared Class Reference</b></h4>
 <h4 style="margin-left:27px"><span class="label"><a name="11686">3.1</a></span>
@@ -778,6 +810,14 @@ All output files must be inside the output directory of the build. You would gen
 Both <a href="#11885">sources</a> and <a href="#11907">outputs</a> must be specified. Sources can include as many files as you want, but there can only be one item in the outputs list (plural is used for the name for consistency with other target types).</div>
 <div style="margin-left:81px"><span class="label"><a name="11906">3.2.5.2.4</a></span>
 If there is more than one source file, your output name should specify a mapping from each source file to an output file name. TODO</div>
+<div style="margin-left:63px"><span class="label"><a name="12484">3.2.5.3</a></span>
+TODO CopyDeps</div>
+<div style="margin-left:81px"><span class="label"><a name="12485">3.2.5.3.1</a></span>
+Copy all files delivered by deps</div>
+<div style="margin-left:63px"><span class="label"><a name="12482">3.2.5.4</a></span>
+TODO ClearDeps</div>
+<div style="margin-left:81px"><span class="label"><a name="12483">3.2.5.4.1</a></span>
+Delete all files delivered by deps</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11697">4</a></span>
 <b>Predeclared Field Reference</b></h4>
 <h4 style="margin-left:27px"><span class="label"><a name="11917">4.1</a></span>
@@ -1140,33 +1180,35 @@ type CompilerType = ( `msvc, `gcc, `clang )</div>
 <b>Predeclared Variable Reference</b></h4>
 <div style="margin-left:27px"><span class="label"><a name="12364">6.1</a></span>
 <b>TODO</b></div>
-<div style="margin-left:27px"><span class="label"><a name="11921">6.2</a></span>
+<div style="margin-left:27px"><span class="label"><a name="12574">6.2</a></span>
+let busy_version: string</div>
+<div style="margin-left:27px"><span class="label"><a name="11921">6.3</a></span>
 let host_cpu: CpuType</div>
-<div style="margin-left:27px"><span class="label"><a name="11922">6.3</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11922">6.4</a></span>
 let host_cpu_ver: int</div>
-<div style="margin-left:27px"><span class="label"><a name="11923">6.4</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11923">6.5</a></span>
 let host_wordsize: WordSize</div>
-<div style="margin-left:27px"><span class="label"><a name="11924">6.5</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11924">6.6</a></span>
 let host_os: OsType</div>
-<div style="margin-left:27px"><span class="label"><a name="11925">6.6</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11925">6.7</a></span>
 let host_toolchain: CompilerType</div>
-<div style="margin-left:27px"><span class="label"><a name="11926">6.7</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11926">6.8</a></span>
 let host_toolchain_ver: int</div>
-<div style="margin-left:27px"><span class="label"><a name="11933">6.8</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11933">6.9</a></span>
 let root_build_dir: path</div>
-<div style="margin-left:27px"><span class="label"><a name="12034">6.9</a></span>
+<div style="margin-left:27px"><span class="label"><a name="12034">6.10</a></span>
 let root_source_dir: path</div>
-<div style="margin-left:27px"><span class="label"><a name="11927">6.10</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11927">6.11</a></span>
 var target_cpu: CpuType</div>
-<div style="margin-left:27px"><span class="label"><a name="11928">6.11</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11928">6.12</a></span>
 var target_cpu_ver: int</div>
-<div style="margin-left:27px"><span class="label"><a name="11929">6.12</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11929">6.13</a></span>
 var target_wordsize: WordSize</div>
-<div style="margin-left:27px"><span class="label"><a name="11930">6.13</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11930">6.14</a></span>
 var target_os: OsType</div>
-<div style="margin-left:27px"><span class="label"><a name="11931">6.14</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11931">6.15</a></span>
 var target_toolchain: CompilerType</div>
-<div style="margin-left:27px"><span class="label"><a name="11932">6.15</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11932">6.16</a></span>
 var target_toolchain_ver: int</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11996">7</a></span>
 <b>Predeclared Procedure Reference</b></h4>
@@ -1175,19 +1217,19 @@ abspath</h4>
 <div style="margin-left:45px"><span class="label"><a name="12008">7.1.1</a></span>
 <b>abspath(): path</b></div>
 <div style="margin-left:63px"><span class="label"><a name="12009">7.1.1.1</a></span>
-Returns the absolute path of the current module (i.e. the BUSY file currently analyzed)</div>
+Returns the absolute file system path associated with the current module.</div>
 <div style="margin-left:45px"><span class="label"><a name="12010">7.1.2</a></span>
 <b>abspath(p: path): path</b></div>
 <div style="margin-left:63px"><span class="label"><a name="12011">7.1.2.1</a></span>
-Returns the absolute path of p relative to the current module, or p if already absolute</div>
+Returns the absolute file system path of p relative to the path associated with the current module, or p if already absolute.</div>
 <div style="margin-left:45px"><span class="label"><a name="12012">7.1.3</a></span>
 <b>abspath(m: module): path</b></div>
 <div style="margin-left:63px"><span class="label"><a name="12013">7.1.3.1</a></span>
-Returns the absolute path of the module (i.e. a subdir identifier)</div>
+Returns the absolute file system path associated with the designated module.</div>
 <div style="margin-left:45px"><span class="label"><a name="12015">7.1.4</a></span>
 <b>abspath(m: module; p: path): path</b></div>
 <div style="margin-left:63px"><span class="label"><a name="12016">7.1.4.1</a></span>
-Returns the absolute path of p relative to the given module.</div>
+Returns the absolute file system path of p relative to the path associated with the designated module.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12006">7.2</a></span>
 dump</h4>
 <div style="margin-left:45px"><span class="label"><a name="12391">7.2.1</a></span>
@@ -1207,15 +1249,17 @@ Expects one or more string arguments. Prints the concatenated arguments to the c
 <div style="margin-left:63px"><span class="label"><a name="12052">7.5.1.1</a></span>
 Read the given file as UTF-8 string. Double quotes and \ are replaced by \" and \\. Line breaks and the like are replaced by space. Leading and trailing white space (blanks, line breaks) is stripped. The maximum supported file lengh is limited to 16'000 bytes.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12014">7.6</a></span>
-<b>relpath()</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="12019">7.6.1</a></span>
+<b>relpath</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12546">7.6.1</a></span>
+The returned path is a logical path; the module associated with the root of the source tree is represented by '.'; each successive name segment corresponds to the identifier used in the <b>submod</b> declaration; there is no requirement that the physical directory hierarchy is congruent with the module hierarchy; see <a href="#12169">2.10 Modules</a> for more information.</div>
+<div style="margin-left:45px"><span class="label"><a name="12019">7.6.2</a></span>
 <b>relpath(): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12017">7.6.1.1</a></span>
-Returns the path relative to the root directory of the source tree</div>
-<div style="margin-left:45px"><span class="label"><a name="12020">7.6.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12017">7.6.2.1</a></span>
+Returns the path relative to the module associated with the root directory of the source tree.</div>
+<div style="margin-left:45px"><span class="label"><a name="12020">7.6.3</a></span>
 <b>relpath(m: module): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12021">7.6.2.1</a></span>
-Returns the path of the module (i.e. a subdir identifier) relative to the root directory of the source tree</div>
+<div style="margin-left:63px"><span class="label"><a name="12021">7.6.3.1</a></span>
+Returns the path of the designated module relative to the module associated with the root directory of the source tree.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11997">7.7</a></span>
 samelist</h4>
 <div style="margin-left:45px"><span class="label"><a name="12395">7.7.1</a></span>
@@ -1246,8 +1290,20 @@ For symbols only the string part without <code>`</code> prefix is returned.</div
 topath</h4>
 <div style="margin-left:45px"><span class="label"><a name="12403">7.12.1</a></span>
 Expects one argument of type string. Tries to convert the string into a normalized representation as specified in <a href="#12080">2.3.8 Paths</a>. If that succeeds, the path is returned, otherwise the execution halts with an error.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12003">7.13</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12441">7.13</a></span>
+trycompile</h4>
+<div style="margin-left:45px"><span class="label"><a name="12450">7.13.1</a></span>
+This function compiles C code (without linking). Returns true, if the compiler returns with no error, false otherwise. The following versions of the function are available:</div>
+<div style="margin-left:45px"><span class="label"><a name="12442">7.13.2</a></span>
+<b>trycompile(code:string):bool</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12452">7.13.3</a></span>
+<b>trycompile(code: string; defines: string[]):bool</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12453">7.13.4</a></span>
+<b>trycompile(code: string; defines: string[]; include_dirs: path[]):bool</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12443">7.13.5</a></span>
+<b>trycompile(code: string; defines: string[]; include_dirs: path[]; cflags: string[]):bool</b></div>
+<h4 style="margin-left:27px"><span class="label"><a name="12003">7.14</a></span>
 warning</h4>
-<div style="margin-left:45px"><span class="label"><a name="12394">7.13.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12394">7.14.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stderr).</div>
 </body></html>

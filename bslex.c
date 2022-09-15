@@ -1118,6 +1118,8 @@ const char*bslex_tostring(int tok)
     case Tok_let: return "let";
     case Tok_param: return "param";
     case Tok_subdir: return "subdir";
+    case Tok_submod: return "submod";
+    case Tok_submodule: return "submodule";
     case Tok_then: return "then";
     case Tok_true: return "true";
     case Tok_type: return "type";
@@ -1385,12 +1387,29 @@ static BSTokType tokenTypeFromString( const char* str, int* pos )
     case 's':
         if( at(str,i+1) == 'u' ){
             if( at(str,i+2) == 'b' ){
-                if( at(str,i+3) == 'd' ){
+                switch( at(str,i+3) ){
+                case 'd':
                     if( at(str,i+4) == 'i' ){
                         if( at(str,i+5) == 'r' ){
                             res = Tok_subdir; i += 6;
                         }
                     }
+                    break;
+                case 'm':
+                    if( at(str,i+4) == 'o' ){
+                        if( at(str,i+5) == 'd' ){
+                            if( at(str,i+6) == 'u' ){
+                                if( at(str,i+7) == 'l' ){
+                                    if( at(str,i+8) == 'e' ){
+                                        res = Tok_submodule; i += 9;
+                                    }
+                                }
+                            } else {
+                                res = Tok_submod; i += 6;
+                            }
+                        }
+                    }
+                    break;
                 }
             }
         }

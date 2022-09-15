@@ -6,13 +6,13 @@ BUSY (for *BU*ild *SY*stem) is a lean, cross-platform build system for the GCC, 
 
 Compared to other build systems like CMake, QMake, Meson or GN, BUSY is characterized by a **statically typed** build specification language, and by the possibility to build a project directly from scratch without any further requirements to the host system; BUSY is so lean that it is even suited to be directly integrated with the source tree of a project. 
 
-Here is an **example project** using BUSY: https://github.com/rochus-keller/nappgui/tree/OBX. NAppGUI is an extensive cross-platform GUI library written in C89 (with parts in C++99 and Objective-C) by Francisco García. See the README on how to build the project and check the BUSY files in the root and the src directory (and subdirectories). See below and in the syntax directory for more information about the specification language. Those who know GN will recognize various concepts in BUSY.
+Here is an **example project** using BUSY: https://github.com/rochus-keller/nappgui/tree/BUSY2. NAppGUI is an extensive cross-platform GUI library written in C89 (with parts in C++99 and Objective-C) by Francisco García. See the README on how to build the project and check the BUSY files in the root and the src directory (and subdirectories). See below and in the syntax directory for more information about the specification language. Those who know GN will recognize various concepts in BUSY.
 
 Here are a few excerpts for convenience:
 
 ```
 # from the top-level BUSY file
-subdir src
+submod src
 
 let shared_lib* = src.shared_lib
 let static_lib* = src.static_lib
@@ -31,8 +31,8 @@ let main_config - : Config {
 		"NAPPGUI_BUILD=\"" + readstring('../prj/build.txt') + "\"" ]
 }
 
-subdir core
-subdir draw2d
+submod core
+submod draw2d
 	# and many more
 	
 let all_lib_sources : Group { # only visible in this BUSY file
@@ -51,7 +51,7 @@ let static_lib* : Library {
 ```
 ```
 # from the draw2d BUSY file
-subdir gtk3
+submod gtk3
 
 let sources * : SourceSet {
 	.sources = [
@@ -119,9 +119,9 @@ With the `-S` option you can explicitly set the path to the root of the source d
 
 With the `-B` option you can explicitly set the path to the root of the build directory tree.
 
-With the `-T` option you can explicitly select which products should be built; e.g. `-T my_lib` would look for a public variable declaration of a `Product` subtype named "my_lib" in the root BUSY file; it is also possible to select more than one product, or a product from a BUSY file located further down the source tree; the latter must be visible from the root (i.e. the variable and subdirectory declarations in the designator must be public).
+With the `-T` option you can explicitly select which products should be built; e.g. `-T my_lib` would look for a public variable declaration of a `Product` subtype named "my_lib" in the root BUSY file; it is also possible to select more than one product, or a product from a BUSY file located further down the source tree; the latter must be visible from the root (i.e. the variable and submodule declarations in the designator must be public).
 
-With the `-P` option parameter values can be set; the syntax is `-P x.y=value`, where value is a valid BUSY basic type literal syntax; the syntax of strings and symbols usually has to make use of command line escapes, e.g. like `-P "string_param=\"this is a string\""`. Again it is possible to set parameters of BUSY files located further down the source tree, but only if the subdirectory declarations in the designator are public.
+With the `-P` option parameter values can be set; the syntax is `-P x.y=value`, where value is a valid BUSY basic type literal syntax; the syntax of strings and symbols usually has to make use of command line escapes, e.g. like `-P "string_param=\"this is a string\""`. Again it is possible to set parameters of BUSY files located further down the source tree, but only if the submodule declarations in the designator are public.
 
 With the `-c` option only the parser/analyzer is run to check the BUSY files. No build is run, no files or directories are generated.
 
@@ -133,7 +133,7 @@ Builds are specified using BUSY files including code written in the BUSY specifi
 
 There is a BUSY file in the root of the source tree and any subdirectory which includes files or other subdirectories relevant to the build.
 
-The BUSY files are the "modules" of the specification language. Declarations are only visible within the module unless declared public (`*`, visible to outer and nested modules) or protected (`-`, visible only to nested modules). Subdirectories must be explicitly declared using the `subdir` keyword. 
+The BUSY files are the "modules" of the specification language. Declarations are only visible within the module unless declared public (`*`, visible to outer and nested modules) or protected (`-`, visible only to nested modules). Submodules must be explicitly declared and associated with the corresponding directories using the `submod` keyword. 
 
 The specification makes use of pre-declared types, procedures and variables. Pre-declared types are the basic types `bool`, `int`, `real`, `string`, `path` and `symbol`, enumeration types like ```type LibraryType* = (`static, `shared, `framework)```, and class types like 
 
