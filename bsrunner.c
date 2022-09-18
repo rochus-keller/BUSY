@@ -379,12 +379,12 @@ static void compilesources(lua_State* L, int inst, int builtins)
             {
             case BS_gcc:
             case BS_clang:
-                lua_pushstring(L,"-O2 -c -o ");
+                lua_pushstring(L," -O2 -c -o ");
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,out) ) );
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,src) ) );
                 break;
             case BS_msvc:
-                lua_pushstring(L,"/nologo /O2 /MD /c /Fo");
+                lua_pushstring(L," /nologo /O2 /MD /c /Fo");
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,out) ) );
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,src) ) );
                 break;

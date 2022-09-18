@@ -15,14 +15,14 @@
 // http://www.fsf.org/licensing/licenses/info/GPLv2.html and
 // http://www.gnu.org/copyleft/gpl.html.
 
-Busy ::=  { ( subdirectory | declaration | statement | macrodef ) [';'] }
+Busy ::=  { ( Submodule | declaration | statement | macrodef ) [';'] }
 
 typeref ::= designator [ '[]' ]
 // desig instead of ident because type could be an enum or class declared in some other module
 
 // basic type is integer | real | string | boolean | path | symbol
 
-subdirectory ::= ( submodule | submod | subdir ) identdef [ ( '=' | ':=' ) ( path | ident ) ]
+Submodule ::= ( submodule | submod | subdir ) identdef [ ( '=' | ':=' ) ( path | ident ) ]  [ '(' paramList ')' ]
 // subdir is deprecated
 // path can be any absolute or relative path; a relative path is interpreted relative to the current module;
 // the subdirectory structure is static; only what we do with it (i.e. dependencies) is dynamic;
@@ -30,10 +30,13 @@ subdirectory ::= ( submodule | submod | subdir ) identdef [ ( '=' | ':=' ) ( pat
 // a correspondence with a physical structure.
 // The subdir decl controls what status the system has before entering the directory
 // and it makes it explicit, which directories belong to the build and which don't.
+// maybe set params here
 
-//paramList ::= paramValue { ',' paramValue }
-
-//paramValue ::= ident '=' expression
+paramList ::= paramValue { [','] paramValue }
+paramValue ::=  ident [ ( '=' | ':=' ) expression ] 
+// default value if no expression is true
+// ident must be a parameter of the submodule, on submodule level
+// TODO: should we be able to set params of subsubmodules?
 
 declaration ::= vardecl | typedecl
 
@@ -46,7 +49,7 @@ macrodef ::= define identdef (   // rather "macro instruction"; similarities wit
 	// macros are regular syntax, there is no preprocessor; macros are a sequence of tokens which is
 	// inserted wherever the macro is referenced; the expressions of a macro reference are inserted
 	// into the token stream where the argument is referenced.
-body ::= '{' { ( subdirectory | declaration | statement ) [';'] } '}'
+body ::= '{' { ( Submodule | declaration | statement ) [';'] } '}'
 
 // TODO: include directives, only on top-level, not in a macro
 // the include just inlines text, whereas import is a separate module and namespace;

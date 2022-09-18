@@ -265,6 +265,8 @@ static void addToScope(BSParserContext* ctx, BSScope* scope, BSIdentDef* id, int
     BS_END_LUA_FUNC(ctx);
 }
 
+static int expression(BSParserContext* ctx, BSScope* scope, int lhsType);
+static void parampath(BSParserContext* ctx, const char* name, int len);
 static void submodule(BSParserContext* ctx, int subdir)
 {
     BS_BEGIN_LUA_FUNC(ctx,0);
@@ -275,6 +277,7 @@ static void submodule(BSParserContext* ctx, int subdir)
     if( id.visi == BS_PublicDefault )
         error(ctx, id.loc.row, id.loc.col,"'!' is not applicable here" );
     BSToken t = peekToken(ctx,1);
+    BSToken pt = t;
     if( t.tok == Tok_Eq || t.tok == Tok_ColonEq )
     {
         nextToken(ctx); // eat '='
@@ -283,6 +286,7 @@ static void submodule(BSParserContext* ctx, int subdir)
         {
             path = t.val;
             pathlen = t.len;
+            pt = t;
 
             // We now support all paths (no necessity of source-tree and dir-tree correspondence)
             // #rdir is made of idents, not dir names
@@ -298,7 +302,7 @@ static void submodule(BSParserContext* ctx, int subdir)
                         pathlen -= 2;
                     }
                     if( strncmp(path,"//",2) == 0 || strncmp(path,"..",2) == 0)
-                        error(ctx, t.loc.row, t.loc.col,"this path is not supported here" );
+                        error(ctx, pt.loc.row, pt.loc.col,"this path is not supported here" );
                     if( strncmp(path,".",1) == 0 )
                     {
                         path += 2;
@@ -308,12 +312,90 @@ static void submodule(BSParserContext* ctx, int subdir)
                     for( i = 0; i < pathlen; i++ )
                     {
                         if( path[i] == '/' )
-                            error(ctx, t.loc.row, t.loc.col,"expecting an immediate subdirectory" );
+                            error(ctx, pt.loc.row, pt.loc.col,"expecting an immediate subdirectory" );
                     }
                 }
             }
         }else
-            error(ctx, t.loc.row, t.loc.col,"expecting a path or an ident" );
+            error(ctx, pt.loc.row, pt.loc.col,"expecting a path or an ident" );
+    }
+
+    t = peekToken(ctx,1);
+    if( t.tok == Tok_Lpar )
+    {
+        nextToken(ctx); // eat lpar
+        t = peekToken(ctx,1);
+        while( t.tok != Tok_Rpar && t.tok != Tok_Eof )
+        {
+            if( t.tok != Tok_ident )
+                error(ctx, t.loc.row, t.loc.col,"expexting an identifier" );
+            nextToken(ctx); // eat ident
+            BSToken pname = t;
+            parampath(ctx,id.name,id.len);
+            lua_pop(ctx->L,1);
+            lua_pushstring(ctx->L,".");
+            lua_pushlstring(ctx->L,pname.val,pname.len);
+            lua_concat(ctx->L,3);
+            const int nm = lua_gettop(ctx->L);
+            t = peekToken(ctx,1);
+            if( t.tok == Tok_Eq || t.tok == Tok_ColonEq )
+            {
+                nextToken(ctx); // eat eq
+                t = peekToken(ctx,1);
+                expression(ctx,&ctx->module,0);
+                lua_getfield(ctx->L,-1,"#kind");
+                const int kind = lua_tointeger(ctx->L,-1);
+                lua_pop(ctx->L,2); // type, kind
+                if( kind != BS_BaseType )
+                    error(ctx, t.loc.row, t.loc.col,"parameter value must be of basic type" );
+                switch( lua_type(ctx->L,-1) )
+                {
+                case LUA_TBOOLEAN:
+                    lua_pushstring(ctx->L, lua_toboolean(ctx->L,-1) ? "true" : "false");
+                    lua_replace(ctx->L,-2);
+                    break;
+                case LUA_TNUMBER:
+                    lua_pushstring(ctx->L, lua_tostring(ctx->L,-1));
+                    lua_replace(ctx->L,-2);
+                    break;
+                case LUA_TSTRING:
+                    break;
+                }
+                t = peekToken(ctx,1);
+            }else
+            {
+                lua_pushstring(ctx->L,"true");
+            }
+            const int val = lua_gettop(ctx->L);
+            // check if param is already set, otherwise set it
+            lua_pushvalue(ctx->L,nm);
+            lua_rawget(ctx->L,BS_Params);
+            const int overridden = !lua_isnil(ctx->L,-1);
+            lua_pop(ctx->L,1);
+            if( overridden )
+            {
+                warning(ctx,pname.loc.row,pname.loc.col,"parameter %s is overridden by outer value", lua_tostring(ctx->L,nm));
+                lua_pop(ctx->L,2); // nm, val
+            }else
+            {
+                lua_createtable(ctx->L,0,0);
+                lua_pushvalue(ctx->L,-2);
+                lua_rawseti(ctx->L,-2,1); // the param value is a table which carries the value in index 1
+                lua_replace(ctx->L,-2);
+                // stack: nm, tables
+                // because value is boxed in a table the module knows not to do visibility check
+                lua_rawset(ctx->L,BS_Params);
+            }
+            if( t.tok == Tok_Comma )
+            {
+                nextToken(ctx); // eat comma
+                t = peekToken(ctx,1);
+            }
+        }
+        if( t.tok == Tok_Eof )
+            error(ctx, t.loc.row, t.loc.col,"non-terminated module parameter list" );
+        else
+            nextToken(ctx); // eat rpar
     }
 
     lua_createtable(ctx->L,0,0); // module definition
@@ -345,7 +427,7 @@ static void submodule(BSParserContext* ctx, int subdir)
             lua_getfield(ctx->L,ctx->module.table,"#dir");
             lua_pushlstring(ctx->L,path,pathlen);
             if( bs_add_path(ctx->L, -2, -1) != 0 )
-                error(ctx, t.loc.row, t.loc.col,"cannot convert this path" );
+                error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path" );
             lua_replace(ctx->L,-3);
             lua_pop(ctx->L,1);
         }else
@@ -363,7 +445,7 @@ static void submodule(BSParserContext* ctx, int subdir)
         // if path is already present then this module is called recursively, i.e. indefinitely
         lua_getfield(ctx->L,-1,"#dir");
         if( lua_equal(ctx->L,newPath,-1) )
-            error(ctx, t.loc.row, t.loc.col,"path points to the same directory as current or outer module" );
+            error(ctx, pt.loc.row, pt.loc.col,"path points to the same directory as current or outer module" );
         lua_pop(ctx->L,1);
         lua_getfield(ctx->L,-1,"^");
         lua_replace(ctx->L,-2);
@@ -1696,7 +1778,6 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
     BS_END_LUA_FUNC(ctx);
 }
 
-static int expression(BSParserContext* ctx, BSScope* scope, int lhsType);
 static void vardecl(BSParserContext* ctx, BSScope* scope);
 static void condition(BSParserContext* ctx, BSScope* scope);
 static void assigOrCall(BSParserContext* ctx, BSScope* scope);
@@ -2927,10 +3008,10 @@ static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken
     BS_END_LUA_FUNC(ctx);
 }
 
-static void parampath(BSParserContext* ctx, BSIdentDef* id)
+static void parampath(BSParserContext* ctx, const char* name, int len)
 {
     BS_BEGIN_LUA_FUNC(ctx,2);
-    lua_pushlstring(ctx->L,id->name, id->len);
+    lua_pushlstring(ctx->L,name, len);
     const int path = lua_gettop(ctx->L);
     lua_pushvalue(ctx->L,ctx->module.table);
     const int curmod = lua_gettop(ctx->L);
@@ -3161,7 +3242,7 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
 
         if( kind == Tok_param )
         {
-            parampath(ctx,&id);
+            parampath(ctx,id.name,id.len);
 
             const int accessible = lua_tointeger(ctx->L,-1);
             lua_pop(ctx->L,1);
@@ -3171,7 +3252,11 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
             // stack: desig, val or nil
             if( !lua_isnil(ctx->L,-1) )
             {
-                if( !accessible )
+                if( lua_istable(ctx->L,-1) )
+                {
+                    lua_rawgeti(ctx->L,-1,1);
+                    lua_replace(ctx->L,-2);
+                }else if( !accessible )
                     error(ctx, id.loc.row, id.loc.col,
                            "the parameter %s cannot be set because it is not visible from the root directory",
                            lua_tostring(ctx->L,desig));
