@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-09-15, Work in progress</div>
+2022-09-19, Work in progress</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -420,7 +420,7 @@ Variables declared with <b>var</b> or <b>param</b> are mutable. Variables declar
 <div style="margin-left:45px"><span class="label"><a name="12170">2.6.4</a></span>
 The explicit type reference is optional if an default vallue is assigned; if an explicit type reference is present, then the type of the default value must be assignment compatible with the explicit type (see <a href="#12240">2.8.3 Assignments</a>).</div>
 <div style="margin-left:45px"><span class="label"><a name="12379">2.6.5</a></span>
-Variables declared as <b>param</b> can only be of basic or enumeration type.</div>
+Variables declared as <b>param</b> can only be of basic or enumeration type, and can be set from either the outer module (see <a href="#12109">2.4 Declarations and scope rules</a> and <a href="#12169">2.10 Modules</a>) or by means provided by the compiler implementation (e.g. command line parameters). </div>
 <div style="margin-left:45px"><span class="label"><a name="12171">2.6.6</a></span>
 If an explicit type reference is present and of class type, then the initializer can be an object constructor. Before the object constructor runs, an instance of the explicit class type is created and initialized with default values by the runtime. The created instance is mutable within the constructor block even if the variable is declared with <b>let</b>. The created instance can be referenced by a designator with a '.' prefix (local instance operator). Here is an example:</div>
 <div style="margin-left:63px"><span class="label"><a name="12190">2.6.6.1</a></span>
@@ -651,7 +651,7 @@ Calls</h4>
 <div style="margin-left:63px"><span class="label"><a name="12353">2.8.5.1</a></span>
 A procedure call activates a predeclared procedure. It has a (possibly empty) a list of actual parameters. The correspondence is established by the positions. </div>
 <div style="margin-left:63px"><span class="label"><a name="12357">2.8.5.2</a></span>
-Each actual parameter must be an expression. This expression is evaluated before the procedure activation, and the resulting value is assigned to the formal parameter.</div>
+Each actual parameter must be an expression. This expression is evaluated before the procedure activation, and the resulting value is assigned to the formal parameter. The evaluation order is from left to right.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12570">2.9</a></span>
 Macros</h4>
 <div style="margin-left:45px"><span class="label"><a name="12576">2.9.1</a></span>
@@ -678,8 +678,12 @@ A module is associated with a directory in the file system, and specifically wit
 Syntax:</div>
 <div style="margin-left:63px"><span class="label"><a name="12359">2.10.3.1</a></span>
 <code>Module ::= { ( submodule | declaration | statement | macrodef ) [';'] }</code></div>
-<div style="margin-left:63px"><span class="label"><a name="12360">2.10.3.2</a></span>
-<code>submodule ::= </code><b><code>submod</code></b><code> identdef [ '=' ( path | ident ) ]</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12586">2.10.3.2</a></span>
+<code>submodule ::= submod  identdef [ '=' ( path | ident ) ][ '(' paramList ')' ]</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12587">2.10.3.3</a></span>
+<code>paramList ::= paramValue { [','] paramValue }</code></div>
+<div style="margin-left:63px"><span class="label"><a name="12588">2.10.3.4</a></span>
+<code>paramValue ::= ident [ ( '=' | ':=' ) expression ]</code></div>
 <div style="margin-left:45px"><span class="label"><a name="12374">2.10.4</a></span>
 Modules are in a hierarchical relationship to each other. This relationship is explicit. Each module - starting from the module which represents the root directory of the source tree - declares which other modules belong to the build using the <b>submod</b> declaration. A <b>submod</b> declaration references the file system directory the module is associated with, and makes the submodule accessible to the current module by the given identifier. </div>
 <div style="margin-left:45px"><span class="label"><a name="12551">2.10.5</a></span>
@@ -692,9 +696,11 @@ In other words: the module hierarchy is a logical hierarchy which can, but doesn
 Each <b>submod</b> declaration constitutes a separate instance of a module, even if two or more modules in the module hierarchy are associated with the same file system directory.</div>
 <div style="margin-left:45px"><span class="label"><a name="12376">2.10.9</a></span>
 Modules are parsed and executed depth-first; when the parser meets a <b>submod</b> declaration, it parses the submodule before it continues with the current module.</div>
-<div style="margin-left:45px"><span class="label"><a name="12569">2.10.10</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12589">2.10.10</a></span>
+A <b>submod</b> declaration may have a list of parameter names and optional value expressions. The value expressions are evaluated from left to right. The name identifier must correspond to a name of a <b>param</b> declaration in the submodule (see <a href="#12151">2.6 Variable declarations</a>). If the value expression is missing, <b>true</b> is assumed as value. Parameter values set by means provided by the compiler override the parameter values set via <b>submod</b> declaration.</div>
+<div style="margin-left:45px"><span class="label"><a name="12569">2.10.11</a></span>
 Implementations are expected to also support the <b>submodule</b> keyword as a synonym of <b>submod</b>.</div>
-<div style="margin-left:45px"><span class="label"><a name="12568">2.10.11</a></span><span class="ident">NOTE</span>
+<div style="margin-left:45px"><span class="label"><a name="12568">2.10.12</a></span><span class="ident">NOTE</span>
 In an earlier version of this specification the keyword <b>subdir</b> was used instead of <b>submod</b>. Implementations might want to continue <b>subdir</b> as a synonym and true functional subset of <b>submod</b>.  </div>
 <h4 style="margin-left:27px"><span class="label"><a name="12241">2.11</a></span>
 Alternative Syntax</h4>

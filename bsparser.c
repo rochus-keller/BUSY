@@ -1359,78 +1359,82 @@ static void readstring(BSParserContext* ctx, int n, int row, int col)
         lua_pop(ctx->L,1);
     }
 
-    FILE* f = bs_fopen(bs_denormalize_path(lua_tostring(ctx->L,-2)),"r");
-    if( f == NULL )
-        error(ctx, row, col,"cannot open file for reading: %s", lua_tostring(ctx->L,-2) );
-    fseek(f, 0L, SEEK_END);
-    int sz = ftell(f);
-    if( sz < 0 )
-        error(ctx, row, col,"cannot determine file size: %s", lua_tostring(ctx->L,-2) );
-    rewind(f);
-    if( sz > 16000 )
-        error(ctx, row, col,"file is too big to be read: %s", lua_tostring(ctx->L,-2) );
-    char* tmp1 = (char*) malloc(sz+1);
-    char* tmp2 = (char*) malloc(2*sz+1);
-    if( tmp1 == NULL || tmp2 == NULL )
-        error(ctx, row, col,"not enough memory to read file: %s", lua_tostring(ctx->L,-2) );
-    if( fread(tmp1,1,sz,f) != (size_t)sz )
+    if( !ctx->skipMode )
     {
-        free(tmp1);
-        free(tmp2);
-        error(ctx, row, col,"error reading file: %s", lua_tostring(ctx->L,-2) );
-    }
-    tmp1[sz] = 0;
-    char* p = tmp1;
-    char* q = tmp2;
-    char* lastnws = 0;
-    while( sz )
-    {
-        uchar n = 0;
-        const uint ch = unicode_decode_utf8((const uchar*) p, &n);
-        if( n == 0 || ch == 0 )
+        FILE* f = bs_fopen(bs_denormalize_path(lua_tostring(ctx->L,-2)),"r");
+        if( f == NULL )
+            error(ctx, row, col,"cannot open file for reading: %s", lua_tostring(ctx->L,-2) );
+        fseek(f, 0L, SEEK_END);
+        int sz = ftell(f);
+        if( sz < 0 )
+            error(ctx, row, col,"cannot determine file size: %s", lua_tostring(ctx->L,-2) );
+        rewind(f);
+        if( sz > 16000 )
+            error(ctx, row, col,"file is too big to be read: %s", lua_tostring(ctx->L,-2) );
+        char* tmp1 = (char*) malloc(sz+1);
+        char* tmp2 = (char*) malloc(2*sz+1);
+        if( tmp1 == NULL || tmp2 == NULL )
+            error(ctx, row, col,"not enough memory to read file: %s", lua_tostring(ctx->L,-2) );
+        if( fread(tmp1,1,sz,f) != (size_t)sz )
         {
             free(tmp1);
             free(tmp2);
-            error(ctx, row, col,"invalid utf-8 format: %s", lua_tostring(ctx->L,-2) );
+            error(ctx, row, col,"error reading file: %s", lua_tostring(ctx->L,-2) );
         }
-        if( unicode_isspace(ch) && q == tmp2 )
-            ; // swallow leading white space
-        else
-            switch(ch)
+        tmp1[sz] = 0;
+        char* p = tmp1;
+        char* q = tmp2;
+        char* lastnws = 0;
+        while( sz )
+        {
+            uchar n = 0;
+            const uint ch = unicode_decode_utf8((const uchar*) p, &n);
+            if( n == 0 || ch == 0 )
             {
-            case '\n':
-            case '\r':
-            case '\b':
-            case '\f':
-            case '\t':
-            case '\v':
-                *q++ = ' ';
-                break;
-            case '\\':
-                *q++ = '\\';
-                *q = '\\';
-                lastnws = q++;
-                break;
-            case '"':
-                *q++ = '\\';
-                *q = '"';
-                lastnws = q++;
-                break;
-            default:
-                if( !unicode_isspace(ch) )
-                    lastnws = q;
-                memcpy(q,p,n);
-                q += n;
+                free(tmp1);
+                free(tmp2);
+                error(ctx, row, col,"invalid utf-8 format: %s", lua_tostring(ctx->L,-2) );
             }
-        sz -= n;
-        p += n;
-    }
-    if( lastnws )
-        q = lastnws + 1;
-    *q = 0;
-    lua_pushstring(ctx->L, tmp2);
-    free(tmp1);
-    free(tmp2);
+            if( unicode_isspace(ch) && q == tmp2 )
+                ; // swallow leading white space
+            else
+                switch(ch)
+                {
+                case '\n':
+                case '\r':
+                case '\b':
+                case '\f':
+                case '\t':
+                case '\v':
+                    *q++ = ' ';
+                    break;
+                case '\\':
+                    *q++ = '\\';
+                    *q = '\\';
+                    lastnws = q++;
+                    break;
+                case '"':
+                    *q++ = '\\';
+                    *q = '"';
+                    lastnws = q++;
+                    break;
+                default:
+                    if( !unicode_isspace(ch) )
+                        lastnws = q;
+                    memcpy(q,p,n);
+                    q += n;
+                }
+            sz -= n;
+            p += n;
+        }
+        if( lastnws )
+            q = lastnws + 1;
+        *q = 0;
+        lua_pushstring(ctx->L, tmp2);
+        free(tmp1);
+        free(tmp2);
+    }else
+        lua_pushstring(ctx->L,"");
     lua_getfield(ctx->L,ctx->builtins, "string");
     BS_END_LUA_FUNC(ctx);
 }
@@ -1657,18 +1661,21 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
     assert(res==0);
     lua_replace(ctx->L,tmppath);
 
-    if( !bs_exists(lua_tostring(ctx->L,rootOutDir)) )
+    if( !ctx->skipMode )
     {
-        if( bs_mkdir(lua_tostring(ctx->L,rootOutDir)) != 0 )
-            error(ctx, row, col,"error creating directory %s", lua_tostring(ctx->L,rootOutDir));
-    }
+        if( !bs_exists(lua_tostring(ctx->L,rootOutDir)) )
+        {
+            if( bs_mkdir(lua_tostring(ctx->L,rootOutDir)) != 0 )
+                error(ctx, row, col,"error creating directory %s", lua_tostring(ctx->L,rootOutDir));
+        }
 
-    FILE* tmp = bs_fopen(bs_denormalize_path(lua_tostring(ctx->L,tmppath)),"w");
-    if( tmp == NULL )
-        error(ctx, row, col,"cannot create temporary file %s", lua_tostring(ctx->L,tmppath) );
-    const int codelen = lua_objlen(ctx->L,first);
-    fwrite(lua_tostring(ctx->L,first),1,codelen,tmp);
-    fclose(tmp);
+        FILE* tmp = bs_fopen(bs_denormalize_path(lua_tostring(ctx->L,tmppath)),"w");
+        if( tmp == NULL )
+            error(ctx, row, col,"cannot create temporary file %s", lua_tostring(ctx->L,tmppath) );
+        const int codelen = lua_objlen(ctx->L,first);
+        fwrite(lua_tostring(ctx->L,first),1,codelen,tmp);
+        fclose(tmp);
+    }
 
     lua_getfield(ctx->L,binst,"target_toolchain");
     const int ts = lua_gettop(ctx->L);
@@ -1768,7 +1775,10 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
 
     //fprintf(stdout,"%s\n", lua_tostring(ctx->L,cmd));fflush(stdout); // TEST
 
-    const int res2 = !bs_exec(lua_tostring(ctx->L,cmd)); // works for all gcc, clang and cl
+    int res2 = 0;
+
+    if( !ctx->skipMode )
+        res2 = !bs_exec(lua_tostring(ctx->L,cmd)); // works for all gcc, clang and cl
 
     lua_pop(ctx->L,10); // binst, rootOutDir, tmppath, ts, os, cflags, defines, includes, dir, cmd
 

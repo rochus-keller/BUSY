@@ -89,6 +89,8 @@ begin
 end
 ```
 
+Another, a bit more complex example using BUSY is the (Oberon+ compiler command line version)[https://github.com/rochus-keller/Oberon]; see https://github.com/rochus-keller/LeanQt/blob/main/Readme.md on how to run the build.
+
 BUSY is based on and integrated with the Lua virtual machine (but it is written in C89, not in Lua). Lua is by far one of the easiest to build code bases on all platforms; the only requirement is a C89 compiler; BUSY follows this tradition and benefits from the great work of the Lua authors.
 
 ### Why yet another build system?
@@ -163,9 +165,9 @@ The current BUSY version so far has been used with the NAppGUI framework (see ht
 - [x] Support C as well as Pascal flair syntax versions
 - [x] Able to directly run the build (i.e. independently of Make, NMake or Ninja)
 - [x] Language specification
+- [x] Make a lean Qt source tree version using BUSY
 - [ ] Tutorials
 - [ ] Make a Mono CLR source tree version using BUSY
-- [ ] Make a lean Qt source tree version using BUSY
 - [ ] Check and adapt more concepts from GN as need be
 - [ ] Implement Ninja backend
 - [ ] Implement QMake backend
