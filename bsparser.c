@@ -724,10 +724,10 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
                "identifier doesn't reference a declaration; check spelling and declaration order" );
     if( method != Field )
     {
-        lua_getfield(ctx->L,-1,"#ro");
-        const int ro = lua_toboolean(ctx->L,-1);
+        lua_getfield(ctx->L,-1,"#rw");
+        const int rw = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
-        if( ro )
+        if( rw == BS_let || ( method != LocalOnly && rw == BS_param ) )
             ret = 1;
     }
 
@@ -3076,8 +3076,21 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
     const int var = lua_gettop(ctx->L);
     lua_pushinteger(ctx->L,BS_VarDecl);
     lua_setfield(ctx->L,var,"#kind");
-    lua_pushboolean(ctx->L,kind == Tok_let || kind == Tok_param);
-    lua_setfield(ctx->L,var,"#ro");
+    switch( kind )
+    {
+    case Tok_let:
+        lua_pushinteger(ctx->L,BS_let);
+        break;
+    case Tok_var:
+        lua_pushinteger(ctx->L,BS_var);
+        break;
+    case Tok_param:
+        lua_pushinteger(ctx->L,BS_param);
+        break;
+    default:
+        assert(0);
+    }
+    lua_setfield(ctx->L,var,"#rw");
 
     t = peekToken(ctx,1);
     int explicitType = 0;

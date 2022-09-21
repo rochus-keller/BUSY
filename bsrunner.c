@@ -1025,6 +1025,30 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
     luaL_error(L,"'Copy' not yet implemented");
 }
 
+static void message(lua_State* L,int inst, int cls, int builtins)
+{
+    lua_getfield(L,inst,"msg_type");
+    const int msg_type = lua_gettop(L);
+    if( strcmp(lua_tostring(L,msg_type),"error") == 0 )
+    {
+        lua_pushstring(L,"# ERR: ");
+        lua_getfield(L,inst,"text");
+        lua_concat(L,2);
+        lua_error(L);
+    }else if( strcmp(lua_tostring(L,msg_type),"warning") == 0 )
+    {
+        lua_getfield(L,inst,"text");
+        fprintf(stderr,"# WRN: %s\n", lua_tostring(L,-1));
+        fflush(stderr);
+    }else
+    {
+        lua_getfield(L,inst,"text");
+        fprintf(stdout,"# %s\n", lua_tostring(L,lua_gettop(L)));
+        fflush(stdout);
+    }
+    lua_pop(L,2); // msg_type, text
+}
+
 int bs_createBuildDirs(lua_State* L) // lua function; params: rootModuleDef, rootPath
 {
     enum { rootModule = 1, rootPath = 2 };
@@ -1105,6 +1129,8 @@ int bs_run(lua_State* L) // args: productinst, returns: inst
         foreach(L,inst,cls,builtins);
     else if( isa( L, builtins, cls, "Copy") )
         copy(L,inst,cls,builtins);
+    else if( isa( L, builtins, cls, "Message") )
+        message(L,inst,cls,builtins);
     else
         luaL_error(L,"don't know how to build instances of class '%s'", name);
 

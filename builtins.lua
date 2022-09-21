@@ -63,6 +63,11 @@ enumtype("LibraryType")
 	enumitem("shared")
 	enumitem("framework")
 	
+enumtype("MessageType")
+	enumitem("error")
+	enumitem("warning")
+	enumitem("info")
+	
 enumtype("OsType") 
 	enumitem("darwin")
 	enumitem("macos")
@@ -197,6 +202,10 @@ class("LuaScriptForeach", globals.Script)
 class("Copy", globals.Action)
 	field("sources", listOf(globals.path))
 	field("outputs", listOf(globals.path))
+
+class("Message", globals.Action)
+	field("msg_type", globals.MessageType) 
+	field("text", globals.string)
 
 
 ---- predeclared procs

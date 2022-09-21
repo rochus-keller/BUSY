@@ -50,6 +50,10 @@ typedef enum BSVisibility { // #visi
     BS_Private, BS_Protected, BS_Public, BS_PublicDefault
 } BSVisibility;
 
+typedef enum BSReadability { // #rw
+    BS_var, BS_let, BS_param
+} BSReadability;
+
 
 /* Expects
  * 1. an absolute, normalized path to the directory in which BUSY is present,
