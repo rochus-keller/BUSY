@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-09-19, Work in progress</div>
+2022-09-26, Work in progress</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -810,6 +810,8 @@ This product type allows you to run a Lua script a single time to produce one or
 <b>Main</b>: <a href="#11885">sources</a></div>
 <div style="margin-left:99px"><span class="label"><a name="11684">3.2.5.1.3.2</a></span>
 This product type allows you to run a script once-per-file over a set of sources. If you want to run a script once that takes many files as input, see <a href="#11679">LuaScript</a>.</div>
+<div style="margin-left:99px"><span class="label"><a name="12617">3.2.5.1.3.3</a></span>
+The <a href="#11917">args</a> field supports <a href="#12603">Source Expansion</a>. To perform source expansion in the <a href="#11917">args</a> field, BUSY substitutes placeholders and produces a different set of arguments for each invocation of the script.</div>
 <h4 style="margin-left:63px"><span class="label"><a name="11893">3.2.5.2</a></span>
 <b>Copy</b></h4>
 <div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.2.1</a></span>
@@ -1064,6 +1066,32 @@ The sources are the set of files that the script will be executed over. The scri
 <a href="#11893">Copy</a></div>
 <div style="margin-left:81px"><span class="label"><a name="11898">4.22.4.2.1</a></span>
 The source are the source files to copy.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="12603">4.22.5</a></span>
+Source Expansion</h4>
+<div style="margin-left:63px"><span class="label"><a name="12605">4.22.5.1</a></span>
+Source expansion is used for the <a href="#11681">LuaScriptForeach</a> and <a href="#11893">Copy</a> action types. Strings can include one or more of the following placeholders. The result is the string representation of the path, as if <a href="#12001">tostring</a> would have been called.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="12607">4.22.5.2</a></span>
+Placeholders</h4>
+<div style="margin-left:81px"><span class="label"><a name="12608">4.22.5.2.1</a></span>
+<pre><code>{{source}}</code></pre></div>
+<div style="margin-left:99px"><span class="label"><a name="12609">4.22.5.2.1.1</a></span>
+The absolute path of the source file. </div>
+<div style="margin-left:81px"><span class="label"><a name="12610">4.22.5.2.2</a></span>
+<pre><code>{{source_file_part}}</code></pre></div>
+<div style="margin-left:99px"><span class="label"><a name="12611">4.22.5.2.2.1</a></span>
+The file part of the source including the extension, e.g. "//foo/bar/baz.txt" =&gt; "baz.txt"</div>
+<div style="margin-left:81px"><span class="label"><a name="12612">4.22.5.2.3</a></span>
+<pre><code>{{source_name_part}}</code></pre></div>
+<div style="margin-left:99px"><span class="label"><a name="12613">4.22.5.2.3.1</a></span>
+The filename part of the source file with no path or extension. e.g. "//foo/bar/baz.txt" =&gt; "baz"</div>
+<div style="margin-left:81px"><span class="label"><a name="12614">4.22.5.2.4</a></span>
+<pre><code>{{source_dir}}</code></pre></div>
+<div style="margin-left:99px"><span class="label"><a name="12622">4.22.5.2.4.1</a></span>
+The absolute path of the directory containing the source file with no trailing slash, e.g. "//foo/bar/baz.txt" =&gt; "/foo/bar"</div>
+<div style="margin-left:81px"><span class="label"><a name="12621">4.22.5.2.5</a></span>
+<pre><code>{{source_ext}}</code></pre></div>
+<div style="margin-left:99px"><span class="label"><a name="12615">4.22.5.2.5.1</a></span>
+The extension of the source file, e.g. "//foo/bar/baz.txt" =&gt; "txt"</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12597">4.23</a></span>
 text</h4>
 <div style="margin-left:45px"><span class="label"><a name="12598">4.23.1</a></span>

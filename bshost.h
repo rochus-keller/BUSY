@@ -35,7 +35,10 @@ extern BSPathStatus bs_normalize_path(const char* in, char* out, int outlen); //
 extern BSPathStatus bs_normalize_path2(const char* in);
 extern BSPathStatus bs_cwd();
 extern BSPathStatus bs_thisapp();
+extern BSPathStatus bs_apply_source_expansion(const char* source, const char* string);
 extern const char* bs_denormalize_path(const char* path);
+typedef enum BSPathPart { BS_all, BS_fileName, BS_filePath, BS_baseName, BS_extension } BSPathPart;
+extern const char* bs_path_part(const char* path, BSPathPart what, int* len );
 extern const char* bs_filename(const char* path);
 extern int bs_forbidden_fschar(unsigned int ch);
 extern int bs_little_endian(); // 1..little, 0..big

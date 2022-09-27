@@ -1514,14 +1514,17 @@ static void tostring(BSParserContext* ctx, int n, int row, int col)
         break;
     case BS_path:
         {
+#if 0
             lua_getfield(ctx->L,ctx->builtins,"#inst");
             lua_getfield(ctx->L,-1,"host_os");
             const int iswin32 = strcmp(lua_tostring(ctx->L,-1),"win32") == 0;
             lua_pop(ctx->L,2);
+#endif
             lua_pushstring(ctx->L, bs_denormalize_path(lua_tostring(ctx->L,-2)) );
+#if 0
+            // not necessary; win32 can pretty well do with forward instead of backslashes
             if( iswin32 )
             {
-                // TODO: not sure whether this is really necessary
                 char* str = (char*)lua_tostring(ctx->L,-1);
                 char* p = str;
                 while(*p != 0)
@@ -1533,6 +1536,7 @@ static void tostring(BSParserContext* ctx, int n, int row, int col)
                 lua_pushstring(ctx->L,str);
                 lua_replace(ctx->L,-2);
             }
+#endif
         }
         break;
     default:

@@ -524,3 +524,133 @@ const char*bs_filename(const char* path)
         p--;
     return p+1;
 }
+
+const char* bs_path_part(const char* path, BSPathPart what, int* len )
+{
+    // expecting a normalized path, i.e. starting with //, .. or .
+    assert(len);
+
+    const int plen = strlen(path);
+    if( what == BS_all )
+    {
+        *len = plen;
+        if( strncmp(path,"//",2) == 0 )
+        {
+            path = bs_denormalize_path(path);
+            *len = strlen(path);
+        }
+        return path;
+    }
+    if( what == BS_fileName )
+    {
+        const char* q = path + plen - 1;
+        const char* p = q;
+        while( p > path && *p != '/' )
+            p--;
+        if( *p == '/' )
+        {
+            *len = q - p;
+            return p + 1;
+        }
+    }
+    if( what == BS_filePath )
+    {
+        const char* q = bs_path_part(path,BS_fileName, len);
+        *len = q - path;
+        if( q > path )
+        {
+            (*len)--; // trailing slash
+            if( strncmp(path,"//",2) == 0 )
+            {
+                const char* tmp = bs_denormalize_path(path);
+                *len -= tmp - path;
+                path = tmp;
+            }
+            return path;
+        }
+    }
+    if( what == BS_baseName )
+    {
+        const char* name = bs_path_part(path,BS_fileName, len);
+        const char* q = name + *len - 1;
+        const char* p = q;
+        while( p > name && *p != '.' )
+            p--;
+        if( *p == '.' )
+        {
+            *len -= q - p + 1;
+            return name;
+        }else
+            return name;
+    }
+    if( what == BS_extension )
+    {
+        const char* name = bs_path_part(path,BS_fileName, len);
+        const char* q = name + *len - 1;
+        const char* p = q;
+        while( p > name && *p != '.' )
+            p--;
+        if( *p == '.' )
+        {
+            *len = q - p;
+            return p + 1;
+        }
+    }
+
+    *len = 0;
+    return path;
+}
+
+static const char* path_part(const char* source, const char* what, int* len )
+{
+    assert(len);
+    if( *len == 6 && strncmp(what,"source", 6) == 0 )
+        return bs_path_part(source,BS_all,len);
+    if( *len == 16 && strncmp(what,"source_file_part", 16) == 0 )
+        return bs_path_part(source,BS_fileName,len);
+    if( *len == 16 && strncmp(what,"source_name_part", 16) == 0 )
+        return bs_path_part(source,BS_baseName,len);
+    if( *len == 10 && strncmp(what,"source_dir", 10) == 0 )
+        return bs_path_part(source,BS_filePath,len);
+    if( *len == 10 && strncmp(what,"source_ext", 10) == 0 )
+        return bs_path_part(source,BS_extension,len);
+    *len = -1;
+    return "";
+}
+
+BSPathStatus bs_apply_source_expansion(const char* source, const char* string)
+{
+    const char* s = string;
+    char* p = s_buf;
+    char* q = s_buf + PATH_MAX;
+    while( *s && p < q )
+    {
+        if( *s == '{' && s[1] == '{' )
+        {
+            s += 2;
+            if( *s == '}' )
+                return BS_InvalidFormat;
+            const char* start = s;
+            while( *s != '}' && *s != 0 )
+                s++;
+            if( *s != '}' || s[1] != '}' )
+                return BS_InvalidFormat;
+            int len = s - start;
+            const char* val = path_part(source,start, &len );
+            if( len < 0 )
+                return BS_NotSupported;
+            if( p + len >= q )
+                return BS_OutOfSpace;
+            strncpy(p,val,len);
+            s += 2;
+            p += len;
+        }else
+        {
+            *p = *s;
+            p++;
+            s++;
+        }
+    }
+    *p = 0;
+    return BS_OK;
+}

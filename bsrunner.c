@@ -1017,7 +1017,80 @@ static void script(lua_State* L,int inst, int cls, int builtins)
 
 static void foreach(lua_State* L,int inst, int cls, int builtins)
 {
-    luaL_error(L,"'LuaScriptForeach' not yet implemented");
+    const int top = lua_gettop(L);
+
+    lua_createtable(L,0,0);
+    lua_pushinteger(L,BS_Nothing);
+    lua_setfield(L,-2,"#kind");
+    lua_setfield(L,inst,"#out");
+
+    getModuleVarFrom(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    lua_getfield(L,inst,"script");
+    const int script = lua_gettop(L);
+    if( *lua_tostring(L,script) != '/' )
+    {
+        // relative path
+        addPath(L,absDir,script);
+        lua_replace(L,script);
+    }
+
+    bs_thisapp2(L);
+    const int app = lua_gettop(L);
+
+    size_t i;
+    lua_getfield(L,inst,"sources");
+    const int sources = lua_gettop(L);
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        lua_rawgeti(L,sources,i);
+        const int source = lua_gettop(L);
+        if( *lua_tostring(L,source) != '/' )
+        {
+            addPath(L,absDir,source);
+            lua_replace(L,source);
+        }
+
+        lua_pushstring(L,"");
+        const int args = lua_gettop(L);
+
+        lua_getfield(L,inst,"args");
+        const int arglist = lua_gettop(L);
+        size_t j;
+        for( j = 1; j <= lua_objlen(L,arglist); j++ )
+        {
+            lua_pushvalue(L,args);
+            lua_pushstring(L," ");
+            lua_rawgeti(L,arglist,j);
+            if( bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1)) != BS_OK )
+                luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
+            lua_pop(L,1);
+            lua_pushstring(L,bs_global_buffer());
+            lua_concat(L,3);
+            lua_replace(L,args);
+        }
+        lua_pop(L,1); // arglist
+
+        lua_pushfstring(L, "%s %s %s", bs_denormalize_path(lua_tostring(L,app) ),
+                        bs_denormalize_path(lua_tostring(L,script) ),
+                        lua_tostring(L,args) );
+        const int cmd = lua_gettop(L);
+
+        fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+        fflush(stdout);
+        if( bs_exec(lua_tostring(L,cmd)) != 0 )
+        {
+            // stderr was already written to the console
+            lua_pushnil(L);
+            lua_error(L);
+        }
+        lua_pop(L,3); // args, cmd, source
+    }
+
+    lua_pop(L,4); // abDir, script, app, sources
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
 }
 
 static void copy(lua_State* L,int inst, int cls, int builtins)
