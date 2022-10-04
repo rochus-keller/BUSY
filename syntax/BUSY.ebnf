@@ -116,7 +116,7 @@ block ::= { ( declaration | \LL:2\ statement ) [';'] }
 
 statement ::= condition | assigOrCall
 
-condition ::= if expression 
+condition ::= if expression  // NOTE if true {} can be used as block statement, e.g. to limit side effects in macros
 	( '{' block '}' [ else ( condition | '{' block '}' ) ] // also supports if(expression){}
 	| then block { elsif expression then block } [ else block ] end
 	)

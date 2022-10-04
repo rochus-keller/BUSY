@@ -316,6 +316,13 @@ static void compilesources(lua_State* L, int inst, int builtins)
             continue;
         }
 
+#if 0
+        FILE* tmp = fopen("files.txt","a");
+        fwrite(lua_tostring(L,file),1,lua_objlen(L,file),tmp);
+        fwrite("\n",1,1,tmp);
+        fclose(tmp);
+#endif
+
         if( *lua_tostring(L,file) != '/' )
             addPath(L,absDir,file); // path could be absolute!
         else
@@ -323,10 +330,14 @@ static void compilesources(lua_State* L, int inst, int builtins)
         const int src = lua_gettop(L);
 
         addPath(L,rootOutDir,relDir);
-        lua_pushfstring(L,"/%d_%s",i,bs_filename(lua_tostring(L,file)));
         // only use the filename and suffix here, strip all path segments; otherwise subdirs have to be created;
-        // the name is actually not relevant, so we just prefix it with a number to reduce name collisions (possible
-        // when collecting  files from different directories in the same module)
+#ifdef BS_HAVE_FILE_PREFIX
+        // the name is actually not relevant, so we can just prefix it with a number to reduce name collisions
+        // (possible when collecting  files from different directories in the same module)
+        lua_pushfstring(L,"/%d_%s",i,bs_filename(lua_tostring(L,file)));
+#else
+        lua_pushfstring(L,"/%s",bs_filename(lua_tostring(L,file)));
+#endif
         if( toolchain == BS_msvc )
             lua_pushstring(L,".obj");
         else

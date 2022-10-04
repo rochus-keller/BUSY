@@ -518,11 +518,16 @@ int bs_exec(const char* cmd)
 
 const char*bs_filename(const char* path)
 {
+#if 0
     const int len = strlen(path);
     const char* p = path + len - 1;
     while( *p != '/' )
         p--;
     return p+1;
+#else
+    int len;
+    return bs_path_part(path,BS_fileName,&len);
+#endif
 }
 
 const char* bs_path_part(const char* path, BSPathPart what, int* len )
