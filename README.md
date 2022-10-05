@@ -89,7 +89,7 @@ begin
 end
 ```
 
-Another, a bit more complex example using BUSY is the [Oberon+ compiler command line version](https://github.com/rochus-keller/Oberon); see https://github.com/rochus-keller/LeanQt/blob/main/Readme.md on how to run the build.
+Another, a bit more complex example using BUSY is the [Oberon+ compiler command line version](https://github.com/rochus-keller/Oberon); see https://github.com/rochus-keller/LeanQt/blob/main/Readme.md on how to run the build. It also demonstrates the special support for the Qt moc and rcc tools. 
 
 BUSY is based on and integrated with the Lua virtual machine (but it is written in C89, not in Lua). Lua is by far one of the easiest to build code bases on all platforms; the only requirement is a C89 compiler; BUSY follows this tradition and benefits from the great work of the Lua authors.
 

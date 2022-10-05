@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-09-26, Work in progress</div>
+2022-10-05, Work in progress</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -121,8 +121,14 @@ A lot of text is derived from the Oberon+ language specification, <a href="https
 <a href="#11679">3.2.5.1.2 LuaScript</a></div>
 <div style="margin-left:117px"><span class="label"><a name="12302">1.5.2.2.3.1.2</a></span>
 <a href="#11681">3.2.5.1.3 LuaScriptForeach</a></div>
-<div style="margin-left:99px"><span class="label"><a name="12303">1.5.2.2.3.2</a></span>
-<a href="#11893">3.2.5.2 Copy</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12638">1.5.2.2.3.2</a></span>
+<a href="#12590">3.2.5.2 Message</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12640">1.5.2.2.3.3</a></span>
+<a href="#12625">3.2.5.3 Moc</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12641">1.5.2.2.3.4</a></span>
+<a href="#12635">3.2.5.4 Rcc</a></div>
+<div style="margin-left:99px"><span class="label"><a name="12303">1.5.2.2.3.5</a></span>
+<a href="#11893">3.2.5.5 TODO Copy</a></div>
 <div style="margin-left:45px"><span class="label"><a name="12305">1.5.3</a></span>
 <a href="#11697">4 Predeclared  Field Reference</a></div>
 <div style="margin-left:63px"><span class="label"><a name="12306">1.5.3.1</a></span>
@@ -812,29 +818,41 @@ This product type allows you to run a Lua script a single time to produce one or
 This product type allows you to run a script once-per-file over a set of sources. If you want to run a script once that takes many files as input, see <a href="#11679">LuaScript</a>.</div>
 <div style="margin-left:99px"><span class="label"><a name="12617">3.2.5.1.3.3</a></span>
 The <a href="#11917">args</a> field supports <a href="#12603">Source Expansion</a>. To perform source expansion in the <a href="#11917">args</a> field, BUSY substitutes placeholders and produces a different set of arguments for each invocation of the script.</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11893">3.2.5.2</a></span>
-<b>Copy</b></h4>
-<div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.2.1</a></span>
-<b>Main</b>: <a href="#11885">sources</a>, <a href="#11907">outputs</a></div>
-<div style="margin-left:81px"><span class="label"><a name="11894">3.2.5.2.2</a></span>
-All output files must be inside the output directory of the build. You would generally use |$target_out_dir| or |$target_gen_dir| to reference the output or generated intermediate file directories, respectively. TODO</div>
-<div style="margin-left:81px"><span class="label"><a name="11905">3.2.5.2.3</a></span>
-Both <a href="#11885">sources</a> and <a href="#11907">outputs</a> must be specified. Sources can include as many files as you want, but there can only be one item in the outputs list (plural is used for the name for consistency with other target types).</div>
-<div style="margin-left:81px"><span class="label"><a name="11906">3.2.5.2.4</a></span>
-If there is more than one source file, your output name should specify a mapping from each source file to an output file name. TODO</div>
-<h4 style="margin-left:63px"><span class="label"><a name="12590">3.2.5.3</a></span>
+<h4 style="margin-left:63px"><span class="label"><a name="12590">3.2.5.2</a></span>
 Message</h4>
-<div style="margin-left:81px"><span class="label"><a name="12591">3.2.5.3.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12591">3.2.5.2.1</a></span>
 <b>Main</b>: <a href="#12597">text</a>, <a href="#12593">msg_type</a></div>
-<div style="margin-left:81px"><span class="label"><a name="12601">3.2.5.3.2</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12601">3.2.5.2.2</a></span>
 The instance displays a message to the console. In case of MessageType `error the build halts.</div>
-<div style="margin-left:63px"><span class="label"><a name="12484">3.2.5.4</a></span>
+<h4 style="margin-left:63px"><span class="label"><a name="12625">3.2.5.3</a></span>
+Moc</h4>
+<div style="margin-left:81px"><span class="label"><a name="12626">3.2.5.3.1</a></span>
+<b>Main</b>: <a href="#11885">sources</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12634">3.2.5.3.2</a></span>
+Calls the Qt moc executable to which the predeclared moc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked.</div>
+<h4 style="margin-left:63px"><span class="label"><a name="12635">3.2.5.4</a></span>
+<b>Rcc</b></h4>
+<div style="margin-left:81px"><span class="label"><a name="12636">3.2.5.4.1</a></span>
+<b>Main</b>: <a href="#11885">sources</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12637">3.2.5.4.2</a></span>
+Calls the Qt rcc executable to which the predeclared rcc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked.</div>
+<div style="margin-left:63px"><span class="label"><a name="11893">3.2.5.5</a></span>
+TODO Copy</div>
+<div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.5.1</a></span>
+<b>Main</b>: <a href="#11885">sources</a>, <a href="#11907">outputs</a></div>
+<div style="margin-left:81px"><span class="label"><a name="11894">3.2.5.5.2</a></span>
+All output files must be inside the output directory of the build. You would generally use |$target_out_dir| or |$target_gen_dir| to reference the output or generated intermediate file directories, respectively. TODO</div>
+<div style="margin-left:81px"><span class="label"><a name="11905">3.2.5.5.3</a></span>
+Both <a href="#11885">sources</a> and <a href="#11907">outputs</a> must be specified. Sources can include as many files as you want, but there can only be one item in the outputs list (plural is used for the name for consistency with other target types).</div>
+<div style="margin-left:81px"><span class="label"><a name="11906">3.2.5.5.4</a></span>
+If there is more than one source file, your output name should specify a mapping from each source file to an output file name. TODO</div>
+<div style="margin-left:63px"><span class="label"><a name="12484">3.2.5.6</a></span>
 TODO CopyDeps</div>
-<div style="margin-left:81px"><span class="label"><a name="12485">3.2.5.4.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12485">3.2.5.6.1</a></span>
 Copy all files delivered by deps</div>
-<div style="margin-left:63px"><span class="label"><a name="12482">3.2.5.5</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12482">3.2.5.7</a></span>
 TODO ClearDeps</div>
-<div style="margin-left:81px"><span class="label"><a name="12483">3.2.5.5.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12483">3.2.5.7.1</a></span>
 Delete all files delivered by deps</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11697">4</a></span>
 <b>Predeclared Field Reference</b></h4>
@@ -1033,9 +1051,9 @@ outputs</h4>
 <div style="margin-left:45px"><span class="label"><a name="11908">4.20.1</a></span>
 <b>outputs: path[]</b></div>
 <div style="margin-left:45px"><span class="label"><a name="11909">4.20.2</a></span>
-Outputs is valid for <a href="#11893">Copy</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> target types and indicates the resulting files. Outputs must always refer to files in the build directory.</div>
+Outputs is valid for <a href="#11893">TODO Copy</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> target types and indicates the resulting files. Outputs must always refer to files in the build directory.</div>
 <div style="margin-left:45px"><span class="label"><a name="11910">4.20.3</a></span>
-<a href="#11893">Copy</a></div>
+<a href="#11893">TODO Copy</a></div>
 <div style="margin-left:63px"><span class="label"><a name="11911">4.20.3.1</a></span>
 Copy targets should have exactly one entry in the outputs list. If there is exactly one source, this can be a literal file name or a source expansion. If there is more than one source, this must contain a source expansion to map a single input name to a single output name. </div>
 <h4 style="margin-left:27px"><span class="label"><a name="11901">4.21</a></span>
@@ -1063,13 +1081,17 @@ As a special case, a file ending in ".def" will be treated as a Windows module d
 <div style="margin-left:81px"><span class="label"><a name="11900">4.22.4.1.1</a></span>
 The sources are the set of files that the script will be executed over. The script will run once per file.</div>
 <div style="margin-left:63px"><span class="label"><a name="11896">4.22.4.2</a></span>
-<a href="#11893">Copy</a></div>
+<a href="#11893">TODO Copy</a></div>
 <div style="margin-left:81px"><span class="label"><a name="11898">4.22.4.2.1</a></span>
 The source are the source files to copy.</div>
+<div style="margin-left:63px"><span class="label"><a name="12628">4.22.4.3</a></span>
+<a href="#12625">Moc</a> and <a href="#12635">Rcc</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12629">4.22.4.3.1</a></span>
+The sources are the files which have to be processed by moc or rcc.</div>
 <h4 style="margin-left:45px"><span class="label"><a name="12603">4.22.5</a></span>
 Source Expansion</h4>
 <div style="margin-left:63px"><span class="label"><a name="12605">4.22.5.1</a></span>
-Source expansion is used for the <a href="#11681">LuaScriptForeach</a> and <a href="#11893">Copy</a> action types. Strings can include one or more of the following placeholders. The result is the string representation of the path, as if <a href="#12001">tostring</a> would have been called.</div>
+Source expansion is used for the <a href="#11681">LuaScriptForeach</a> and <a href="#11893">TODO Copy</a> action types. Strings can include one or more of the following placeholders. The result is the string representation of the path, as if <a href="#12001">tostring</a> would have been called.</div>
 <h4 style="margin-left:63px"><span class="label"><a name="12607">4.22.5.2</a></span>
 Placeholders</h4>
 <div style="margin-left:81px"><span class="label"><a name="12608">4.22.5.2.1</a></span>
@@ -1083,7 +1105,7 @@ The file part of the source including the extension, e.g. "//foo/bar/baz.txt" =&
 <div style="margin-left:81px"><span class="label"><a name="12612">4.22.5.2.3</a></span>
 <pre><code>{{source_name_part}}</code></pre></div>
 <div style="margin-left:99px"><span class="label"><a name="12613">4.22.5.2.3.1</a></span>
-The filename part of the source file with no path or extension. e.g. "//foo/bar/baz.txt" =&gt; "baz"</div>
+The filename part of the source file with no path or extension. e.g. "//foo/bar/baz.tar.gz" =&gt; "baz.tar"</div>
 <div style="margin-left:81px"><span class="label"><a name="12614">4.22.5.2.4</a></span>
 <pre><code>{{source_dir}}</code></pre></div>
 <div style="margin-left:99px"><span class="label"><a name="12622">4.22.5.2.4.1</a></span>
@@ -1091,7 +1113,7 @@ The absolute path of the directory containing the source file with no trailing s
 <div style="margin-left:81px"><span class="label"><a name="12621">4.22.5.2.5</a></span>
 <pre><code>{{source_ext}}</code></pre></div>
 <div style="margin-left:99px"><span class="label"><a name="12615">4.22.5.2.5.1</a></span>
-The extension of the source file, e.g. "//foo/bar/baz.txt" =&gt; "txt"</div>
+The extension of the source file, e.g. "//foo/bar/baz.tar.gz" =&gt; "gz"</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12597">4.23</a></span>
 text</h4>
 <div style="margin-left:45px"><span class="label"><a name="12598">4.23.1</a></span>
@@ -1256,17 +1278,21 @@ let host_toolchain_ver: int</div>
 let root_build_dir: path</div>
 <div style="margin-left:27px"><span class="label"><a name="12034">6.10</a></span>
 let root_source_dir: path</div>
-<div style="margin-left:27px"><span class="label"><a name="11927">6.11</a></span>
+<div style="margin-left:27px"><span class="label"><a name="12632">6.11</a></span>
+var moc_path: path</div>
+<div style="margin-left:27px"><span class="label"><a name="12633">6.12</a></span>
+var rcc_path: path</div>
+<div style="margin-left:27px"><span class="label"><a name="11927">6.13</a></span>
 var target_cpu: CpuType</div>
-<div style="margin-left:27px"><span class="label"><a name="11928">6.12</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11928">6.14</a></span>
 var target_cpu_ver: int</div>
-<div style="margin-left:27px"><span class="label"><a name="11929">6.13</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11929">6.15</a></span>
 var target_wordsize: WordSize</div>
-<div style="margin-left:27px"><span class="label"><a name="11930">6.14</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11930">6.16</a></span>
 var target_os: OsType</div>
-<div style="margin-left:27px"><span class="label"><a name="11931">6.15</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11931">6.17</a></span>
 var target_toolchain: CompilerType</div>
-<div style="margin-left:27px"><span class="label"><a name="11932">6.16</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11932">6.18</a></span>
 var target_toolchain_ver: int</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11996">7</a></span>
 <b>Predeclared Procedure Reference</b></h4>

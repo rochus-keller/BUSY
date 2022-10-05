@@ -576,6 +576,21 @@ const char* bs_path_part(const char* path, BSPathPart what, int* len )
     }
     if( what == BS_baseName )
     {
+        // find the first '.'
+        const char* name = bs_path_part(path,BS_fileName, len);
+        const char* q = name;
+        while( *q != '.' && *q != 0 )
+            q++;
+        if( *q == '.' )
+        {
+            *len = q - name;
+            return name;
+        }else
+            return name;
+    }
+    if( what == BS_completeBaseName )
+    {
+        // find the last '.'
         const char* name = bs_path_part(path,BS_fileName, len);
         const char* q = name + *len - 1;
         const char* p = q;
@@ -614,7 +629,7 @@ static const char* path_part(const char* source, const char* what, int* len )
     if( *len == 16 && strncmp(what,"source_file_part", 16) == 0 )
         return bs_path_part(source,BS_fileName,len);
     if( *len == 16 && strncmp(what,"source_name_part", 16) == 0 )
-        return bs_path_part(source,BS_baseName,len);
+        return bs_path_part(source,BS_completeBaseName,len);
     if( *len == 10 && strncmp(what,"source_dir", 10) == 0 )
         return bs_path_part(source,BS_filePath,len);
     if( *len == 10 && strncmp(what,"source_ext", 10) == 0 )
@@ -658,4 +673,13 @@ BSPathStatus bs_apply_source_expansion(const char* source, const char* string)
     }
     *p = 0;
     return BS_OK;
+}
+
+time_t bs_exists2(const char* denormalizedPath)
+{
+    struct stat st = {0};
+    if( stat(denormalizedPath, &st) == 0 )
+        return st.st_mtime;
+    else
+        return 0;
 }

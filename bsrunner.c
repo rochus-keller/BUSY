@@ -254,10 +254,51 @@ typedef enum BSOutKind { // #kind
     BS_ObjectFiles,
     BS_StaticLib,
     BS_DynamicLib,
-    BS_Executable
+    BS_Executable,
+    BS_SourceFiles // in case of Moc
 } BSOutKind;
 
-static void compilesources(lua_State* L, int inst, int builtins)
+static void addinlistsources(lua_State* L, int inlist, int out)
+{
+    lua_getfield(L,inlist,"#kind");
+    const int k = lua_tointeger(L,-1);
+    lua_pop(L,1); // kind
+
+    size_t i, len = 0;
+    switch(k)
+    {
+    case BS_Mixed:
+        len = lua_objlen(L,inlist);
+        for( i = 1; i <= len; i++ )
+        {
+            lua_rawgeti(L,inlist,i);
+            const int sublist = lua_gettop(L);
+            addinlistsources(L,sublist,out);
+            if( lua_objlen(L,sublist) == 0 )
+            {
+                lua_pushnil(L);
+                lua_rawseti(L,inlist,i); // remove what we used
+            }
+            lua_pop(L,1); // sublist
+        }
+        break;
+    case BS_SourceFiles:
+        len = lua_objlen(L,inlist); // lua_objlen renders wrong number when called in for loop where elements are set to nil
+        for( i = 1; i <= len; i++ )
+        {
+            lua_rawgeti(L,inlist,i);
+            lua_rawseti(L,out, lua_objlen(L,out)+1 );
+            lua_pushnil(L);
+            lua_rawseti(L,inlist,i); // remove what we used
+        }
+        break;
+    default:
+        // ignore
+        break;
+    }
+}
+
+static void compilesources(lua_State* L, int inst, int builtins, int inlist)
 {
     const int top = lua_gettop(L);
 
@@ -300,8 +341,19 @@ static void compilesources(lua_State* L, int inst, int builtins)
     addall(L,inst,cflags,cflags_c,cflags_cc,cflags_objc,cflags_objcc,defines,includes,toolchain == BS_msvc);
 
     size_t i;
+
     lua_getfield(L,inst,"sources");
     const int sources = lua_gettop(L);
+    lua_createtable(L,lua_objlen(L,sources),0);
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        // copy all sources to a new table to avoid changing the original sources
+        lua_rawgeti(L,sources,i);
+        lua_rawseti(L,-2,i);
+    }
+    lua_replace(L,-2);
+    addinlistsources(L,inlist,sources);
+
     int n = 0;
     for( i = 1; i <= lua_objlen(L,sources); i++ )
     {
@@ -783,7 +835,6 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     lua_setfield(L,outlist,"#kind");
     lua_pushvalue(L,out);
     lua_rawseti(L,outlist,1);
-    // TODO: for dynlibs also store libname and libpath
     lua_pushvalue(L,outlist);
     lua_setfield(L,inst,"#out");
     lua_pop(L,1); // outlist
@@ -887,10 +938,11 @@ static void builddeps(lua_State* L, int inst)
 
 static void library(lua_State* L,int inst, int cls, int builtins)
 {
+    const int top = lua_gettop(L);
     lua_getfield(L,inst,"#out");
     const int mixed = lua_gettop(L);
     assert( lua_istable(L,mixed) );
-    compilesources(L,inst,builtins);
+    compilesources(L,inst,builtins, mixed);
     lua_getfield(L,inst,"#out");
     if( lua_objlen(L,mixed) == 0 )
         lua_replace(L,mixed);
@@ -903,14 +955,16 @@ static void library(lua_State* L,int inst, int cls, int builtins)
         link(L,inst,builtins,mixed,BS_StaticLib);
 
     lua_pop(L,2); // out, lib_type
+    assert( top == lua_gettop(L) );
 }
 
 static void executable(lua_State* L,int inst, int cls, int builtins)
 {
+    const int top = lua_gettop(L);
     lua_getfield(L,inst,"#out");
     const int mixed = lua_gettop(L);
     assert( lua_istable(L,mixed) );
-    compilesources(L,inst,builtins);
+    compilesources(L,inst,builtins,mixed);
     lua_getfield(L,inst,"#out");
     if( lua_objlen(L,mixed) == 0 )
         lua_replace(L,mixed);
@@ -918,14 +972,16 @@ static void executable(lua_State* L,int inst, int cls, int builtins)
         lua_rawseti(L,mixed,lua_objlen(L,mixed)+1);
     link(L,inst,builtins,mixed,BS_Executable);
     lua_pop(L,1); // mixed
+    assert( top == lua_gettop(L) );
 }
 
 static void sourceset(lua_State* L,int inst, int cls, int builtins)
 {
+    const int top = lua_gettop(L);
     lua_getfield(L,inst,"#out");
     const int mixed = lua_gettop(L);
     assert( lua_istable(L,mixed) );
-    compilesources(L,inst,builtins);
+    compilesources(L,inst,builtins,mixed);
     if( lua_objlen(L,mixed) == 0 )
         lua_pop(L,1); // mixed
     else
@@ -934,6 +990,7 @@ static void sourceset(lua_State* L,int inst, int cls, int builtins)
         lua_rawseti(L,mixed,lua_objlen(L,mixed)+1); // append it to mixed
         lua_setfield(L,inst,"#out"); // set mixed again as inst.#out
     }
+    assert( top == lua_gettop(L) );
 }
 
 static void group(lua_State* L,int inst, int cls, int builtins)
@@ -1026,7 +1083,7 @@ static void script(lua_State* L,int inst, int cls, int builtins)
     assert( top == bottom );
 }
 
-static void foreach(lua_State* L,int inst, int cls, int builtins)
+static void runforeach(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
 
@@ -1100,6 +1157,197 @@ static void foreach(lua_State* L,int inst, int cls, int builtins)
     }
 
     lua_pop(L,4); // abDir, script, app, sources
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+}
+
+static void runmoc(lua_State* L,int inst, int cls, int builtins)
+{
+    const int top = lua_gettop(L);
+
+    lua_createtable(L,0,0);
+    const int outlist = lua_gettop(L);
+    lua_pushinteger(L,BS_SourceFiles);
+    lua_setfield(L,outlist,"#kind");
+    lua_pushvalue(L,outlist);
+    lua_setfield(L,inst,"#out");
+
+    getModuleVarFrom(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    lua_getfield(L,builtins,"#inst");
+    const int binst = lua_gettop(L);
+
+    lua_getfield(L,binst,"root_build_dir");
+    getModuleVarFrom(L,inst,"#rdir");
+    addPath(L,-2,-1);
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
+
+    lua_getfield(L,binst,"moc_path");
+    const int app = lua_gettop(L);
+    if( lua_isnil(L,app) || strcmp(".",lua_tostring(L,app)) == 0 )
+    {
+        lua_pushstring(L,"moc");
+        lua_replace(L,app);
+    }else if( *lua_tostring(L,app) != '/' )
+    {
+        // relative path
+        addPath(L,absDir,app);
+        lua_replace(L,app);
+    }
+
+    size_t i;
+    lua_getfield(L,inst,"sources");
+    const int sources = lua_gettop(L);
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        lua_rawgeti(L,sources,i);
+        const int source = lua_gettop(L);
+        if( *lua_tostring(L,source) != '/' )
+        {
+            addPath(L,absDir,source);
+            lua_replace(L,source);
+        }
+
+        lua_pushfstring(L,"%s/moc_%s.cpp",lua_tostring(L,outDir), bs_filename(lua_tostring(L,source)));
+        const int outFile = lua_gettop(L);
+
+        lua_pushvalue(L,outFile);
+        lua_rawseti(L,outlist,i);
+
+        // check if there is a {{source_dir}}/{{source_name_part}}_p.h and - if true - include it in the generated file
+        lua_pushstring(L,"{{source_dir}}/{{source_name_part}}_p.h");
+        bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1));
+        const int includePrivateHeader = bs_exists2(bs_global_buffer());
+        lua_pop(L,1);
+
+        lua_pushfstring(L, "%s %s -o %s", bs_denormalize_path(lua_tostring(L,app) ),
+                        bs_denormalize_path(lua_tostring(L,source) ),
+                        bs_denormalize_path(lua_tostring(L,outFile)) );
+        if( includePrivateHeader )
+        {
+            lua_pushstring(L," -p {{source_dir}}");
+            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1));
+            lua_pushstring(L, bs_global_buffer());
+            lua_replace(L,-2);
+            lua_pushstring(L," -b {{source_name_part}}_p.h");
+            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1));
+            lua_pushstring(L, bs_global_buffer());
+            lua_replace(L,-2);
+            lua_concat(L,3);
+        }
+        const int cmd = lua_gettop(L);
+
+        const time_t srcExists = bs_exists(lua_tostring(L,source));
+        const time_t outExists = bs_exists(lua_tostring(L,outFile));
+
+        if( !outExists || outExists < srcExists )
+        {
+            fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+            fflush(stdout);
+            // only call if outfile is older than source
+            if( bs_exec(lua_tostring(L,cmd)) != 0 )
+            {
+                // stderr was already written to the console
+                lua_pushnil(L);
+                lua_error(L);
+            }
+        }
+        lua_pop(L,3); // cmd, source, outFile
+    }
+
+    lua_pop(L,6); // outlist absDir binst outDir app sources
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+}
+
+static void runrcc(lua_State* L,int inst, int cls, int builtins)
+{
+    const int top = lua_gettop(L);
+
+    lua_createtable(L,0,0);
+    const int outlist = lua_gettop(L);
+    lua_pushinteger(L,BS_SourceFiles);
+    lua_setfield(L,outlist,"#kind");
+    lua_pushvalue(L,outlist);
+    lua_setfield(L,inst,"#out");
+
+    getModuleVarFrom(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    lua_getfield(L,builtins,"#inst");
+    const int binst = lua_gettop(L);
+
+    lua_getfield(L,binst,"root_build_dir");
+    getModuleVarFrom(L,inst,"#rdir");
+    addPath(L,-2,-1);
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
+
+    lua_getfield(L,binst,"rcc_path");
+    const int app = lua_gettop(L);
+    if( lua_isnil(L,app) || strcmp(".",lua_tostring(L,app)) == 0 )
+    {
+        lua_pushstring(L,"rcc");
+        lua_replace(L,app);
+    }else if( *lua_tostring(L,app) != '/' )
+    {
+        // relative path
+        addPath(L,absDir,app);
+        lua_replace(L,app);
+    }
+
+    size_t i;
+    lua_getfield(L,inst,"sources");
+    const int sources = lua_gettop(L);
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        lua_rawgeti(L,sources,i);
+        const int source = lua_gettop(L);
+        if( *lua_tostring(L,source) != '/' )
+        {
+            addPath(L,absDir,source);
+            lua_replace(L,source);
+        }
+
+        lua_pushfstring(L,"%s/qrc_%s.cpp",lua_tostring(L,outDir), bs_filename(lua_tostring(L,source)));
+        const int outFile = lua_gettop(L);
+
+        lua_pushvalue(L,outFile);
+        lua_rawseti(L,outlist,i);
+
+        int len = 0;
+        const char* name = bs_path_part(lua_tostring(L,source),BS_baseName, &len);
+        lua_pushlstring(L,name,len);
+        lua_pushfstring(L, "%s %s -o %s -name %s", bs_denormalize_path(lua_tostring(L,app) ),
+                        bs_denormalize_path(lua_tostring(L,source) ),
+                        bs_denormalize_path(lua_tostring(L,outFile)),
+                        lua_tostring(L,-1));
+        lua_replace(L,-2);
+        const int cmd = lua_gettop(L);
+
+        const time_t srcExists = bs_exists(lua_tostring(L,source));
+        const time_t outExists = bs_exists(lua_tostring(L,outFile));
+
+        if( !outExists || outExists < srcExists )
+        {
+            fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+            fflush(stdout);
+            // only call if outfile is older than source
+            if( bs_exec(lua_tostring(L,cmd)) != 0 )
+            {
+                // stderr was already written to the console
+                lua_pushnil(L);
+                lua_error(L);
+            }
+        }
+        lua_pop(L,3); // cmd, source, outFile
+    }
+
+    lua_pop(L,6); // outlist absDir binst outDir app sources
     const int bottom = lua_gettop(L);
     assert( top == bottom );
 }
@@ -1210,11 +1458,15 @@ int bs_run(lua_State* L) // args: productinst, returns: inst
     else if( isa( L, builtins, cls, "LuaScript") )
         script(L,inst,cls,builtins);
     else if( isa( L, builtins, cls, "LuaScriptForeach") )
-        foreach(L,inst,cls,builtins);
+        runforeach(L,inst,cls,builtins);
     else if( isa( L, builtins, cls, "Copy") )
         copy(L,inst,cls,builtins);
     else if( isa( L, builtins, cls, "Message") )
         message(L,inst,cls,builtins);
+    else if( isa( L, builtins, cls, "Moc") )
+        runmoc(L,inst,cls,builtins);
+    else if( isa( L, builtins, cls, "Rcc") )
+        runrcc(L,inst,cls,builtins);
     else
         luaL_error(L,"don't know how to build instances of class '%s'", name);
 

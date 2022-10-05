@@ -207,6 +207,11 @@ class("Message", globals.Action)
 	field("msg_type", globals.MessageType) 
 	field("text", globals.string)
 
+class("Moc", globals.Action)
+	field("sources", listOf(globals.path))
+
+class("Rcc", globals.Action)
+	field("sources", listOf(globals.path))
 
 ---- predeclared procs
 
@@ -251,6 +256,8 @@ variable("target_wordsize", globals.WordSize, false)
 variable("target_os", globals.OsType, false)
 variable("target_toolchain", globals.CompilerType, false)
 variable("target_toolchain_ver", globals.int, false)
+variable("moc_path", globals.path, false)
+variable("rcc_path", globals.path, false)
 
 B = require("BUSY")
 inst.busy_version = B.version()
@@ -262,6 +269,8 @@ inst.host_os = B.os()
 inst.target_os = inst.host_os
 inst.host_toolchain, inst.host_toolchain_ver = B.compiler()
 inst.target_toolchain, inst.target_toolchain_ver = inst.host_toolchain, inst.host_toolchain_ver
+inst.moc_path = "."
+inst.rcc_path = "."
 
 
 return globals
