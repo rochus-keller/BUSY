@@ -1201,21 +1201,38 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
     size_t i;
     lua_getfield(L,inst,"sources");
     const int sources = lua_gettop(L);
+    int n = 0;
     for( i = 1; i <= lua_objlen(L,sources); i++ )
     {
         lua_rawgeti(L,sources,i);
         const int source = lua_gettop(L);
+        const int lang = guessLang(lua_tostring(L,source));
+
         if( *lua_tostring(L,source) != '/' )
         {
             addPath(L,absDir,source);
             lua_replace(L,source);
         }
 
-        lua_pushfstring(L,"%s/moc_%s.cpp",lua_tostring(L,outDir), bs_filename(lua_tostring(L,source)));
+        if( lang == BS_header )
+            // this file is automatically passed to the compiler over the deps chain; the user doesn't see it
+            lua_pushfstring(L,"%s/moc_%s.cpp",lua_tostring(L,outDir), bs_filename(lua_tostring(L,source)));
+        else
+        {
+            int len;
+            const char* name = bs_path_part(lua_tostring(L,source),BS_baseName,&len);
+            lua_pushlstring(L,name,len);
+            // this file has to be included at the bottom of the cpp file, so use the naming of the Qt documentation.
+            lua_pushfstring(L,"%s/%s.moc",lua_tostring(L,outDir), bs_filename(lua_tostring(L,-1)));
+            lua_replace(L,-2);
+        }
         const int outFile = lua_gettop(L);
 
-        lua_pushvalue(L,outFile);
-        lua_rawseti(L,outlist,i);
+        if( lang == BS_header )
+        {
+            lua_pushvalue(L,outFile);
+            lua_rawseti(L,outlist,++n);
+        }
 
         // check if there is a {{source_dir}}/{{source_name_part}}_p.h and - if true - include it in the generated file
         lua_pushstring(L,"{{source_dir}}/{{source_name_part}}_p.h");
@@ -1226,7 +1243,7 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
         lua_pushfstring(L, "%s %s -o %s", bs_denormalize_path(lua_tostring(L,app) ),
                         bs_denormalize_path(lua_tostring(L,source) ),
                         bs_denormalize_path(lua_tostring(L,outFile)) );
-        if( includePrivateHeader )
+        if( includePrivateHeader && lang == BS_header )
         {
             lua_pushstring(L," -p {{source_dir}}");
             bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1));

@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-10-05, Work in progress</div>
+2022-10-06, Work in progress</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -830,12 +830,14 @@ Moc</h4>
 <b>Main</b>: <a href="#11885">sources</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12634">3.2.5.3.2</a></span>
 Calls the Qt moc executable to which the predeclared moc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked.</div>
+<div style="margin-left:81px"><span class="label"><a name="12642">3.2.5.3.3</a></span>
+Note that usually Q_OBJECT marked classes are in header files; if instead a .cpp file is added to <a href="#11885">sources</a> a c++ file with the same name but the suffix .moc is generated, which has to be included at the bottom of the .cpp file (see <a href="https://doc.qt.io/qt-5/moc.html"><u>the original Qt moc documentation</u></a> for more information).</div>
 <h4 style="margin-left:63px"><span class="label"><a name="12635">3.2.5.4</a></span>
 <b>Rcc</b></h4>
 <div style="margin-left:81px"><span class="label"><a name="12636">3.2.5.4.1</a></span>
 <b>Main</b>: <a href="#11885">sources</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12637">3.2.5.4.2</a></span>
-Calls the Qt rcc executable to which the predeclared rcc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked.</div>
+Calls the Qt rcc executable to which the predeclared rcc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked (see <a href="https://doc.qt.io/qt-5/rcc.html"><u>the original Qt rcc documentation</u></a> for more information).</div>
 <div style="margin-left:63px"><span class="label"><a name="11893">3.2.5.5</a></span>
 TODO Copy</div>
 <div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.5.1</a></span>
@@ -1258,42 +1260,72 @@ type CompilerType = ( `msvc, `gcc, `clang )</div>
 type MessageType = ( `error, `warning, `info )</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11920">6</a></span>
 <b>Predeclared Variable Reference</b></h4>
-<div style="margin-left:27px"><span class="label"><a name="12364">6.1</a></span>
-<b>TODO</b></div>
-<div style="margin-left:27px"><span class="label"><a name="12574">6.2</a></span>
+<div style="margin-left:27px"><span class="label"><a name="12574">6.1</a></span>
 let busy_version: string</div>
-<div style="margin-left:27px"><span class="label"><a name="11921">6.3</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11921">6.2</a></span>
 let host_cpu: CpuType</div>
-<div style="margin-left:27px"><span class="label"><a name="11922">6.4</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12654">6.2.1</a></span>
+The CPU detected when BUSY is compiled</div>
+<div style="margin-left:27px"><span class="label"><a name="11922">6.3</a></span>
 let host_cpu_ver: int</div>
-<div style="margin-left:27px"><span class="label"><a name="11923">6.5</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12655">6.3.1</a></span>
+The CPU version detected when BUSY is compiled</div>
+<div style="margin-left:27px"><span class="label"><a name="11923">6.4</a></span>
 let host_wordsize: WordSize</div>
-<div style="margin-left:27px"><span class="label"><a name="11924">6.6</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12656">6.4.1</a></span>
+The word size used to compile BUSY</div>
+<div style="margin-left:27px"><span class="label"><a name="11924">6.5</a></span>
 let host_os: OsType</div>
-<div style="margin-left:27px"><span class="label"><a name="11925">6.7</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12657">6.5.1</a></span>
+The OS detected when BUSY is compiled</div>
+<div style="margin-left:27px"><span class="label"><a name="11925">6.6</a></span>
 let host_toolchain: CompilerType</div>
-<div style="margin-left:27px"><span class="label"><a name="11926">6.8</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12658">6.6.1</a></span>
+The toolchain used to compile BUSY</div>
+<div style="margin-left:27px"><span class="label"><a name="11926">6.7</a></span>
 let host_toolchain_ver: int</div>
-<div style="margin-left:27px"><span class="label"><a name="11933">6.9</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12659">6.7.1</a></span>
+The version of the toolchain used to compile BUSY</div>
+<div style="margin-left:27px"><span class="label"><a name="11933">6.8</a></span>
 let root_build_dir: path</div>
-<div style="margin-left:27px"><span class="label"><a name="12034">6.10</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12660">6.8.1</a></span>
+The path where the build results are saved; either a default value or an explicit value set via command line options</div>
+<div style="margin-left:27px"><span class="label"><a name="12034">6.9</a></span>
 let root_source_dir: path</div>
-<div style="margin-left:27px"><span class="label"><a name="12632">6.11</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12661">6.9.1</a></span>
+The path of the source tree root directory; either a default value or an explicit value set via command line options</div>
+<div style="margin-left:27px"><span class="label"><a name="12632">6.10</a></span>
 var moc_path: path</div>
-<div style="margin-left:27px"><span class="label"><a name="12633">6.12</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12652">6.10.1</a></span>
+initialized with '.' which translates to calling moc found on the search path or halting with error.</div>
+<div style="margin-left:27px"><span class="label"><a name="12633">6.11</a></span>
 var rcc_path: path</div>
-<div style="margin-left:27px"><span class="label"><a name="11927">6.13</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12653">6.11.1</a></span>
+initialized with '.' which translates to calling rcc found on the search path or halting with error.</div>
+<div style="margin-left:27px"><span class="label"><a name="11927">6.12</a></span>
 var target_cpu: CpuType</div>
-<div style="margin-left:27px"><span class="label"><a name="11928">6.14</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12646">6.12.1</a></span>
+initialized with host_cpu</div>
+<div style="margin-left:27px"><span class="label"><a name="11928">6.13</a></span>
 var target_cpu_ver: int</div>
-<div style="margin-left:27px"><span class="label"><a name="11929">6.15</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12647">6.13.1</a></span>
+initialized with host_cpu_ver</div>
+<div style="margin-left:27px"><span class="label"><a name="11929">6.14</a></span>
 var target_wordsize: WordSize</div>
-<div style="margin-left:27px"><span class="label"><a name="11930">6.16</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12648">6.14.1</a></span>
+initialized with host_wordsize</div>
+<div style="margin-left:27px"><span class="label"><a name="11930">6.15</a></span>
 var target_os: OsType</div>
-<div style="margin-left:27px"><span class="label"><a name="11931">6.17</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12649">6.15.1</a></span>
+initialized with host_os</div>
+<div style="margin-left:27px"><span class="label"><a name="11931">6.16</a></span>
 var target_toolchain: CompilerType</div>
-<div style="margin-left:27px"><span class="label"><a name="11932">6.18</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12650">6.16.1</a></span>
+initialized with host_toolchain_ver</div>
+<div style="margin-left:27px"><span class="label"><a name="11932">6.17</a></span>
 var target_toolchain_ver: int</div>
+<div style="margin-left:45px"><span class="label"><a name="12651">6.17.1</a></span>
+initialized with host_toolchain_ver</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11996">7</a></span>
 <b>Predeclared Procedure Reference</b></h4>
 <h4 style="margin-left:27px"><span class="label"><a name="12007">7.1</a></span>
@@ -1314,80 +1346,86 @@ Returns the absolute file system path associated with the designated module.</di
 <b>abspath(m: module; p: path): path</b></div>
 <div style="margin-left:63px"><span class="label"><a name="12016">7.1.4.1</a></span>
 Returns the absolute file system path of p relative to the path associated with the designated module.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12006">7.2</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12643">7.2</a></span>
+build_dir</h4>
+<div style="margin-left:45px"><span class="label"><a name="12644">7.2.1</a></span>
+<b>build_dir(): path</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12645">7.2.1.1</a></span>
+The result corresponds to <code>root_build_dir + relpath()</code></div>
+<h4 style="margin-left:27px"><span class="label"><a name="12006">7.3</a></span>
 dump</h4>
-<div style="margin-left:45px"><span class="label"><a name="12391">7.2.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12391">7.3.1</a></span>
 This procedure is for debugging purpose. It expects one or two arguments. The first argument can be of any type; its type and value are printed to the console. The optional second argument is a string printed to the console.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12004">7.3</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12004">7.4</a></span>
 error</h4>
-<div style="margin-left:45px"><span class="label"><a name="12392">7.3.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12392">7.4.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stderr) and halts the program.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12005">7.4</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12005">7.5</a></span>
 message</h4>
-<div style="margin-left:45px"><span class="label"><a name="12393">7.4.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12393">7.5.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stdout).</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12050">7.5</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12050">7.6</a></span>
 <b>readstring</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="12051">7.5.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12051">7.6.1</a></span>
 <b>readstring(from: path): string</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12052">7.5.1.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12052">7.6.1.1</a></span>
 Read the given file as UTF-8 string. Double quotes and \ are replaced by \" and \\. Line breaks and the like are replaced by space. Leading and trailing white space (blanks, line breaks) is stripped. The maximum supported file lengh is limited to 16'000 bytes.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12014">7.6</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12014">7.7</a></span>
 <b>relpath</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="12546">7.6.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12546">7.7.1</a></span>
 The returned path is a logical path; the module associated with the root of the source tree is represented by '.'; each successive name segment corresponds to the identifier used in the <b>submod</b> declaration; there is no requirement that the physical directory hierarchy is congruent with the module hierarchy; see <a href="#12169">2.10 Modules</a> for more information.</div>
-<div style="margin-left:45px"><span class="label"><a name="12019">7.6.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12019">7.7.2</a></span>
 <b>relpath(): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12017">7.6.2.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12017">7.7.2.1</a></span>
 Returns the path relative to the module associated with the root directory of the source tree.</div>
-<div style="margin-left:45px"><span class="label"><a name="12020">7.6.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12020">7.7.3</a></span>
 <b>relpath(m: module): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12021">7.6.3.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12021">7.7.3.1</a></span>
 Returns the path of the designated module relative to the module associated with the root directory of the source tree.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11997">7.7</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11997">7.8</a></span>
 samelist</h4>
-<div style="margin-left:45px"><span class="label"><a name="12395">7.7.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12395">7.8.1</a></span>
 Expects two arguments of the same list type and compares their elements one by one in order. Returns <b>false</b>, if the elements or their number differ, and <b>true</b> otherwise.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11998">7.8</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11998">7.9</a></span>
 sameset</h4>
-<div style="margin-left:45px"><span class="label"><a name="12396">7.8.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12396">7.9.1</a></span>
 Expects two arguments of the same list type and compares their elements. The lists are treated like sets, i.e. the order of elements is insignificant and multiple copies of the same element are counted as one. Returns <b>true</b>, if both lists contain the same elements, <b>false</b> otherwise.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11999">7.9</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11999">7.10</a></span>
 toint</h4>
-<div style="margin-left:45px"><span class="label"><a name="12397">7.9.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12397">7.10.1</a></span>
 Expects one argument of real type and returns the largest int less than or equal to a given real.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12000">7.10</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12000">7.11</a></span>
 toreal</h4>
-<div style="margin-left:45px"><span class="label"><a name="12398">7.10.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12398">7.11.1</a></span>
 Expects one argument of int type and returns the same number as real type.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12001">7.11</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12001">7.12</a></span>
 tostring</h4>
-<div style="margin-left:45px"><span class="label"><a name="12399">7.11.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12399">7.12.1</a></span>
 Expects one argument of base or enumeration type und returns the string representation or the argument.</div>
-<div style="margin-left:45px"><span class="label"><a name="12400">7.11.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12400">7.12.2</a></span>
 For bool type the strings "true" or "false" are returned.</div>
-<div style="margin-left:45px"><span class="label"><a name="12401">7.11.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12401">7.12.3</a></span>
 For path types, a <code>'//'</code> prefix is changed to "/" and for a <code>// letter ':'</code> prefix is changed the two leading slashes are removed.</div>
-<div style="margin-left:45px"><span class="label"><a name="12402">7.11.4</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12402">7.12.4</a></span>
 For symbols only the string part without <code>`</code> prefix is returned.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12002">7.12</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12002">7.13</a></span>
 topath</h4>
-<div style="margin-left:45px"><span class="label"><a name="12403">7.12.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12403">7.13.1</a></span>
 Expects one argument of type string. Tries to convert the string into a normalized representation as specified in <a href="#12080">2.3.8 Paths</a>. If that succeeds, the path is returned, otherwise the execution halts with an error.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12441">7.13</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12441">7.14</a></span>
 trycompile</h4>
-<div style="margin-left:45px"><span class="label"><a name="12450">7.13.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12450">7.14.1</a></span>
 This function compiles C code (without linking). Returns true, if the compiler returns with no error, false otherwise. The following versions of the function are available:</div>
-<div style="margin-left:45px"><span class="label"><a name="12442">7.13.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12442">7.14.2</a></span>
 <b>trycompile(code:string):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12452">7.13.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12452">7.14.3</a></span>
 <b>trycompile(code: string; defines: string[]):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12453">7.13.4</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12453">7.14.4</a></span>
 <b>trycompile(code: string; defines: string[]; include_dirs: path[]):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12443">7.13.5</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12443">7.14.5</a></span>
 <b>trycompile(code: string; defines: string[]; include_dirs: path[]; cflags: string[]):bool</b></div>
-<h4 style="margin-left:27px"><span class="label"><a name="12003">7.14</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12003">7.15</a></span>
 warning</h4>
-<div style="margin-left:45px"><span class="label"><a name="12394">7.14.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12394">7.15.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stderr).</div>
 </body></html>

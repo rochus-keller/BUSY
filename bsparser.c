@@ -1465,6 +1465,24 @@ static void relpath(BSParserContext* ctx, int n, int row, int col)
     BS_END_LUA_FUNC(ctx);
 }
 
+static void build_dir(BSParserContext* ctx, int n, int row, int col)
+{
+    BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
+    if( n != 0 )
+        error(ctx, row, col,"expecting zero arguments" );
+
+    lua_getfield(ctx->L,ctx->builtins,"#inst");
+    lua_getfield(ctx->L,-1,"root_build_dir");
+    lua_replace(ctx->L,-2);
+    lua_getfield(ctx->L,ctx->module.table,"#rdir");
+    bs_add_path(ctx->L, -2, -1);
+    lua_replace(ctx->L,-3);
+    lua_pop(ctx->L,1);
+    lua_getfield(ctx->L,ctx->builtins, "path");
+
+    BS_END_LUA_FUNC(ctx);
+}
+
 static void toint(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
@@ -2030,6 +2048,9 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
         break;
     case 15:
         trycompile(ctx,n,lpar.loc.row, lpar.loc.col);
+        break;
+    case 16:
+        build_dir(ctx,n,lpar.loc.row, lpar.loc.col);
         break;
     default:
         error(ctx, lpar.loc.row, lpar.loc.col,"procedure not yet implemented" );
