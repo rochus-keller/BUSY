@@ -587,7 +587,7 @@ static void addall2(lua_State* L,int inst,int ldflags, int lib_dirs, int lib_nam
     assert( top == bottom );
 }
 
-static void renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int ismsvc)
+static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int ismsvc)
 {
     // BS_ObjectFiles: list of file names
     // BS_StaticLib, BS_DynamicLib, BS_Executable: one file name
@@ -597,6 +597,8 @@ static void renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int is
     const int k = lua_tointeger(L,-1);
     lua_pop(L,1); // kind
 
+    time_t srcExists = 0;
+
     size_t i;
     switch(k)
     {
@@ -605,7 +607,9 @@ static void renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int is
         {
             lua_rawgeti(L,list,i);
             const int sublist = lua_gettop(L);
-            renderobjectfiles(L,sublist,out, buf, ismsvc);
+            const time_t exists = renderobjectfiles(L,sublist,out, buf, ismsvc);
+            if( exists > srcExists )
+                srcExists = exists;
             lua_pop(L,1); // sublist
         }
         break;
@@ -614,6 +618,9 @@ static void renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int is
         {
             lua_rawgeti(L,list,i);
             const int path = lua_gettop(L);
+            const time_t exists = bs_exists(lua_tostring(L,path));
+            if( exists > srcExists )
+                srcExists = exists;
             if( buf )
             {
                 lua_pushvalue(L,buf);
@@ -638,6 +645,10 @@ static void renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int is
                 lua_concat(L,2); // the name of the import library is xyz.dll.lib
             }
 
+            const time_t exists = bs_exists(lua_tostring(L,path));
+            if( exists > srcExists )
+                srcExists = exists;
+
             if( buf )
             {
                 lua_pushvalue(L,buf);
@@ -653,6 +664,7 @@ static void renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int is
         // ignore
         break;
     }
+    return srcExists;
 }
 
 static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
@@ -738,6 +750,8 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     }
     lua_concat(L,2);
     const int out = lua_gettop(L);
+
+    const time_t outExists = bs_exists(lua_tostring(L,out));
 
     lua_pushvalue(L,outbase);
     lua_pushstring(L,".rsp");
@@ -839,6 +853,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     lua_setfield(L,inst,"#out");
     lua_pop(L,1); // outlist
 
+    time_t srcExists = 0;
 
     if( useRsp )
     {
@@ -846,7 +861,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
         if( f == NULL )
             luaL_error(L, "cannot open rsp file for writing: %s", lua_tostring(L,rsp));
 
-        renderobjectfiles(L,inlist,f,0, toolchain == BS_msvc);
+        srcExists = renderobjectfiles(L,inlist,f,0, toolchain == BS_msvc);
 
         fwrite(lua_tostring(L,ldflags),1,lua_objlen(L,ldflags),f);
         fwrite(lua_tostring(L,lib_dirs),1,lua_objlen(L,lib_dirs),f);
@@ -858,17 +873,20 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     }else
     {
         // luaL_Buffer doesn't work; luaL_pushresult produces "attempt to concatenate a table value"
-        renderobjectfiles(L,inlist,0,cmd, toolchain == BS_msvc);
+        srcExists = renderobjectfiles(L,inlist,0,cmd, toolchain == BS_msvc);
         // TODO lib_files
     }
 
-    fprintf(stdout,"%s\n", lua_tostring(L,cmd));
-    fflush(stdout);
-    if( bs_exec(lua_tostring(L,cmd)) != 0 ) // works for all gcc, clang and cl
+    if( !outExists || outExists < srcExists )
     {
-        // stderr was already written to the console
-        lua_pushnil(L);
-        lua_error(L);
+        fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+        fflush(stdout);
+        if( bs_exec(lua_tostring(L,cmd)) != 0 ) // works for all gcc, clang and cl
+        {
+            // stderr was already written to the console
+            lua_pushnil(L);
+            lua_error(L);
+        }
     }
     lua_pop(L,1); // cmd
 
@@ -1198,7 +1216,25 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
         lua_replace(L,app);
     }
 
+    lua_pushstring(L,"");
+    const int defines = lua_gettop(L);
+    lua_getfield(L,inst,"defines");
+    const int defs = lua_gettop(L);
     size_t i;
+    for( i = 1; i <= lua_objlen(L,defs); i++ )
+    {
+        lua_rawgeti(L,defs,i);
+        lua_pushvalue(L,defines);
+        if( strstr(lua_tostring(L,-2),"\\\"") != NULL )
+            lua_pushfstring(L," \"-D %s\"", lua_tostring(L,-2)); // strings can potentially include whitespace, thus quotes
+        else
+            lua_pushfstring(L," -D %s", lua_tostring(L,-2));
+        lua_concat(L,2);
+        lua_replace(L,defines);
+        lua_pop(L,1); // def
+    }
+    lua_pop(L,1); // defs
+
     lua_getfield(L,inst,"sources");
     const int sources = lua_gettop(L);
     int n = 0;
@@ -1240,9 +1276,10 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
         const int includePrivateHeader = bs_exists2(bs_global_buffer());
         lua_pop(L,1);
 
-        lua_pushfstring(L, "%s %s -o %s", bs_denormalize_path(lua_tostring(L,app) ),
+        lua_pushfstring(L, "%s %s -o %s%s", bs_denormalize_path(lua_tostring(L,app) ),
                         bs_denormalize_path(lua_tostring(L,source) ),
-                        bs_denormalize_path(lua_tostring(L,outFile)) );
+                        bs_denormalize_path(lua_tostring(L,outFile)),
+                        lua_tostring(L,defines));
         if( includePrivateHeader && lang == BS_header )
         {
             lua_pushstring(L," -p {{source_dir}}");
@@ -1275,7 +1312,7 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
         lua_pop(L,3); // cmd, source, outFile
     }
 
-    lua_pop(L,6); // outlist absDir binst outDir app sources
+    lua_pop(L,7); // outlist absDir binst outDir defines app sources
     const int bottom = lua_gettop(L);
     assert( top == bottom );
 }

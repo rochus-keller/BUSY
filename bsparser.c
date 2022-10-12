@@ -770,7 +770,11 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
 
             lua_getfield(ctx->L,-1,"#kind");
             if( lua_tointeger(ctx->L,-1) != BS_ClassDecl )
+            {
+                if( t.loc.row != line )
+                    warning(ctx,t.loc.row,t.loc.col,"designator has wrapped around from the previous line; did you miss a semicolon?");
                 error(ctx, t.loc.row, t.loc.col, "can only dereference fields or variables of class type" );
+            }
             lua_pop(ctx->L,1); // kind
 
             lua_replace(ctx->L,-3); // remove the field or var decl; top is now a classdecl
@@ -3465,6 +3469,8 @@ static void assignment(BSParserContext* ctx, BSScope* scope, int lro)
     {
         if( lro == 0 && rro != 0 && ( t.tok == Tok_Eq || t.tok == Tok_ColonEq ) )
             error(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to var" );
+        if( lro == 2 && rro == 1 && ( t.tok == Tok_Eq || t.tok == Tok_ColonEq ) )
+            error(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to field" );
     }
 
     lua_getfield(ctx->L,lt,"#type");

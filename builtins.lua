@@ -209,6 +209,7 @@ class("Message", globals.Action)
 
 class("Moc", globals.Action)
 	field("sources", listOf(globals.path))
+	field("defines", listOf(globals.string))
 
 class("Rcc", globals.Action)
 	field("sources", listOf(globals.path))
