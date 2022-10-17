@@ -3470,7 +3470,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope, int lro)
         if( lro == 0 && rro != 0 && ( t.tok == Tok_Eq || t.tok == Tok_ColonEq ) )
             error(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to var" );
         if( lro == 2 && rro == 1 && ( t.tok == Tok_Eq || t.tok == Tok_ColonEq ) )
-            error(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to field" );
+            error(ctx, t.loc.row, t.loc.col,"cannot assign immutable object to field; use += instead" );
     }
 
     lua_getfield(ctx->L,lt,"#type");

@@ -258,43 +258,31 @@ typedef enum BSOutKind { // #kind
     BS_SourceFiles // in case of Moc
 } BSOutKind;
 
-static void addinlistsources(lua_State* L, int inlist, int out)
+static void copyItems(lua_State* L, int inlist, int outlist, BSOutKind what )
 {
     lua_getfield(L,inlist,"#kind");
-    const int k = lua_tointeger(L,-1);
+    const unsigned k = lua_tointeger(L,-1);
     lua_pop(L,1); // kind
 
-    size_t i, len = 0;
-    switch(k)
+    if( k == BS_Mixed )
     {
-    case BS_Mixed:
-        len = lua_objlen(L,inlist);
+        size_t i, len = lua_objlen(L,inlist);
         for( i = 1; i <= len; i++ )
         {
             lua_rawgeti(L,inlist,i);
             const int sublist = lua_gettop(L);
-            addinlistsources(L,sublist,out);
-            if( lua_objlen(L,sublist) == 0 )
-            {
-                lua_pushnil(L);
-                lua_rawseti(L,inlist,i); // remove what we used
-            }
+            copyItems(L,sublist,outlist,what);
             lua_pop(L,1); // sublist
         }
-        break;
-    case BS_SourceFiles:
-        len = lua_objlen(L,inlist); // lua_objlen renders wrong number when called in for loop where elements are set to nil
+    }else if( k == what )
+    {
+        // also works with BS_DynamicLib, BS_StaticLib and BS_Executable
+        size_t i, len = lua_objlen(L,inlist);
         for( i = 1; i <= len; i++ )
         {
             lua_rawgeti(L,inlist,i);
-            lua_rawseti(L,out, lua_objlen(L,out)+1 );
-            lua_pushnil(L);
-            lua_rawseti(L,inlist,i); // remove what we used
+            lua_rawseti(L,outlist, lua_objlen(L,outlist)+1 );
         }
-        break;
-    default:
-        // ignore
-        break;
     }
 }
 
@@ -352,9 +340,10 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
         lua_rawseti(L,-2,i);
     }
     lua_replace(L,-2);
-    addinlistsources(L,inlist,sources);
+    copyItems(L,inlist,sources, BS_SourceFiles);
+    copyItems(L,inlist,outlist, BS_ObjectFiles);
 
-    int n = 0;
+    int n = lua_objlen(L,outlist);
     for( i = 1; i <= lua_objlen(L,sources); i++ )
     {
         lua_rawgeti(L,sources,i);
@@ -607,6 +596,7 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
         {
             lua_rawgeti(L,list,i);
             const int sublist = lua_gettop(L);
+            assert( lua_istable(L,sublist) );
             const time_t exists = renderobjectfiles(L,sublist,out, buf, ismsvc);
             if( exists > srcExists )
                 srcExists = exists;
@@ -635,7 +625,7 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
     case BS_StaticLib:
     case BS_DynamicLib:
         {
-            lua_rawgeti(L,list,1);
+            lua_rawgeti(L,list,1); // there is only one item, which has index 1
             const int path = lua_gettop(L);
 
             if(ismsvc && k == BS_DynamicLib)
@@ -925,9 +915,13 @@ static void builddeps(lua_State* L, int inst)
         // stack: subout
 
         const int subout = lua_gettop(L);
-        lua_getfield(L,-1,"#kind");
-        const int k = lua_tointeger(L,-1);
-        lua_pop(L,1);
+        int k = BS_Nothing;
+        if( lua_istable(L,subout) )
+        {
+            lua_getfield(L,-1,"#kind");
+            k = lua_tointeger(L,-1);
+            lua_pop(L,1);
+        }
 
         if( k == BS_Mixed )
         {
@@ -945,8 +939,10 @@ static void builddeps(lua_State* L, int inst)
                 lua_rawseti(L,out,++nout);
             }
             lua_pop(L,1); // subout
-        }else
+        }else if( lua_istable(L,subout) )
             lua_rawseti(L,out,++nout); // eats subout
+        else
+            lua_pop(L,1);
     }
     lua_setfield(L,inst,"#out");
     lua_pop(L,1); // deps
@@ -954,60 +950,133 @@ static void builddeps(lua_State* L, int inst)
     assert( top == bottom );
 }
 
+static int makeCopyOfLibs(lua_State* L, int inlist)
+{
+    const int top = lua_gettop(L);
+    lua_getfield(L,inlist,"#kind");
+    const int k = lua_tointeger(L,-1);
+    lua_pop(L,1); // kind
+
+    assert( k == BS_Mixed );
+
+    size_t i, len = 0;
+    len = lua_objlen(L,inlist);
+    int hasLibs = 0;
+    for( i = 1; i <= len; i++ )
+    {
+        lua_rawgeti(L,inlist,i);
+        const int sublist = lua_gettop(L);
+        lua_getfield(L,sublist,"#kind");
+        const int k = lua_tointeger(L,-1);
+        lua_pop(L,2); // kind, sublist
+        assert( k != BS_Mixed );
+        if( k == BS_StaticLib || k == BS_DynamicLib )
+        {
+            hasLibs = 1;
+            break;
+        }
+    }
+    if( hasLibs )
+    {
+        lua_createtable(L,0,0);
+        lua_pushinteger(L,BS_Mixed);
+        lua_setfield(L,-2,"#kind");
+        const int outlist = lua_gettop(L);
+        int n = 0;
+        for( i = 1; i <= len; i++ )
+        {
+            lua_rawgeti(L,inlist,i);
+            const int sublist = lua_gettop(L);
+            lua_getfield(L,sublist,"#kind");
+            const int k = lua_tointeger(L,-1);
+            lua_pop(L,1); // kind
+            if( k == BS_StaticLib || k == BS_DynamicLib )
+                lua_rawseti(L,outlist,++n);
+            else
+                lua_pop(L,1); // sublist
+        }
+    }
+    assert( top + ( hasLibs ? 1: 0 ) == lua_gettop(L) );
+    return hasLibs;
+}
+
 static void library(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
     lua_getfield(L,inst,"#out");
-    const int mixed = lua_gettop(L);
-    assert( lua_istable(L,mixed) );
-    compilesources(L,inst,builtins, mixed);
+    const int inlist = lua_gettop(L); // inlist is of kind BS_Mixed and doesn't have items of kind BS_Mixed
+    assert( lua_istable(L,inlist) );
+    compilesources(L,inst,builtins, inlist);
+
     lua_getfield(L,inst,"#out");
-    if( lua_objlen(L,mixed) == 0 )
-        lua_replace(L,mixed);
-    else
-        lua_rawseti(L,mixed,lua_objlen(L,mixed)+1);
+    if( makeCopyOfLibs(L,inlist) )
+    {
+        // inlist included libs, so top of stack is new BS_Mixed which includes these libs (and only those)
+        lua_replace(L,inlist);
+        lua_rawseti(L,inlist,lua_objlen(L,inlist)+1);
+        // now the new BS_Mixed also includes the BS_ObjectFiles from compile output
+    }else
+        lua_replace(L,inlist); // make BS_ObjectFiles from compile output the new inlist
+
     lua_getfield(L,inst,"lib_type");
+    // link sets out to a new table of kind BS_DynamicLib or BS_StaticLib; inlist is not passed out
     if( strcmp(lua_tostring(L,-1),"shared") == 0 )
-        link(L,inst,builtins,mixed,BS_DynamicLib);
+        link(L,inst,builtins,inlist,BS_DynamicLib);
     else
-        link(L,inst,builtins,mixed,BS_StaticLib);
+        link(L,inst,builtins,inlist,BS_StaticLib);
 
     lua_pop(L,2); // out, lib_type
     assert( top == lua_gettop(L) );
+
+    // passes on one lib (either BS_DynamicLib or BS_StaticLib)
 }
 
 static void executable(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
     lua_getfield(L,inst,"#out");
-    const int mixed = lua_gettop(L);
-    assert( lua_istable(L,mixed) );
-    compilesources(L,inst,builtins,mixed);
+    const int inlist = lua_gettop(L);
+    assert( lua_istable(L,inlist) );
+    compilesources(L,inst,builtins,inlist);
+
     lua_getfield(L,inst,"#out");
-    if( lua_objlen(L,mixed) == 0 )
-        lua_replace(L,mixed);
-    else
-        lua_rawseti(L,mixed,lua_objlen(L,mixed)+1);
-    link(L,inst,builtins,mixed,BS_Executable);
+    if( makeCopyOfLibs(L,inlist) )
+    {
+        // inlist included libs, so top of stack is new BS_Mixed which includes these libs (and only those)
+        lua_replace(L,inlist);
+        lua_rawseti(L,inlist,lua_objlen(L,inlist)+1);
+        // now the new BS_Mixed also includes the BS_ObjectFiles from compile output
+    }else
+        lua_replace(L,inlist); // make BS_ObjectFiles from compile output the new inlist
+
+    link(L,inst,builtins,inlist,BS_Executable);
     lua_pop(L,1); // mixed
     assert( top == lua_gettop(L) );
+
+    // passes on one BS_Executable
 }
 
 static void sourceset(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
     lua_getfield(L,inst,"#out");
-    const int mixed = lua_gettop(L);
-    assert( lua_istable(L,mixed) );
-    compilesources(L,inst,builtins,mixed);
-    if( lua_objlen(L,mixed) == 0 )
-        lua_pop(L,1); // mixed
-    else
+    const int inlist = lua_gettop(L);
+    assert( lua_istable(L,inlist) );
+    compilesources(L,inst,builtins,inlist);
+    // #out is now a BS_ObjectFiles
+
+    if( makeCopyOfLibs(L,inlist) )
     {
-        lua_getfield(L,inst,"#out"); // result of compilesources
-        lua_rawseti(L,mixed,lua_objlen(L,mixed)+1); // append it to mixed
+        // inlist included libs, so top of stack is new BS_Mixed which includes these libs (and only those)
+        lua_replace(L,inlist);
+        lua_getfield(L,inst,"#out");
+        lua_rawseti(L,inlist,lua_objlen(L,inlist)+1); // add BS_ObjectFiles to the new BS_Mixed
         lua_setfield(L,inst,"#out"); // set mixed again as inst.#out
-    }
+    }else
+        lua_pop(L,1); // inlist
+
+    // passes on a BS_ObjectFiles or a BS_Mixed with BS_ObjectFiles and the libs from orig inlist
+
     assert( top == lua_gettop(L) );
 }
 
@@ -1055,9 +1124,13 @@ static void script(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
 
+#if 0
     lua_createtable(L,0,0);
     lua_pushinteger(L,BS_Nothing);
     lua_setfield(L,-2,"#kind");
+#else
+    lua_pushnil(L);
+#endif
     lua_setfield(L,inst,"#out");
 
     getModuleVarFrom(L,inst,"#dir");
@@ -1105,9 +1178,13 @@ static void runforeach(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
 
+#if 0
     lua_createtable(L,0,0);
     lua_pushinteger(L,BS_Nothing);
     lua_setfield(L,-2,"#kind");
+#else
+    lua_pushnil(L);
+#endif
     lua_setfield(L,inst,"#out");
 
     getModuleVarFrom(L,inst,"#dir");
@@ -1315,6 +1392,8 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
     lua_pop(L,7); // outlist absDir binst outDir defines app sources
     const int bottom = lua_gettop(L);
     assert( top == bottom );
+
+    // passes on one BS_SourceFiles
 }
 
 static void runrcc(lua_State* L,int inst, int cls, int builtins)
