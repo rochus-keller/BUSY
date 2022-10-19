@@ -20,7 +20,7 @@
 #include "bshost.h"
 #include "bsunicode.h"
 #include "bsdetect.h"
-#include <stdlib.h>
+#include <stdlib.h> 
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h>
@@ -621,16 +621,16 @@ const char* bs_path_part(const char* path, BSPathPart what, int* len )
     return path;
 }
 
-static const char* path_part(const char* source, const char* what, int* len )
+static const char* path_part(const char* source, const char* what, int* len, int onlyFileParts )
 {
     assert(len);
-    if( *len == 6 && strncmp(what,"source", 6) == 0 )
+    if( *len == 6 && strncmp(what,"source", 6) == 0 && !onlyFileParts )
         return bs_path_part(source,BS_all,len);
     if( *len == 16 && strncmp(what,"source_file_part", 16) == 0 )
         return bs_path_part(source,BS_fileName,len);
     if( *len == 16 && strncmp(what,"source_name_part", 16) == 0 )
         return bs_path_part(source,BS_completeBaseName,len);
-    if( *len == 10 && strncmp(what,"source_dir", 10) == 0 )
+    if( *len == 10 && strncmp(what,"source_dir", 10) == 0 && !onlyFileParts )
         return bs_path_part(source,BS_filePath,len);
     if( *len == 10 && strncmp(what,"source_ext", 10) == 0 )
         return bs_path_part(source,BS_extension,len);
@@ -638,7 +638,7 @@ static const char* path_part(const char* source, const char* what, int* len )
     return "";
 }
 
-BSPathStatus bs_apply_source_expansion(const char* source, const char* string)
+BSPathStatus bs_apply_source_expansion(const char* source, const char* string, int onlyFileParts)
 {
     const char* s = string;
     char* p = s_buf;
@@ -656,7 +656,7 @@ BSPathStatus bs_apply_source_expansion(const char* source, const char* string)
             if( *s != '}' || s[1] != '}' )
                 return BS_InvalidFormat;
             int len = s - start;
-            const char* val = path_part(source,start, &len );
+            const char* val = path_part(source,start, &len, onlyFileParts );
             if( len < 0 )
                 return BS_NotSupported;
             if( p + len >= q )
@@ -682,4 +682,27 @@ time_t bs_exists2(const char* denormalizedPath)
         return st.st_mtime;
     else
         return 0;
+}
+
+int bs_copy(const char* normalizedToPath, const char* normalizedFromPath)
+{
+#ifdef _WIN32
+    return CopyFileA(bs_denormalize_path(normalizedFromPath), bs_denormalize_path(normalizedToPath), FALSE ) ? 0 : -1; // returns 0 on success, -1 otherwise
+#else
+    const char* to = bs_denormalize_path(normalizedToPath);
+    const char* from = bs_denormalize_path(normalizedFromPath);
+    const int fromLen = strlen(from);
+    const int len = 3+fromLen+strlen(to)+2;
+    char* cmd = (char*)malloc(len);
+    strcpy(cmd,"cp ");
+    strcpy(cmd+3,from);
+    *(cmd+3+fromLen) = ' ';
+    strcpy(cmd+3+1+fromLen,to);
+    cmd[len] = 0;
+    // fprintf(stdout,"%s\n",cmd);
+    // fflush(stdout);
+    const int res = bs_exec(cmd);
+    free(cmd);
+    return res;
+#endif
 }

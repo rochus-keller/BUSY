@@ -103,6 +103,13 @@ enumtype("WordSize")
 	enumitem("64")
 	enumitem("128")
 
+enumtype("FileType")
+	enumitem("object_file")
+	enumitem("source_file")
+	enumitem("static_lib")
+	enumitem("shared_lib")
+	enumitem("executable")
+
 
 -- standard classes
 local curClass
@@ -200,8 +207,9 @@ class("LuaScriptForeach", globals.Script)
 	field("sources", listOf(globals.path))
 	
 class("Copy", globals.Action)
-	field("sources", listOf(globals.path))
+	field("sources", listOf(globals.path)) 
 	field("outputs", listOf(globals.path))
+	field("use_deps", listOf(globals.FileType))
 
 class("Message", globals.Action)
 	field("msg_type", globals.MessageType) 

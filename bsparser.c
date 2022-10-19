@@ -20,7 +20,7 @@
 // It's actually not only a parser, but it also directly interprets the syntax with no full AST.
 
 #include "bsparser.h"
-#include "bslex.h"
+#include "bslex.h" 
 #include "bshost.h"
 #include "bsunicode.h"
 #include <memory.h>
@@ -1100,42 +1100,48 @@ static int isInEnum( BSParserContext* ctx, int type, int sym )
     return found;
 }
 
-static int sameType( BSParserContext* ctx, int a, int b )
+static int sameType( BSParserContext* ctx, int left, int right )
 {
     const int top = lua_gettop(ctx->L);
-    if( a <= 0 )
-        a += top + 1;
-    if( b <= 0 )
-        b += top + 1;
-    if( lua_equal(ctx->L,a,b) )
+    if( left <= 0 )
+        left += top + 1;
+    if( right <= 0 )
+        right += top + 1;
+    if( lua_equal(ctx->L,left,right) )
         return 1;
-    if( !lua_istable(ctx->L,a) || !lua_istable(ctx->L,b) )
+    if( !lua_istable(ctx->L,left) || !lua_istable(ctx->L,right) )
         return 0;
-    lua_getfield(ctx->L,a,"#kind");
-    const int ka = lua_tointeger(ctx->L,-1);
+    lua_getfield(ctx->L,left,"#kind");
+    const int kleft = lua_tointeger(ctx->L,-1);
     lua_pop(ctx->L,1);
-    lua_getfield(ctx->L,b,"#kind");
-    const int kb = lua_tointeger(ctx->L,-1);
+    lua_getfield(ctx->L,right,"#kind");
+    const int kright = lua_tointeger(ctx->L,-1);
     lua_pop(ctx->L,1);
-    if( ka != kb )
+#if 0 // doesnt work since right is a type, not a value
+    if( kleft == BS_EnumDecl && kright == BS_BaseType )
+        return isInEnum(ctx,left,right);
+    if( kright == BS_EnumDecl && kleft == BS_BaseType )
+        return isInEnum(ctx,right,left);
+#endif
+    if( kleft != kright )
         return 0;
-    if( ka == BS_ClassDecl || kb == BS_ClassDecl || ka == BS_EnumDecl || kb == BS_EnumDecl )
+    if( kleft == BS_ClassDecl || kright == BS_ClassDecl || kleft == BS_EnumDecl || kright == BS_EnumDecl )
         return 0; // we already checked whether table a and b ar the same
-    if( ka == BS_BaseType && kb == BS_BaseType )
+    if( kleft == BS_BaseType && kright == BS_BaseType )
     {
-        lua_getfield(ctx->L,a,"#type");
-        const int ta = lua_tointeger(ctx->L,-1);
+        lua_getfield(ctx->L,left,"#type");
+        const int tl = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
-        lua_getfield(ctx->L,b,"#type");
-        const int tb = lua_tointeger(ctx->L,-1);
+        lua_getfield(ctx->L,right,"#type");
+        const int tr = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
-        return ta == tb;
+        return tl == tr;
     }
-    if( ka == BS_ListType && kb == BS_ListType )
+    if( kleft == BS_ListType && kright == BS_ListType )
     {
-        lua_getfield(ctx->L,a,"#type");
-        lua_getfield(ctx->L,b,"#type");
-        const int res = sameType(ctx,-1,-2);
+        lua_getfield(ctx->L,left,"#type");
+        lua_getfield(ctx->L,right,"#type");
+        const int res = sameType(ctx,-2,-1);
         lua_pop(ctx->L,2);
         return res;
     }
@@ -2069,37 +2075,37 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
 
 
 // returns 0: no list or incompatible; 1: both list; 2: left list; 3: right list
-static int isListAndElemType( BSParserContext* ctx, int lhs, int rhs )
+static int isListAndElemType( BSParserContext* ctx, int lhst, int rhst, int lhsv, int rhsv )
 {
     // lhs is list and rhs is list or element or vice versa; lhs and rhs point to types
     const int top = lua_gettop(ctx->L);
-    if( lhs <= 0 )
-        lhs += top + 1;
-    if( rhs <= 0 )
-        rhs += top + 1;
-    if( !lua_istable(ctx->L,lhs) || !lua_istable(ctx->L,rhs) )
+    if( lhst <= 0 )
+        lhst += top + 1;
+    if( rhst <= 0 )
+        rhst += top + 1;
+    if( !lua_istable(ctx->L,lhst) || !lua_istable(ctx->L,rhst) )
         return 0;
-    lua_getfield(ctx->L,lhs,"#kind");
+    lua_getfield(ctx->L,lhst,"#kind");
     const int klhs = lua_tointeger(ctx->L,-1);
     lua_pop(ctx->L,1);
-    lua_getfield(ctx->L,rhs,"#kind");
+    lua_getfield(ctx->L,rhst,"#kind");
     const int krhs = lua_tointeger(ctx->L,-1);
     lua_pop(ctx->L,1);
     if( klhs != BS_ListType && krhs != BS_ListType )
         return 0;
-    if( klhs == BS_ListType && krhs == BS_ListType && sameType(ctx,lhs,rhs) )
+    if( klhs == BS_ListType && krhs == BS_ListType && sameType(ctx,lhst,rhst) )
         return 1; // both lists
     if( klhs == BS_ListType )
     {
-        lua_getfield(ctx->L,lhs,"#type");
-        const int res = sameType(ctx,-1,rhs) || isSameOrSubclass(ctx, -1, rhs) || isInEnum(ctx,-1,rhs);
+        lua_getfield(ctx->L,lhst,"#type");
+        const int res = sameType(ctx,-1,rhst) || isSameOrSubclass(ctx, -1, rhst) || isInEnum(ctx,-1,rhsv);
         lua_pop(ctx->L,1);
         return res ? 2 : 0; // lhs is list, rhs is element
     }
     if( krhs == BS_ListType )
     {
-        lua_getfield(ctx->L,rhs,"#type");
-        const int res = sameType(ctx,lhs,-1) || isSameOrSubclass(ctx, lhs, -1) || isInEnum(ctx,lhs, -1);
+        lua_getfield(ctx->L,rhst,"#type");
+        const int res = sameType(ctx,lhst,-1) || isSameOrSubclass(ctx, lhst, -1) || isInEnum(ctx,-1, lhsv);
         lua_pop(ctx->L,1);
         return res ? 3 : 0; // rhs is list, lhs is element
     }
@@ -2190,12 +2196,14 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
         lua_createtable(ctx->L,0,0);
         const int list = lua_gettop(ctx->L);
         expression(ctx,scope,0);
-
-        lua_getfield(ctx->L,-1,"#kind");
+        // value, type
+        const int expType = lua_gettop(ctx->L);
+        const int expVal = expType - 1;
+        lua_getfield(ctx->L,expType,"#kind");
         const int kr = lua_tointeger(ctx->L,-1);
         lua_pop(ctx->L,1);
 
-        if( lhsType && kr == BS_ClassDecl )
+        if( lhsType )
         {
             lua_getfield(ctx->L,lhsType,"#kind");
             int kl = lua_tointeger(ctx->L,-1);
@@ -2203,19 +2211,19 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
             if( kl == BS_ListType )
             {
                 lua_getfield(ctx->L,lhsType,"#type");
-                if( !isSameOrSubclass(ctx,-1,-2) )
-                    error(ctx, t.loc.row, t.loc.col,"the element is not compatible with the class" );
+                if( !isSameOrSubclass(ctx,-1,expType) && !isInEnum(ctx,-1,expVal) && !sameType(ctx,-1,expType) )
+                    error(ctx, t.loc.row, t.loc.col,"the element is not compatible with the list type" );
                 // replace the type of the first expression by lhsType
-                lua_replace(ctx->L,-2);
+                lua_replace(ctx->L,expType);
             }// else: the assignment type check produces the error
         }
 
         // store the first element in the list
-        lua_pushvalue(ctx->L,-2);
+        lua_pushvalue(ctx->L,expVal);
         lua_rawseti(ctx->L,list,++n);
-        lua_remove(ctx->L,-2);
+        lua_remove(ctx->L,expVal);
         // take the type of the first element as reference
-        const int type = lua_gettop(ctx->L);
+        const int refType = lua_gettop(ctx->L);
 
         t = peekToken(ctx,1);
         if( t.tok == Tok_Comma )
@@ -2226,7 +2234,7 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
         while( t.tok != Tok_Rbrack && t.tok != Tok_Eof )
         {
             expression(ctx,scope,0);
-            if( !sameType(ctx,type,-1) && !isSameOrSubclass(ctx,type,-1) )
+            if( !sameType(ctx,refType,-1) && !isSameOrSubclass(ctx,refType,-1) && !isInEnum(ctx,refType,-2) )
                 error(ctx, t.loc.row, t.loc.col,"all elements of the list literal must have compatible types" );
             lua_pushvalue(ctx->L,-2);
             lua_rawseti(ctx->L,list,++n);
@@ -2247,7 +2255,7 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
         lua_createtable(ctx->L,0,0);
         lua_pushinteger(ctx->L,BS_ListType);
         lua_setfield(ctx->L,-2, "#kind" );
-        lua_pushvalue(ctx->L,type);
+        lua_pushvalue(ctx->L,refType);
         lua_setfield(ctx->L,-2, "#type" );
         lua_remove(ctx->L,-2);
         // stack: list, list type
@@ -2464,7 +2472,7 @@ static void evalMulOp(BSParserContext* ctx, BSToken* tok)
     BS_BEGIN_LUA_FUNC(ctx,-2); // value, type
     const int lhs = lua_gettop(ctx->L) - 4 + 1;
     const int rhs = lua_gettop(ctx->L) - 2 + 1;
-    const int l = isListAndElemType(ctx,-3,-1);
+    const int l = isListAndElemType(ctx,-3,-1,0,0);
     if( l )
     {
         const int nl = l == 1 || l == 2 ? lua_objlen(ctx->L,lhs) : 0;
@@ -2655,7 +2663,7 @@ static void evalAddOp(BSParserContext* ctx, BSToken* tok)
     BS_BEGIN_LUA_FUNC(ctx,-2); // value, type
     const int lhs = lua_gettop(ctx->L) - 4 + 1;
     const int rhs = lua_gettop(ctx->L) - 2 + 1;
-    const int l = isListAndElemType(ctx,-3,-1);
+    const int l = isListAndElemType(ctx,-3,-1,0,0);
     if( l )
     {
         const int nl = l == 1 || l == 2 ? lua_objlen(ctx->L,lhs) : 0;
@@ -2834,7 +2842,7 @@ static void evalRelation(BSParserContext* ctx, BSToken* tok)
 {
     // in: // value, type, value, type
     BS_BEGIN_LUA_FUNC(ctx,-2); // value, type
-    const int l = isListAndElemType(ctx,-3,-1);
+    const int l = isListAndElemType(ctx,-3,-1,0,0);
     const int lhs = lua_gettop(ctx->L) - 4 + 1; // value
     const int rhs = lua_gettop(ctx->L) - 2 + 1; // value
 
@@ -3452,7 +3460,7 @@ static void assignment(BSParserContext* ctx, BSScope* scope, int lro)
     // value, type
     const int rhs = lua_gettop(ctx->L) - 1;
 
-    const int l = isListAndElemType(ctx,lt,rhs+1);
+    const int l = isListAndElemType(ctx,lt,rhs+1,lhs,rhs);
     const int sub = isSameOrSubclass(ctx,lt,rhs+1);
     const int same = sameType(ctx,lt,rhs+1);
     const int inenum = isInEnum(ctx,lt,rhs);

@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-10-06, Work in progress</div>
+2022-10-19, Work in progress</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -128,7 +128,7 @@ A lot of text is derived from the Oberon+ language specification, <a href="https
 <div style="margin-left:99px"><span class="label"><a name="12641">1.5.2.2.3.4</a></span>
 <a href="#12635">3.2.5.4 Rcc</a></div>
 <div style="margin-left:99px"><span class="label"><a name="12303">1.5.2.2.3.5</a></span>
-<a href="#11893">3.2.5.5 TODO Copy</a></div>
+<a href="#11893">3.2.5.5 Copy</a></div>
 <div style="margin-left:45px"><span class="label"><a name="12305">1.5.3</a></span>
 <a href="#11697">4 Predeclared  Field Reference</a></div>
 <div style="margin-left:63px"><span class="label"><a name="12306">1.5.3.1</a></span>
@@ -649,7 +649,7 @@ There are four assignment variants: plain replacement (<b>=</b>), in-place add (
 <div style="margin-left:63px"><span class="label"><a name="12367">2.8.3.4</a></span>
 All four variants are available for numeric types. The in-place variants are an abbreviation of their corresponding arithmetic operators; e.g. <code>a += 10</code>  is an abbreviation of <code>a = a + 10</code> (see <a href="#12220">2.7.3.4 Arithmetic operators</a>).</div>
 <div style="margin-left:63px"><span class="label"><a name="12368">2.8.3.5</a></span>
-All four variants are available for list type variables or fields. The plain assignment replaces the the designated variable or field by the list resulting from the expression. In contrast the in-place arithmetic operations modify the list referenced by the designated variable or field. The <b>+=</b> operator appends the value of the expression (a list or element) to the list. The <b>*=</b> operator appends the value of the expression to the list, if it is a single element and not yet contained in the list. The <b>*=</b> operator replaces the contents of the list by the intersection, if the value of the expression is a list. The <b>-=</b> operator removes the given element(s) from the list, if the value of the expression is either a single element or a list.</div>
+All four variants are available for list type variables or fields. The plain assignment replaces the the designated variable or field by the list resulting from the expression. In contrast the in-place arithmetic operations modify the list referenced by the designated variable or field. The <b>+=</b> operator appends a copy of the value of the expression (a list or element) to the list. The <b>*=</b> operator appends the value of the expression to the list, if it is a single element and not yet contained in the list. The <b>*=</b> operator replaces the contents of the list by the intersection, if the value of the expression is a list. The <b>-=</b> operator removes the given element(s) from the list, if the value of the expression is either a single element or a list.</div>
 <div style="margin-left:63px"><span class="label"><a name="12369">2.8.3.6</a></span>
 The plain replacement (<b>=</b>) and in-place add (<b>+=</b>) operators also apply to string and path types. The designated variable or field  must be of the same type as the expression. The plain assignment replaces the the designated variable or field value by the string or path resulting from the expression. In case of strings, the <b>+=</b> operator concatenates the right side to the left side. In case of paths, the left side is replaced by a concatenated, normalized version of the left and right side; the right side must be a relative path; the ../ are resolved with the operation; if the left side doesn't have enough segments to accommodate the right side, the execution halts with an error.</div>
 <h4 style="margin-left:45px"><span class="label"><a name="12350">2.8.4</a></span>
@@ -827,7 +827,7 @@ The instance displays a message to the console. In case of MessageType `error th
 <h4 style="margin-left:63px"><span class="label"><a name="12625">3.2.5.3</a></span>
 Moc</h4>
 <div style="margin-left:81px"><span class="label"><a name="12626">3.2.5.3.1</a></span>
-<b>Main</b>: <a href="#11885">sources</a></div>
+<b>Main</b>: <a href="#11885">sources</a>, <a href="#11741">defines</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12634">3.2.5.3.2</a></span>
 Calls the Qt moc executable to which the predeclared moc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked.</div>
 <div style="margin-left:81px"><span class="label"><a name="12642">3.2.5.3.3</a></span>
@@ -838,24 +838,22 @@ Note that usually Q_OBJECT marked classes are in header files; if instead a .cp
 <b>Main</b>: <a href="#11885">sources</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12637">3.2.5.4.2</a></span>
 Calls the Qt rcc executable to which the predeclared rcc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked (see <a href="https://doc.qt.io/qt-5/rcc.html"><u>the original Qt rcc documentation</u></a> for more information).</div>
-<div style="margin-left:63px"><span class="label"><a name="11893">3.2.5.5</a></span>
-TODO Copy</div>
+<h4 style="margin-left:63px"><span class="label"><a name="11893">3.2.5.5</a></span>
+<b>Copy</b></h4>
 <div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.5.1</a></span>
-<b>Main</b>: <a href="#11885">sources</a>, <a href="#11907">outputs</a></div>
-<div style="margin-left:81px"><span class="label"><a name="11894">3.2.5.5.2</a></span>
-All output files must be inside the output directory of the build. You would generally use |$target_out_dir| or |$target_gen_dir| to reference the output or generated intermediate file directories, respectively. TODO</div>
-<div style="margin-left:81px"><span class="label"><a name="11905">3.2.5.5.3</a></span>
-Both <a href="#11885">sources</a> and <a href="#11907">outputs</a> must be specified. Sources can include as many files as you want, but there can only be one item in the outputs list (plural is used for the name for consistency with other target types).</div>
-<div style="margin-left:81px"><span class="label"><a name="11906">3.2.5.5.4</a></span>
-If there is more than one source file, your output name should specify a mapping from each source file to an output file name. TODO</div>
-<div style="margin-left:63px"><span class="label"><a name="12484">3.2.5.6</a></span>
-TODO CopyDeps</div>
-<div style="margin-left:81px"><span class="label"><a name="12485">3.2.5.6.1</a></span>
-Copy all files delivered by deps</div>
-<div style="margin-left:63px"><span class="label"><a name="12482">3.2.5.7</a></span>
-TODO ClearDeps</div>
-<div style="margin-left:81px"><span class="label"><a name="12483">3.2.5.7.1</a></span>
-Delete all files delivered by deps</div>
+<b>Main</b>: <a href="#11885">sources</a>, <a href="#11907">outputs</a>, <a href="#12679">use_deps</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12682">3.2.5.5.2</a></span>
+Copy the files explicitly listed in <a href="#11885">sources</a> or received from <a href="#11831">deps</a> (subject to the file types in <a href="#12679">use_deps</a>) to the places listed in <a href="#11907">outputs</a>. </div>
+<div style="margin-left:81px"><span class="label"><a name="12683">3.2.5.5.3</a></span>
+<a href="#11907">outputs</a> makes use of <a href="#12603">Source Expansion</a>; the place-holders <a href="#12610">{{source_file_part}}</a>, <a href="#12612">{{source_name_part}}</a> and <a href="#12621">{{source_ext}}</a> are available.</div>
+<div style="margin-left:81px"><span class="label"><a name="12684">3.2.5.5.4</a></span>
+<a href="#11885">sources</a> and <a href="#11907">outputs</a> can include as many files as you want; each entry in <a href="#11885">sources</a> is copied to all places in <a href="#11907">outputs</a>.</div>
+<div style="margin-left:81px"><span class="label"><a name="12687">3.2.5.5.5</a></span><span class="ident">NOTE</span>
+For security reasons <a href="#11907">outputs</a> only accepts relative paths.</div>
+<div style="margin-left:81px"><span class="label"><a name="12688">3.2.5.5.6</a></span>
+Each file path in <a href="#11907">outputs</a> is interpreted relative to <b>build_dir()</b>.</div>
+<div style="margin-left:81px"><span class="label"><a name="12685">3.2.5.5.7</a></span><span class="ident">NOTE</span>
+If the output file exists it is overwritten without warning.</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11697">4</a></span>
 <b>Predeclared Field Reference</b></h4>
 <h4 style="margin-left:27px"><span class="label"><a name="11917">4.1</a></span>
@@ -941,13 +939,25 @@ deps</h4>
 <div style="margin-left:45px"><span class="label"><a name="11832">4.10.1</a></span>
 <b>deps: Product[]</b></div>
 <div style="margin-left:45px"><span class="label"><a name="11833">4.10.2</a></span>
-Specifies (private) compile-time dependencies of a produt. Such dependencies are propagated up the dependency tree and linked to dependent products, but do not grant the ability to include headers from the dependency. Public configs are not forwarded.</div>
+Specifies compile-time dependencies of a product. Such dependencies are propagated up the dependency tree and linked to dependent products, but do not grant the ability to include headers from the dependency. </div>
 <h4 style="margin-left:45px"><span class="label"><a name="11834">4.10.3</a></span>
 <a href=""><b>D</b></a><b>etails of dependency propagation</b></h4>
-<div style="margin-left:63px"><span class="label"><a name="11835">4.10.3.1</a></span>
-Source sets, shared libraries, and non-complete static libraries will be propagated up the dependency tree across groups, non-complete static libraries and source sets.</div>
-<div style="margin-left:63px"><span class="label"><a name="11836">4.10.3.2</a></span>
-Executables, shared libraries, and complete static libraries will link all propagated targets and stop propagation. Actions and copy steps also stop propagation, allowing them to take a library as an input but not force dependents to link to it.</div>
+<div style="margin-left:63px"><span class="label"><a name="12668">4.10.3.1</a></span>
+The results of <a href="#11633">Executable</a>, <a href="#11662">Library</a>, <a href="#11647">SourceSet</a>, <a href="#11671">Group</a>, <a href="#12625">Moc</a> and <a href="#12635">Rcc</a> will be propagated up the dependency tree.</div>
+<div style="margin-left:63px"><span class="label"><a name="12670">4.10.3.2</a></span>
+<a href="#11671">Group</a> is special in that it just passes on all results of its dependencies.</div>
+<div style="margin-left:63px"><span class="label"><a name="12671">4.10.3.3</a></span>
+<a href="#11647">SourceSet</a> consumes sources from its dependencies and propagates object files up the dependency tree; object files and libraries from its dependencies are passed through.</div>
+<div style="margin-left:63px"><span class="label"><a name="12672">4.10.3.4</a></span>
+<a href="#11662">Library</a> consumes sources, object files and libraries from its dependencies and passes the resulting library up the dependency tree.</div>
+<div style="margin-left:63px"><span class="label"><a name="12673">4.10.3.5</a></span>
+<a href="#11633">Executable</a> consumes sources, object files and libraries from its dependencies and passes the resulting executable up the dependency tree.</div>
+<div style="margin-left:63px"><span class="label"><a name="12674">4.10.3.6</a></span>
+<a href="#12625">Moc</a> and <a href="#12635">Rcc</a> don't consume or pass through anything from their dependencies, but pass the resulting source files up the dependency tree.</div>
+<div style="margin-left:63px"><span class="label"><a name="12677">4.10.3.7</a></span>
+<a href="#11893">Copy</a> includes the file types listed in <a href="#12679">use_deps</a> from its dependencies in its source list, but doesn't pass anything up the dependency tree.</div>
+<div style="margin-left:63px"><span class="label"><a name="12675">4.10.3.8</a></span>
+<a href="#11679">LuaScript</a>, <a href="#11681">LuaScriptForeach</a> and <a href="#12590">Message</a> don't consume or pass through anything from their dependencies.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11825">4.11</a></span>
 frameworks</h4>
 <div style="margin-left:45px"><span class="label"><a name="11826">4.11.1</a></span>
@@ -1053,9 +1063,9 @@ outputs</h4>
 <div style="margin-left:45px"><span class="label"><a name="11908">4.20.1</a></span>
 <b>outputs: path[]</b></div>
 <div style="margin-left:45px"><span class="label"><a name="11909">4.20.2</a></span>
-Outputs is valid for <a href="#11893">TODO Copy</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> target types and indicates the resulting files. Outputs must always refer to files in the build directory.</div>
+Outputs is valid for <a href="#11893">Copy</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> target types and indicates the resulting files. Outputs must always refer to files in the build directory.</div>
 <div style="margin-left:45px"><span class="label"><a name="11910">4.20.3</a></span>
-<a href="#11893">TODO Copy</a></div>
+<a href="#11893">Copy</a></div>
 <div style="margin-left:63px"><span class="label"><a name="11911">4.20.3.1</a></span>
 Copy targets should have exactly one entry in the outputs list. If there is exactly one source, this can be a literal file name or a source expansion. If there is more than one source, this must contain a source expansion to map a single input name to a single output name. </div>
 <h4 style="margin-left:27px"><span class="label"><a name="11901">4.21</a></span>
@@ -1083,7 +1093,7 @@ As a special case, a file ending in ".def" will be treated as a Windows module d
 <div style="margin-left:81px"><span class="label"><a name="11900">4.22.4.1.1</a></span>
 The sources are the set of files that the script will be executed over. The script will run once per file.</div>
 <div style="margin-left:63px"><span class="label"><a name="11896">4.22.4.2</a></span>
-<a href="#11893">TODO Copy</a></div>
+<a href="#11893">Copy</a></div>
 <div style="margin-left:81px"><span class="label"><a name="11898">4.22.4.2.1</a></span>
 The source are the source files to copy.</div>
 <div style="margin-left:63px"><span class="label"><a name="12628">4.22.4.3</a></span>
@@ -1093,7 +1103,7 @@ The sources are the files which have to be processed by moc or rcc.</div>
 <h4 style="margin-left:45px"><span class="label"><a name="12603">4.22.5</a></span>
 Source Expansion</h4>
 <div style="margin-left:63px"><span class="label"><a name="12605">4.22.5.1</a></span>
-Source expansion is used for the <a href="#11681">LuaScriptForeach</a> and <a href="#11893">TODO Copy</a> action types. Strings can include one or more of the following placeholders. The result is the string representation of the path, as if <a href="#12001">tostring</a> would have been called.</div>
+Source expansion is used for the <a href="#11681">LuaScriptForeach</a> and <a href="#11893">Copy</a> action types. Strings can include one or more of the following placeholders. The result is the string representation of the path, as if <a href="#12001">tostring</a> would have been called.</div>
 <h4 style="margin-left:63px"><span class="label"><a name="12607">4.22.5.2</a></span>
 Placeholders</h4>
 <div style="margin-left:81px"><span class="label"><a name="12608">4.22.5.2.1</a></span>
@@ -1122,33 +1132,39 @@ text</h4>
 <b>text : string</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12599">4.23.2</a></span>
 An arbitrary string to be displayed</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11951">4.24</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12679">4.24</a></span>
+<b>use_deps</b></h4>
+<div style="margin-left:45px"><span class="label"><a name="12680">4.24.1</a></span>
+<b>use_deps: FileType[]</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12681">4.24.2</a></span>
+A list of file types to be consumed from the dependencies; currently only used by <a href="#11893">Copy</a>.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="11951">4.25</a></span>
 <b>Fields not implemented yet (TODO)</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="11952">4.24.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="11952">4.25.1</a></span>
 Wheter this is implemented at all, or only explicit config assignment is implemented, is subject to further analysis; the current assumption is that these features introduce more complexity than benefit.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11878">4.24.2</a></span>
+<h4 style="margin-left:45px"><span class="label"><a name="11878">4.25.2</a></span>
 all_dependent_configs</h4>
-<div style="margin-left:63px"><span class="label"><a name="11879">4.24.2.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11879">4.25.2.1</a></span>
 <b>all_dependent_configs: Config[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11880">4.24.2.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11880">4.25.2.2</a></span>
 All targets depending on this one, and recursively, all targets depending on those, will have the configs listed in this variable added to them. These configs will also apply to the current target.</div>
-<div style="margin-left:63px"><span class="label"><a name="11881">4.24.2.3</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11881">4.25.2.3</a></span>
 This addition happens in a second phase once a target and all of its dependencies have been resolved. Therefore, a target will not see these force-added configs in their "configs" variable while the script is running, and they can not be removed. As a result, this capability should generally only be used to add defines and include directories necessary to compile a target's headers.</div>
-<div style="margin-left:63px"><span class="label"><a name="11884">4.24.2.4</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11884">4.25.2.4</a></span>
 see <a href="#11711">Order of application:</a></div>
-<div style="margin-left:63px"><span class="label"><a name="11882">4.24.2.5</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11882">4.25.2.5</a></span>
 See also <a href="#11838">public_deps</a>.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11865">4.24.3</a></span>
+<h4 style="margin-left:45px"><span class="label"><a name="11865">4.25.3</a></span>
 public_configs</h4>
-<div style="margin-left:63px"><span class="label"><a name="11866">4.24.3.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11866">4.25.3.1</a></span>
 <b>public_configs: Config[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11867">4.24.3.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11867">4.25.3.2</a></span>
 Targets directly depending on this one will have the configs listed in this variable added to them. These configs will also apply to the current target. Generally, public configs are used to apply defines and include directories necessary to compile this target's header files.</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11868">4.24.3.3</a></span>
+<h4 style="margin-left:63px"><span class="label"><a name="11868">4.25.3.3</a></span>
 <a href=""><b>P</b></a><b>ropagation of public configs</b></h4>
-<div style="margin-left:81px"><span class="label"><a name="11869">4.24.3.3.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11869">4.25.3.3.1</a></span>
 Public configs are applied to all targets that depend directly on this one. These dependant targets can further push this target's public configs higher in the dependency tree by depending on it via public_deps (see <a href="#11838">public_deps</a>).</div>
-<div style="margin-left:81px"><span class="label"><a name="11870">4.24.3.3.2</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11870">4.25.3.3.2</a></span>
 <pre><code>let lower: Library {</code></pre>
 <pre><code>  # This will get applied to all targets that depend on this one.</code></pre>
 <pre><code>  .public_configs = [ my_config ]</code></pre>
@@ -1165,13 +1181,13 @@ Public configs are applied to all targets that depend directly on this one. Thes
 <pre><code>  # one won't get it.</code></pre>
 <pre><code>  .deps = [ intermediate ]</code></pre>
 <pre><code>}</code></pre></div>
-<div style="margin-left:81px"><span class="label"><a name="11871">4.24.3.3.3</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11871">4.25.3.3.3</a></span>
 Public config propagation happens in a second phase once a target and all of its dependencies have been resolved. Therefore, a target will not see these force-added configs in their "configs" variable while the script is running, and they can not be removed. As a result, this capability should generally only be used to add defines and include directories rather than setting complicated flags that some targets may not want.</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11873">4.24.3.4</a></span>
+<h4 style="margin-left:63px"><span class="label"><a name="11873">4.25.3.4</a></span>
 <a href=""><b>A</b></a><b>voiding applying public configs to this target</b></h4>
-<div style="margin-left:81px"><span class="label"><a name="11874">4.24.3.4.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11874">4.25.3.4.1</a></span>
 If you want the config to apply to targets that depend on this one, but NOT this one, define an extra layer of indirection using a group:</div>
-<div style="margin-left:81px"><span class="label"><a name="11875">4.24.3.4.2</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11875">4.25.3.4.2</a></span>
 <pre><code># Internal target to actually compile the sources. Not visible from outside.</code></pre>
 <pre><code>let internal_target: Library {</code></pre>
 <pre><code>  # Force all external targets to depend on the group instead of directly</code></pre>
@@ -1184,63 +1200,63 @@ If you want the config to apply to targets that depend on this one, but NOT this
 <pre><code>  .public_configs = [ external_settings ]</code></pre>
 <pre><code>  .deps = [ internal_target ]</code></pre>
 <pre><code>}</code></pre></div>
-<div style="margin-left:63px"><span class="label"><a name="11877">4.24.3.5</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11877">4.25.3.5</a></span>
 see <a href="#11711">Order of application:</a></div>
-<h4 style="margin-left:45px"><span class="label"><a name="11838">4.24.4</a></span>
+<h4 style="margin-left:45px"><span class="label"><a name="11838">4.25.4</a></span>
 public_deps</h4>
-<div style="margin-left:63px"><span class="label"><a name="11839">4.24.4.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11839">4.25.4.1</a></span>
 <b>public_deps: Product[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11840">4.24.4.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11840">4.25.4.2</a></span>
 Public dependencies are like private dependencies (see <a href="#11831">deps</a>) but additionally express that the current product exposes the listed deps as part of its public API.</div>
-<div style="margin-left:63px"><span class="label"><a name="11841">4.24.4.3</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11841">4.25.4.3</a></span>
 This has several ramifications:</div>
-<div style="margin-left:81px"><span class="label"><a name="11842">4.24.4.3.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11842">4.25.4.3.1</a></span>
 public_configs that are part of the dependency are forwarded to direct dependents.</div>
-<div style="margin-left:81px"><span class="label"><a name="11843">4.24.4.3.2</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11843">4.25.4.3.2</a></span>
 Public headers in the dependency are usable by dependents (includes do not require a direct dependency or visibility).</div>
-<div style="margin-left:81px"><span class="label"><a name="11844">4.24.4.3.3</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11844">4.25.4.3.3</a></span>
 If the current target is a shared library, other shared libraries that it publicly depends on (directly or indirectly) are propagated up the dependency tree to dependents for linking.</div>
-<div style="margin-left:63px"><span class="label"><a name="11845">4.24.4.4</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11845">4.25.4.4</a></span>
 See also "public_configs".</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11846">4.24.4.5</a></span>
+<h4 style="margin-left:63px"><span class="label"><a name="11846">4.25.4.5</a></span>
 Discussion</h4>
-<div style="margin-left:81px"><span class="label"><a name="11847">4.24.4.5.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11847">4.25.4.5.1</a></span>
 Say you have three targets: A -&gt; B -&gt; C. C's visibility may allow B to depend on it but not A. Normally, this would prevent A from including any headers from C, and C's public_configs would apply only to B.</div>
-<div style="margin-left:81px"><span class="label"><a name="11848">4.24.4.5.2</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11848">4.25.4.5.2</a></span>
 If B lists C in its public_deps instead of regular deps, A will now inherit C's public_configs and the ability to include C's public headers.</div>
-<div style="margin-left:81px"><span class="label"><a name="11849">4.24.4.5.3</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11849">4.25.4.5.3</a></span>
 Generally if you are writing a target B and you include C's headers as part of B's public headers, or targets depending on B should consider B and C to be part of a unit, you should use public_deps instead of deps.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11856">4.24.5</a></span>
+<h4 style="margin-left:45px"><span class="label"><a name="11856">4.25.5</a></span>
 data</h4>
-<div style="margin-left:63px"><span class="label"><a name="11857">4.24.5.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11857">4.25.5.1</a></span>
 <b>data: path[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11858">4.24.5.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11858">4.25.5.2</a></span>
 Lists files or directories required to run the given target. These are typically data files or directories of data files. The paths are interpreted as being relative to the current build file. Since these are runtime dependencies, they do not affect which targets are built or when. To declare input files to a script, use <a href="#11764">inputs</a>.</div>
-<div style="margin-left:63px"><span class="label"><a name="11859">4.24.5.3</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11859">4.25.5.3</a></span>
 Appearing in the "data" section does not imply any special handling such as copying them to the output directory. This is just used for declaring runtime dependencies. </div>
-<div style="margin-left:63px"><span class="label"><a name="11860">4.24.5.4</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11860">4.25.5.4</a></span>
 BUSY doesn't require data files to exist at build-time. So actions that produce files that are in turn runtime dependencies can list those generated files both in the <a href="#11907">outputs</a> list as well as the "data" list.</div>
-<div style="margin-left:63px"><span class="label"><a name="11861">4.24.5.5</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11861">4.25.5.5</a></span>
 The paths are just rebased and passed along when requested.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11850">4.24.6</a></span>
+<h4 style="margin-left:45px"><span class="label"><a name="11850">4.25.6</a></span>
 data_deps</h4>
-<div style="margin-left:63px"><span class="label"><a name="11851">4.24.6.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11851">4.25.6.1</a></span>
 <b>data_deps: Product[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11852">4.24.6.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11852">4.25.6.2</a></span>
 Specifies dependencies of a target that are not actually linked into the current target. Such dependencies will be built and will be available at runtime.</div>
-<div style="margin-left:63px"><span class="label"><a name="11853">4.24.6.3</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11853">4.25.6.3</a></span>
 This is normally used for things like plugins or helper programs that a target needs at runtime.</div>
-<div style="margin-left:63px"><span class="label"><a name="11855">4.24.6.4</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11855">4.25.6.4</a></span>
 See also <a href="#11831">deps</a> and <a href="#11856">data</a>.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11764">4.24.7</a></span>
+<h4 style="margin-left:45px"><span class="label"><a name="11764">4.25.7</a></span>
 inputs</h4>
-<div style="margin-left:63px"><span class="label"><a name="11767">4.24.7.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11767">4.25.7.1</a></span>
 <b>inputs: Product[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11765">4.24.7.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11765">4.25.7.2</a></span>
 Inputs are compile-time dependencies of the current target. This means that all inputs must be available before compiling any of the sources or executing any actions.</div>
-<div style="margin-left:63px"><span class="label"><a name="11766">4.24.7.3</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11766">4.25.7.3</a></span>
 Inputs are typically only used for <a href="#11678">Action</a> targets.</div>
-<div style="margin-left:63px"><span class="label"><a name="11771">4.24.7.4</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11771">4.25.7.4</a></span>
 TODO</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11934">5</a></span>
 <b>Predeclared Enumeration Reference</b></h4>
@@ -1258,6 +1274,8 @@ type WordSize = ( `16, `32, `64, `128 )</div>
 type CompilerType = ( `msvc, `gcc, `clang )</div>
 <div style="margin-left:27px"><span class="label"><a name="12592">5.7</a></span>
 type MessageType = ( `error, `warning, `info )</div>
+<div style="margin-left:27px"><span class="label"><a name="12678">5.8</a></span>
+type FileType = ( `object_file, `source_file, `static_lib, `shared_lib, `executable )</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11920">6</a></span>
 <b>Predeclared Variable Reference</b></h4>
 <div style="margin-left:27px"><span class="label"><a name="12574">6.1</a></span>

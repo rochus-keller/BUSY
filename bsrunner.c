@@ -19,7 +19,7 @@
 
 #include "bsrunner.h"
 #include "bshost.h"
-#include "bsparser.h"
+#include "bsparser.h" 
 #include "lauxlib.h"
 #include <assert.h>
 #include <string.h>
@@ -1226,7 +1226,7 @@ static void runforeach(lua_State* L,int inst, int cls, int builtins)
             lua_pushvalue(L,args);
             lua_pushstring(L," ");
             lua_rawgeti(L,arglist,j);
-            if( bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1)) != BS_OK )
+            if( bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0) != BS_OK )
                 luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
             lua_pop(L,1);
             lua_pushstring(L,bs_global_buffer());
@@ -1349,7 +1349,7 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
 
         // check if there is a {{source_dir}}/{{source_name_part}}_p.h and - if true - include it in the generated file
         lua_pushstring(L,"{{source_dir}}/{{source_name_part}}_p.h");
-        bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1));
+        bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
         const int includePrivateHeader = bs_exists2(bs_global_buffer());
         lua_pop(L,1);
 
@@ -1360,11 +1360,11 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
         if( includePrivateHeader && lang == BS_header )
         {
             lua_pushstring(L," -p {{source_dir}}");
-            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1));
+            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
             lua_pushstring(L, bs_global_buffer());
             lua_replace(L,-2);
             lua_pushstring(L," -b {{source_name_part}}_p.h");
-            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1));
+            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
             lua_pushstring(L, bs_global_buffer());
             lua_replace(L,-2);
             lua_concat(L,3);
@@ -1487,7 +1487,115 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
 
 static void copy(lua_State* L,int inst, int cls, int builtins)
 {
-    luaL_error(L,"'Copy' not yet implemented");
+    const int top = lua_gettop(L);
+
+    lua_getfield(L,inst,"#out");
+    const int inlist = lua_gettop(L); // inlist is of kind BS_Mixed and doesn't have items of kind BS_Mixed
+    assert( lua_istable(L,inlist) );
+
+    lua_pushnil(L);
+    lua_setfield(L,inst,"#out");
+
+    getModuleVarFrom(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    lua_getfield(L,builtins,"#inst");
+    lua_getfield(L,-1,"root_build_dir");
+    lua_replace(L,-2);
+    getModuleVarFrom(L,inst,"#rdir");
+    addPath(L,-2,-1); // root_build_dir, rdir, root_build_dir+rdir
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
+
+    size_t i;
+
+    lua_getfield(L,inst,"sources");
+    const int sources = lua_gettop(L);
+    lua_createtable(L,lua_objlen(L,sources),0);
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        // copy all sources to a new table to avoid changing the original sources
+        lua_rawgeti(L,sources,i);
+        lua_rawseti(L,-2,i);
+    }
+    lua_replace(L,-2);
+
+    lua_getfield(L,inst,"use_deps");
+    const int use_deps = lua_gettop(L);
+    assert(lua_istable(L,use_deps));
+    for( i = 1; i <= lua_objlen(L,use_deps); i++ )
+    {
+        lua_rawgeti(L,use_deps,i);
+        const char* what = lua_tostring(L,-1);
+        if( strcmp(what,"object_file") == 0 )
+            copyItems(L,inlist,sources, BS_ObjectFiles);
+        else if( strcmp(what,"source_file") == 0 )
+            copyItems(L,inlist,sources, BS_SourceFiles);
+        else if( strcmp(what,"static_lib") == 0 )
+            copyItems(L,inlist,sources, BS_StaticLib);
+        else if( strcmp(what,"shared_lib") == 0 )
+            copyItems(L,inlist,sources, BS_DynamicLib);
+        else if( strcmp(what,"executable") == 0 )
+            copyItems(L,inlist,sources, BS_Executable);
+        else
+            assert(0);
+        lua_pop(L,1); // use_deps item
+    }
+    lua_pop(L,1); // use_deps
+
+    lua_getfield(L,inst,"outputs");
+    const int outputs = lua_gettop(L);
+    const int len = lua_objlen(L,outputs);
+    if( len == 0 )
+    {
+        lua_getfield(L,inst,"#decl");
+        calcdesig(L,-1);
+        luaL_error(L,"outputs in Copy instance '%s' cannot be empty", lua_tostring(L,-1));
+    }
+
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        lua_rawgeti(L,sources,i);
+        const int from = lua_gettop(L);
+        if( *lua_tostring(L,from) != '/' )
+        {
+            addPath(L,absDir,from);
+            lua_replace(L,from);
+        }
+
+        size_t j;
+        for( j = 1; j <= len; j++ )
+        {
+            lua_rawgeti(L,outputs,j);
+            const int to = lua_gettop(L);
+
+            if( bs_apply_source_expansion(lua_tostring(L,from),lua_tostring(L,to), 1) != BS_OK )
+                luaL_error(L,"cannot do source expansion, invalid placeholders in path: %s", lua_tostring(L,to));
+            lua_pushstring(L,bs_global_buffer());
+            lua_replace(L,to);
+            if( *lua_tostring(L,to) != '/' )
+            {
+                addPath(L,outDir,to);
+                lua_replace(L,to);
+            }else
+            {
+                lua_getfield(L,inst,"#decl");
+                calcdesig(L,-1);
+                luaL_error(L,"outputs in Copy instance '%s' require relative paths", lua_tostring(L,-1));
+            }
+
+            if( bs_copy(lua_tostring(L,to), lua_tostring(L,from) ))
+                luaL_error(L,"cannot copy %s to %s", lua_tostring(L,from), lua_tostring(L,to));
+
+            lua_pop(L,1); // to
+        }
+        lua_pop(L,1); // from
+    }
+
+    lua_pop(L,5); // inlist, absDir, OutDir, sources, outputs
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
 }
 
 static void message(lua_State* L,int inst, int cls, int builtins)
