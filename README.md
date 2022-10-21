@@ -1,7 +1,5 @@
 ## Welcome to the BUSY build system
 
-NOTE that this project and its documentation are work in progress.
-
 BUSY (for *BU*ild *SY*stem) is a lean, cross-platform build system for the GCC, CLANG and MSVC toolchains, with very little system requirements and easy bootsrapping.
 
 Compared to other build systems like CMake, QMake, Meson or GN, BUSY is characterized by a **statically typed** build specification language, and by the possibility to build a project directly from scratch without any further requirements to the host system; BUSY is so lean that it is even suited to be directly integrated with the source tree of a project. 
@@ -158,7 +156,7 @@ BUSY conceptually runs in three phases (similar to BAZEL): the loading phase (pa
 
 ### Planned or work-in-progress features
 
-The current BUSY version so far has been used with the NAppGUI framework (see https://github.com/rochus-keller/nappgui) and tested on Linux (GCC), Windows 10 x86 and AMD64 (MSVC), Windows 7 x86 (MSVC), macOS 10.11 x86_64 and 12.2 M1 (CLANG). I'm interested in reports by other users on the mentioned or other operating systems and toolchains. 
+The current BUSY version is feature complete for the use with [LeanQt](https://github.com/rochus-keller/leanqt), the [Oberon+ OBXMC tool](https://github.com/rochus-keller/Oberon/) and the [NAppGUI framework](https://github.com/rochus-keller/nappgui), and successfully tested on Linux x86 and x86_64 (GCC), Windows 10 x86 and AMD64 (MSVC), Windows 7 x86 (MSVC), and macOS 10.11 x86_64 and 12.2 M1 (CLANG). 
 
 - [x] Statically typed build specification language, "as simple as possible"
 - [x] Support for unicode (UTF-8) in strings, symbols, paths, comments and identifiers
