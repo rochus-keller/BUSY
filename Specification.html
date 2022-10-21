@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-10-19, Work in progress</div>
+2022-10-21</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -779,7 +779,7 @@ Make a ".a" / ".lib" / ".so" / ".dll" / ".dylib" file.</div>
 <div style="margin-left:99px"><span class="label"><a name="11640">3.2.3.1.5.3</a></span>
 If you only need the static library for intermediate results in the build, you should consider a SourceSet instead since it will skip the (potentially slow) step of creating the intermediate library file.</div>
 <div style="margin-left:99px"><span class="label"><a name="11659">3.2.3.1.5.4</a></span>
-A shared library will be specified on the linker line for targets listing the shared library in its <a href="#11831">deps</a>. If you don't want this (say you dynamically load the library at runtime), then you should depend on the shared library via <a href="#11850">data_deps</a>.</div>
+A shared library will be specified on the linker line for targets listing the shared library in its <a href="#11831">deps</a>. If you don't want this (say you dynamically load the library at runtime), then you should depend on the shared library via <a href="xoid://11850@003526b9-5a79-4133-afbf-9bcd57214e0c">&lt;null reference&gt;</a>.</div>
 <h4 style="margin-left:81px"><span class="label"><a name="11647">3.2.3.1.6</a></span>
 <b>SourceSet</b></h4>
 <div style="margin-left:99px"><span class="label"><a name="11648">3.2.3.1.6.1</a></span>
@@ -792,14 +792,10 @@ In most cases, a source set will behave like a static library, except no actual 
 The main difference between a source set and a static library is around handling of exported symbols. Most linkers assume declaring a function exported means exported from the static library. The linker can then do dead code elimination to delete code not reachable from exported functions.</div>
 <div style="margin-left:99px"><span class="label"><a name="11652">3.2.3.1.6.5</a></span>
 A source set will not do this code elimination since there is no link step. This allows you to link many source sets into a shared library and have the "exported symbol" notation indicate "export from the final shared library and not from the intermediate targets." There is no way to express this concept when linking multiple static libraries into a shared library.</div>
-<div style="margin-left:99px"><span class="label"><a name="11988">3.2.3.1.6.6</a></span>
-TODO: what does a SourceSet with linker flags? Warning? Silently ignore?</div>
 <h4 style="margin-left:45px"><span class="label"><a name="11671">3.2.4</a></span>
 <b>Group</b></h4>
 <div style="margin-left:63px"><span class="label"><a name="11672">3.2.4.1</a></span>
 This target type allows you to create meta-targets that just collect a set of dependencies into one named target. </div>
-<div style="margin-left:81px"><span class="label"><a name="11965">3.2.4.1.1</a></span>
-TODO Groups can additionally specify configs that apply to their dependents.</div>
 <h4 style="margin-left:45px"><span class="label"><a name="11678">3.2.5</a></span>
 <b>Action</b></h4>
 <h4 style="margin-left:63px"><span class="label"><a name="11949">3.2.5.1</a></span>
@@ -904,8 +900,6 @@ configs on a <b>CompiledProduct</b></h4>
 When used on a target, the <a href="#11757">include_dirs</a>, <a href="#11741">defines</a>, etc. in each config are appended in the order they appear to the compile command for each file in the target. They will appear after the include_dirs, defines, etc. that the target sets directly.</div>
 <div style="margin-left:63px"><span class="label"><a name="11817">4.7.2.2</a></span>
 Since configs apply after the values set on a target, directly setting a compiler flag will prepend it to the command line. If you want to append a flag instead, you can put that flag in a one-off config and append that config to the target's configs list.</div>
-<div style="margin-left:63px"><span class="label"><a name="11818">4.7.2.3</a></span>
-The build configuration script will generally set up the default configs applying to a given target type (see "set_defaults" TODO). When a target is being defined, it can add to or remove from this list.</div>
 <h4 style="margin-left:45px"><span class="label"><a name="11819">4.7.3</a></span>
 <b>configs on a Config</b></h4>
 <div style="margin-left:63px"><span class="label"><a name="11820">4.7.3.1</a></span>
@@ -987,7 +981,7 @@ ldflags</h4>
 <div style="margin-left:45px"><span class="label"><a name="11774">4.13.2</a></span>
 These flags are passed on the command-line to the linker and generally specify various linking options. Most targets will not need these and will use <a href="#11799">lib_names</a>, <a href="#11782">lib_files</a>, <a href="#11825">frameworks</a> and <a href="#11776">lib_dirs</a> instead.</div>
 <div style="margin-left:45px"><span class="label"><a name="11775">4.13.3</a></span>
-ldflags are NOT pushed to dependents, so applying ldflags to source sets or static libraries will be a no-op. If you want to apply ldflags to dependent targets, put them in a config and set it in the <a href="#11878">all_dependent_configs</a> or <a href="#11865">public_configs</a>.</div>
+ldflags are NOT pushed to dependents, so applying ldflags to source sets or static libraries will be a no-op. If you want to apply ldflags to dependent targets, put them in a config and set it in the <a href="xoid://11878@003526b9-5a79-4133-afbf-9bcd57214e0c">&lt;null reference&gt;</a> or <a href="xoid://11865@003526b9-5a79-4133-afbf-9bcd57214e0c">&lt;null reference&gt;</a>.</div>
 <div style="margin-left:45px"><span class="label"><a name="11777">4.13.4</a></span>
 see <a href="#11711">Order of application:</a></div>
 <h4 style="margin-left:27px"><span class="label"><a name="11776">4.14</a></span>
@@ -1017,7 +1011,7 @@ These libraries will be linked into the final binary (executable or shared libra
 <div style="margin-left:45px"><span class="label"><a name="11803">4.15.5</a></span><a href="#11780">&#x21B3;</a>
 <a href="#11799">lib_names</a><b>, </b><a href="#11782">lib_files</a><b>,</b> and lib_dirs work differently than other flags in two respects. First, they are inherited across static library boundaries until a shared library or executable target is reached. Second, they are uniquified so each one is only passed once (the first instance of it will be the one used).</div>
 <div style="margin-left:45px"><span class="label"><a name="11809">4.15.6</a></span>
-The names will be passed unmodified to the linker and prefixed with the "lib_switch" attribute of the linker tool. Generally you would set the "lib_dirs" so the given library is found. Your BUSY file should not specify the switch (like "-l"): this will be encoded in the "lib_switch" of the tool. TODO</div>
+The names will be passed unmodified to the linker and prefixed with the "lib_switch" attribute of the linker tool. Generally you would set the "lib_dirs" so the given library is found. Your BUSY file should not specify the switch (like "-l"): this will be encoded in the "lib_switch" of the tool. </div>
 <h4 style="margin-left:27px"><span class="label"><a name="11782">4.16</a></span>
 <b>lib_files</b></h4>
 <div style="margin-left:45px"><span class="label"><a name="11784">4.16.1</a></span>
@@ -1138,212 +1132,100 @@ An arbitrary string to be displayed</div>
 <b>use_deps: FileType[]</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12681">4.24.2</a></span>
 A list of file types to be consumed from the dependencies; currently only used by <a href="#11893">Copy</a>.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11951">4.25</a></span>
-<b>Fields not implemented yet (TODO)</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="11952">4.25.1</a></span>
-Wheter this is implemented at all, or only explicit config assignment is implemented, is subject to further analysis; the current assumption is that these features introduce more complexity than benefit.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11878">4.25.2</a></span>
-all_dependent_configs</h4>
-<div style="margin-left:63px"><span class="label"><a name="11879">4.25.2.1</a></span>
-<b>all_dependent_configs: Config[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11880">4.25.2.2</a></span>
-All targets depending on this one, and recursively, all targets depending on those, will have the configs listed in this variable added to them. These configs will also apply to the current target.</div>
-<div style="margin-left:63px"><span class="label"><a name="11881">4.25.2.3</a></span>
-This addition happens in a second phase once a target and all of its dependencies have been resolved. Therefore, a target will not see these force-added configs in their "configs" variable while the script is running, and they can not be removed. As a result, this capability should generally only be used to add defines and include directories necessary to compile a target's headers.</div>
-<div style="margin-left:63px"><span class="label"><a name="11884">4.25.2.4</a></span>
-see <a href="#11711">Order of application:</a></div>
-<div style="margin-left:63px"><span class="label"><a name="11882">4.25.2.5</a></span>
-See also <a href="#11838">public_deps</a>.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11865">4.25.3</a></span>
-public_configs</h4>
-<div style="margin-left:63px"><span class="label"><a name="11866">4.25.3.1</a></span>
-<b>public_configs: Config[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11867">4.25.3.2</a></span>
-Targets directly depending on this one will have the configs listed in this variable added to them. These configs will also apply to the current target. Generally, public configs are used to apply defines and include directories necessary to compile this target's header files.</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11868">4.25.3.3</a></span>
-<a href=""><b>P</b></a><b>ropagation of public configs</b></h4>
-<div style="margin-left:81px"><span class="label"><a name="11869">4.25.3.3.1</a></span>
-Public configs are applied to all targets that depend directly on this one. These dependant targets can further push this target's public configs higher in the dependency tree by depending on it via public_deps (see <a href="#11838">public_deps</a>).</div>
-<div style="margin-left:81px"><span class="label"><a name="11870">4.25.3.3.2</a></span>
-<pre><code>let lower: Library {</code></pre>
-<pre><code>  # This will get applied to all targets that depend on this one.</code></pre>
-<pre><code>  .public_configs = [ my_config ]</code></pre>
-<pre><code>}</code></pre>
-<pre><code>let intermediate: Library {</code></pre>
-<pre><code>  # Depending on "lower" in any way will apply "my_config" to this target.</code></pre>
-<pre><code>  # Additionall, since this target depends on "lower" via public_deps,</code></pre>
-<pre><code>  # targets that depend on this one will also get "my_config".</code></pre>
-<pre><code>  .public_deps = [ lower ]</code></pre>
-<pre><code>}</code></pre>
-<pre><code>let toplevel: Library {</code></pre>
-<pre><code>  # This target will get "my_config" applied to it. However, since this</code></pre>
-<pre><code>  # target uses "deps" and not "public_deps", targets that depend on this</code></pre>
-<pre><code>  # one won't get it.</code></pre>
-<pre><code>  .deps = [ intermediate ]</code></pre>
-<pre><code>}</code></pre></div>
-<div style="margin-left:81px"><span class="label"><a name="11871">4.25.3.3.3</a></span>
-Public config propagation happens in a second phase once a target and all of its dependencies have been resolved. Therefore, a target will not see these force-added configs in their "configs" variable while the script is running, and they can not be removed. As a result, this capability should generally only be used to add defines and include directories rather than setting complicated flags that some targets may not want.</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11873">4.25.3.4</a></span>
-<a href=""><b>A</b></a><b>voiding applying public configs to this target</b></h4>
-<div style="margin-left:81px"><span class="label"><a name="11874">4.25.3.4.1</a></span>
-If you want the config to apply to targets that depend on this one, but NOT this one, define an extra layer of indirection using a group:</div>
-<div style="margin-left:81px"><span class="label"><a name="11875">4.25.3.4.2</a></span>
-<pre><code># Internal target to actually compile the sources. Not visible from outside.</code></pre>
-<pre><code>let internal_target: Library {</code></pre>
-<pre><code>  # Force all external targets to depend on the group instead of directly</code></pre>
-<pre><code>  # on this so the "external_settings" config will get applied.</code></pre>
-<pre><code>  # ...</code></pre>
-<pre><code>}</code></pre>
-<pre><code># External targets depend on this group. Only my_target is visible from outside.</code></pre>
-<pre><code>let my_target *: Group {</code></pre>
-<pre><code>  # Config to apply to all targets that depend on this one.</code></pre>
-<pre><code>  .public_configs = [ external_settings ]</code></pre>
-<pre><code>  .deps = [ internal_target ]</code></pre>
-<pre><code>}</code></pre></div>
-<div style="margin-left:63px"><span class="label"><a name="11877">4.25.3.5</a></span>
-see <a href="#11711">Order of application:</a></div>
-<h4 style="margin-left:45px"><span class="label"><a name="11838">4.25.4</a></span>
-public_deps</h4>
-<div style="margin-left:63px"><span class="label"><a name="11839">4.25.4.1</a></span>
-<b>public_deps: Product[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11840">4.25.4.2</a></span>
-Public dependencies are like private dependencies (see <a href="#11831">deps</a>) but additionally express that the current product exposes the listed deps as part of its public API.</div>
-<div style="margin-left:63px"><span class="label"><a name="11841">4.25.4.3</a></span>
-This has several ramifications:</div>
-<div style="margin-left:81px"><span class="label"><a name="11842">4.25.4.3.1</a></span>
-public_configs that are part of the dependency are forwarded to direct dependents.</div>
-<div style="margin-left:81px"><span class="label"><a name="11843">4.25.4.3.2</a></span>
-Public headers in the dependency are usable by dependents (includes do not require a direct dependency or visibility).</div>
-<div style="margin-left:81px"><span class="label"><a name="11844">4.25.4.3.3</a></span>
-If the current target is a shared library, other shared libraries that it publicly depends on (directly or indirectly) are propagated up the dependency tree to dependents for linking.</div>
-<div style="margin-left:63px"><span class="label"><a name="11845">4.25.4.4</a></span>
-See also "public_configs".</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11846">4.25.4.5</a></span>
-Discussion</h4>
-<div style="margin-left:81px"><span class="label"><a name="11847">4.25.4.5.1</a></span>
-Say you have three targets: A -&gt; B -&gt; C. C's visibility may allow B to depend on it but not A. Normally, this would prevent A from including any headers from C, and C's public_configs would apply only to B.</div>
-<div style="margin-left:81px"><span class="label"><a name="11848">4.25.4.5.2</a></span>
-If B lists C in its public_deps instead of regular deps, A will now inherit C's public_configs and the ability to include C's public headers.</div>
-<div style="margin-left:81px"><span class="label"><a name="11849">4.25.4.5.3</a></span>
-Generally if you are writing a target B and you include C's headers as part of B's public headers, or targets depending on B should consider B and C to be part of a unit, you should use public_deps instead of deps.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11856">4.25.5</a></span>
-data</h4>
-<div style="margin-left:63px"><span class="label"><a name="11857">4.25.5.1</a></span>
-<b>data: path[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11858">4.25.5.2</a></span>
-Lists files or directories required to run the given target. These are typically data files or directories of data files. The paths are interpreted as being relative to the current build file. Since these are runtime dependencies, they do not affect which targets are built or when. To declare input files to a script, use <a href="#11764">inputs</a>.</div>
-<div style="margin-left:63px"><span class="label"><a name="11859">4.25.5.3</a></span>
-Appearing in the "data" section does not imply any special handling such as copying them to the output directory. This is just used for declaring runtime dependencies. </div>
-<div style="margin-left:63px"><span class="label"><a name="11860">4.25.5.4</a></span>
-BUSY doesn't require data files to exist at build-time. So actions that produce files that are in turn runtime dependencies can list those generated files both in the <a href="#11907">outputs</a> list as well as the "data" list.</div>
-<div style="margin-left:63px"><span class="label"><a name="11861">4.25.5.5</a></span>
-The paths are just rebased and passed along when requested.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11850">4.25.6</a></span>
-data_deps</h4>
-<div style="margin-left:63px"><span class="label"><a name="11851">4.25.6.1</a></span>
-<b>data_deps: Product[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11852">4.25.6.2</a></span>
-Specifies dependencies of a target that are not actually linked into the current target. Such dependencies will be built and will be available at runtime.</div>
-<div style="margin-left:63px"><span class="label"><a name="11853">4.25.6.3</a></span>
-This is normally used for things like plugins or helper programs that a target needs at runtime.</div>
-<div style="margin-left:63px"><span class="label"><a name="11855">4.25.6.4</a></span>
-See also <a href="#11831">deps</a> and <a href="#11856">data</a>.</div>
-<h4 style="margin-left:45px"><span class="label"><a name="11764">4.25.7</a></span>
-inputs</h4>
-<div style="margin-left:63px"><span class="label"><a name="11767">4.25.7.1</a></span>
-<b>inputs: Product[]</b></div>
-<div style="margin-left:63px"><span class="label"><a name="11765">4.25.7.2</a></span>
-Inputs are compile-time dependencies of the current target. This means that all inputs must be available before compiling any of the sources or executing any actions.</div>
-<div style="margin-left:63px"><span class="label"><a name="11766">4.25.7.3</a></span>
-Inputs are typically only used for <a href="#11678">Action</a> targets.</div>
-<div style="margin-left:63px"><span class="label"><a name="11771">4.25.7.4</a></span>
-TODO</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11934">5</a></span>
 <b>Predeclared Enumeration Reference</b></h4>
-<div style="margin-left:27px"><span class="label"><a name="12365">5.1</a></span>
-<b>TODO</b></div>
-<div style="margin-left:27px"><span class="label"><a name="11935">5.2</a></span>
-type LibraryType = ( `static, `shared, `framework )</div>
-<div style="margin-left:27px"><span class="label"><a name="11936">5.3</a></span>
-type OsType = ( `darwin, `macos, `win32, ... )</div>
-<div style="margin-left:27px"><span class="label"><a name="11937">5.4</a></span>
-type CpuType = ( `arm, `x86, ... )</div>
-<div style="margin-left:27px"><span class="label"><a name="11938">5.5</a></span>
-type WordSize = ( `16, `32, `64, `128 )</div>
-<div style="margin-left:27px"><span class="label"><a name="11939">5.6</a></span>
-type CompilerType = ( `msvc, `gcc, `clang )</div>
-<div style="margin-left:27px"><span class="label"><a name="12592">5.7</a></span>
-type MessageType = ( `error, `warning, `info )</div>
-<div style="margin-left:27px"><span class="label"><a name="12678">5.8</a></span>
-type FileType = ( `object_file, `source_file, `static_lib, `shared_lib, `executable )</div>
+<div style="margin-left:27px"><span class="label"><a name="11935">5.1</a></span>
+<b>type LibraryType = ( `static, `shared, `framework )</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12690">5.1.1</a></span>
+Used by <a href="#11962">lib_type</a> to control what kind of library is beeing built by a given <a href="#11662">Library</a> instance.</div>
+<div style="margin-left:27px"><span class="label"><a name="11936">5.2</a></span>
+<b>type OsType = ( `darwin, `macos, `win32, ... )</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12692">5.2.1</a></span>
+The type of the OS as identified when compiling BUSY.</div>
+<div style="margin-left:27px"><span class="label"><a name="11937">5.3</a></span>
+<b>type CpuType = ( `arm, `x86, ... )</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12693">5.3.1</a></span>
+The CPU architecture as identified when compiling BUSY.</div>
+<div style="margin-left:27px"><span class="label"><a name="11938">5.4</a></span>
+<b>type WordSize = ( `16, `32, `64, `128 )</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12695">5.4.1</a></span>
+An attribute of the CPU type; corresponds to the pointer byte width of the given CPU.</div>
+<div style="margin-left:27px"><span class="label"><a name="11939">5.5</a></span>
+<b>type CompilerType = ( `msvc, `gcc, `clang )</b></div>
+<div style="margin-left:27px"><span class="label"><a name="12592">5.6</a></span>
+<b>type MessageType = ( `error, `warning, `info )</b></div>
+<div style="margin-left:27px"><span class="label"><a name="12678">5.7</a></span>
+<b>type FileType = ( `object_file, `source_file, `static_lib, `shared_lib, `executable )</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12694">5.7.1</a></span>
+Possible output file types as generated by the build and transmitted along the dependency chain.</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11920">6</a></span>
 <b>Predeclared Variable Reference</b></h4>
 <div style="margin-left:27px"><span class="label"><a name="12574">6.1</a></span>
-let busy_version: string</div>
+<b>let busy_version: string</b></div>
 <div style="margin-left:27px"><span class="label"><a name="11921">6.2</a></span>
-let host_cpu: CpuType</div>
+<b>let host_cpu: CpuType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12654">6.2.1</a></span>
 The CPU detected when BUSY is compiled</div>
 <div style="margin-left:27px"><span class="label"><a name="11922">6.3</a></span>
-let host_cpu_ver: int</div>
+<b>let host_cpu_ver: int</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12655">6.3.1</a></span>
 The CPU version detected when BUSY is compiled</div>
 <div style="margin-left:27px"><span class="label"><a name="11923">6.4</a></span>
-let host_wordsize: WordSize</div>
+<b>let host_wordsize: WordSize</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12656">6.4.1</a></span>
 The word size used to compile BUSY</div>
 <div style="margin-left:27px"><span class="label"><a name="11924">6.5</a></span>
-let host_os: OsType</div>
+<b>let host_os: OsType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12657">6.5.1</a></span>
 The OS detected when BUSY is compiled</div>
 <div style="margin-left:27px"><span class="label"><a name="11925">6.6</a></span>
-let host_toolchain: CompilerType</div>
+<b>let host_toolchain: CompilerType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12658">6.6.1</a></span>
 The toolchain used to compile BUSY</div>
 <div style="margin-left:27px"><span class="label"><a name="11926">6.7</a></span>
-let host_toolchain_ver: int</div>
+<b>let host_toolchain_ver: int</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12659">6.7.1</a></span>
 The version of the toolchain used to compile BUSY</div>
 <div style="margin-left:27px"><span class="label"><a name="11933">6.8</a></span>
-let root_build_dir: path</div>
+<b>let root_build_dir: path</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12660">6.8.1</a></span>
 The path where the build results are saved; either a default value or an explicit value set via command line options</div>
 <div style="margin-left:27px"><span class="label"><a name="12034">6.9</a></span>
-let root_source_dir: path</div>
+<b>let root_source_dir: path</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12661">6.9.1</a></span>
 The path of the source tree root directory; either a default value or an explicit value set via command line options</div>
 <div style="margin-left:27px"><span class="label"><a name="12632">6.10</a></span>
-var moc_path: path</div>
+<b>var moc_path: path</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12652">6.10.1</a></span>
 initialized with '.' which translates to calling moc found on the search path or halting with error.</div>
 <div style="margin-left:27px"><span class="label"><a name="12633">6.11</a></span>
-var rcc_path: path</div>
+<b>var rcc_path: path</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12653">6.11.1</a></span>
 initialized with '.' which translates to calling rcc found on the search path or halting with error.</div>
 <div style="margin-left:27px"><span class="label"><a name="11927">6.12</a></span>
-var target_cpu: CpuType</div>
+<b>var target_cpu: CpuType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12646">6.12.1</a></span>
 initialized with host_cpu</div>
 <div style="margin-left:27px"><span class="label"><a name="11928">6.13</a></span>
-var target_cpu_ver: int</div>
+<b>var target_cpu_ver: int</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12647">6.13.1</a></span>
 initialized with host_cpu_ver</div>
 <div style="margin-left:27px"><span class="label"><a name="11929">6.14</a></span>
-var target_wordsize: WordSize</div>
+<b>var target_wordsize: WordSize</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12648">6.14.1</a></span>
 initialized with host_wordsize</div>
 <div style="margin-left:27px"><span class="label"><a name="11930">6.15</a></span>
-var target_os: OsType</div>
+<b>var target_os: OsType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12649">6.15.1</a></span>
 initialized with host_os</div>
 <div style="margin-left:27px"><span class="label"><a name="11931">6.16</a></span>
-var target_toolchain: CompilerType</div>
+<b>var target_toolchain: CompilerType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12650">6.16.1</a></span>
 initialized with host_toolchain_ver</div>
 <div style="margin-left:27px"><span class="label"><a name="11932">6.17</a></span>
-var target_toolchain_ver: int</div>
+<b>var target_toolchain_ver: int</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12651">6.17.1</a></span>
-initialized with host_toolchain_ver</div>
+initialized with host_toolchain_ver; future versions will support cross-compilation where host and target toolchain usually differ.</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11996">7</a></span>
 <b>Predeclared Procedure Reference</b></h4>
 <h4 style="margin-left:27px"><span class="label"><a name="12007">7.1</a></span>
