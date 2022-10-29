@@ -2198,6 +2198,8 @@ static void evalListLiteral(BSParserContext* ctx, BSScope* scope, BSToken* lbrac
         expression(ctx,scope,0);
         // value, type
         const int expType = lua_gettop(ctx->L);
+        if( lua_isnil(ctx->L,expType) )
+            error(ctx, lbrack->loc.row, lbrack->loc.col,"cannot determine list type" );
         const int expVal = expType - 1;
         lua_getfield(ctx->L,expType,"#kind");
         const int kr = lua_tointeger(ctx->L,-1);
