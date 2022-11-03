@@ -692,13 +692,13 @@ int bs_copy(const char* normalizedToPath, const char* normalizedFromPath)
     const char* to = bs_denormalize_path(normalizedToPath);
     const char* from = bs_denormalize_path(normalizedFromPath);
     const int fromLen = strlen(from);
-    const int len = 3+fromLen+strlen(to)+2;
-    char* cmd = (char*)malloc(len);
+    const int toLen = 3+fromLen+strlen(to)+2;
+    char* cmd = (char*)malloc(toLen+1);
     strcpy(cmd,"cp ");
     strcpy(cmd+3,from);
     *(cmd+3+fromLen) = ' ';
     strcpy(cmd+3+1+fromLen,to);
-    cmd[len] = 0;
+    cmd[toLen] = 0;
     // fprintf(stdout,"%s\n",cmd);
     // fflush(stdout);
     const int res = bs_exec(cmd);
