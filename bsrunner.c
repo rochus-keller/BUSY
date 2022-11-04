@@ -415,7 +415,7 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             switch(lang)
             {
             case BS_c:
-                lua_pushstring(L,"");
+                lua_pushvalue(L,cflags_c);
                 break;
             case BS_cc:
                 lua_pushvalue(L,cflags_cc);
