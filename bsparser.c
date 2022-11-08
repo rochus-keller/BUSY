@@ -318,9 +318,26 @@ static void submodule(BSParserContext* ctx, int subdir)
             }
         }else
             error(ctx, pt.loc.row, pt.loc.col,"expecting a path or an ident" );
+        t = peekToken(ctx,1);
     }
 
-    t = peekToken(ctx,1);
+    const char* altpath = 0;
+    int altpathlen = 0;
+    if( t.tok == Tok_else )
+    {
+        nextToken(ctx); // eat 'else'
+        t = nextToken(ctx);
+        if( t.tok == Tok_path )
+        {
+            altpath = t.val;
+            altpathlen = t.len;
+            pt = t;
+        }else
+            error(ctx, pt.loc.row, pt.loc.col,"expecting a path after 'else'" );
+
+        t = peekToken(ctx,1);
+    }
+
     if( t.tok == Tok_Lpar )
     {
         nextToken(ctx); // eat lpar
@@ -414,6 +431,34 @@ static void submodule(BSParserContext* ctx, int subdir)
     lua_concat(ctx->L,3);
     lua_setfield(ctx->L,module,"#rdir"); // construct rdir from root by concatenating the subdir identdefs
 
+    if( altpath )
+    {
+        if( *altpath == '/' )
+            lua_pushlstring(ctx->L,altpath,altpathlen); // this is already an absolute path
+        else if( *altpath == '.' )
+        {
+            // already normalized
+            lua_getfield(ctx->L,ctx->module.table,"#dir");
+            lua_pushlstring(ctx->L,altpath,altpathlen);
+            if( bs_add_path(ctx->L, -2, -1) != 0 )
+                error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path" );
+            lua_replace(ctx->L,-3);
+            lua_pop(ctx->L,1);
+        }else
+        {
+            if(*altpath == '\'')
+            {
+                altpath++;
+                altpathlen -= 2;
+            }
+            lua_pushstring(ctx->L,ctx->dirpath);
+            lua_pushstring(ctx->L,"/");
+            lua_pushlstring(ctx->L,altpath,altpathlen);
+            lua_concat(ctx->L,3);
+        }
+        lua_setfield(ctx->L,module,"#altmod");
+    }
+
     lua_pushcfunction(ctx->L, bs_parse);
 
     if( *path == '/' )
@@ -432,6 +477,11 @@ static void submodule(BSParserContext* ctx, int subdir)
             lua_pop(ctx->L,1);
         }else
         {
+            if(*path == '\'')
+            {
+                path++;
+                pathlen -= 2;
+            }
             lua_pushstring(ctx->L,ctx->dirpath);
             lua_pushstring(ctx->L,"/");
             lua_pushlstring(ctx->L,path,pathlen);
@@ -4021,15 +4071,29 @@ int bs_parse(lua_State* L)
     ctx.label = calcLabel(ctx.dirpath,calcLevel(L,BS_NewModule)+1);
     // BS_BEGIN_LUA_FUNC(&ctx,1); cannot use this here because module was created above already
     const int $stack = lua_gettop(L)+1;
+
     lua_pushvalue(L,BS_PathToSourceRoot);
     lua_setfield(L,BS_NewModule,"#dir");
     lua_pushvalue(L,BS_PathToSourceRoot);
     lua_pushstring(L,"/");
     lua_pushstring(L,"BUSY");
     lua_concat(L,3);
-    ctx.filepath = lua_tostring(L,-1); // RISK
+    if( !bs_exists( lua_tostring(L,-1) ) )
+    {
+        lua_getfield(L,BS_NewModule,"#altmod");
+        if( lua_isnil(L,-1) )
+            lua_pop(L,1);
+        else if( !bs_exists( lua_tostring(L,-1) ) )
+            luaL_error(L,"neither can find '%s' nor alternative path '%s'", lua_tostring(L,-2), lua_tostring(L,-1) );
+        else
+            lua_replace(L,-2);
+        lua_pushboolean(L,1);
+        lua_setfield(L,BS_NewModule,"#dummy");
+        fprintf(stdout,"# analyzing %s on behalf of %s\n", lua_tostring(L,-1), ctx.dirpath);
+    }else
+        fprintf(stdout,"# analyzing %s\n", lua_tostring(L,-1));
+    ctx.filepath = lua_tostring(L,-1);
     lua_setfield(L,BS_NewModule,"#file");
-    fprintf(stdout,"# analyzing %s\n",ctx.filepath);
     fflush(stdout);
     ctx.lex = bslex_createhilex(bs_denormalize_path(ctx.filepath), ctx.label);
     if( ctx.lex == 0 )
@@ -4043,6 +4107,7 @@ int bs_parse(lua_State* L)
     lua_pushvalue(L,BS_NewModule);
 
     bslex_freehilex(ctx.lex);
+
     BS_END_LUA_FUNC(&ctx);
     return 1;
 }

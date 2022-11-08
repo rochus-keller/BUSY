@@ -1641,9 +1641,11 @@ int bs_createBuildDirs(lua_State* L) // lua function; params: rootModuleDef, roo
 
         lua_getfield(L,module,"#kind");
         const int k = lua_tointeger(L,-1);
-        lua_pop(L,1);
+        lua_getfield(L,module,"#dummy");
+        const int dummy = lua_toboolean(L,-1);
+        lua_pop(L,2);
 
-        if( k == BS_ModuleDef )
+        if( k == BS_ModuleDef && !dummy )
         {
             lua_pushvalue(L,rootPath);
             lua_pushstring(L,"/");

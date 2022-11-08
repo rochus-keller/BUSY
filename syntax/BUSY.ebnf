@@ -22,7 +22,9 @@ typeref ::= designator [ '[]' ]
 
 // basic type is integer | real | string | boolean | path | symbol
 
-Submodule ::= ( submodule | submod | subdir ) identdef [ ( '=' | ':=' ) ( path | ident ) ]  [ '(' paramList ')' ]
+Submodule ::= ( submodule | submod | subdir ) identdef [ ( '=' | ':=' ) ( path | ident ) ] 
+				[ else path ]  
+				[ '(' paramList ')' ]
 // subdir is deprecated
 // path can be any absolute or relative path; a relative path is interpreted relative to the current module;
 // the subdirectory structure is static; only what we do with it (i.e. dependencies) is dynamic;
@@ -30,7 +32,7 @@ Submodule ::= ( submodule | submod | subdir ) identdef [ ( '=' | ':=' ) ( path |
 // a correspondence with a physical structure.
 // The subdir decl controls what status the system has before entering the directory
 // and it makes it explicit, which directories belong to the build and which don't.
-// maybe set params here
+// if the path does not lead to a directory containing a BUSY file, load the file after 'else' instead, if present. 
 
 paramList ::= paramValue { [','] paramValue }
 paramValue ::=  ident [ ( '=' | ':=' ) expression ] 
