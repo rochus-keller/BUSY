@@ -272,6 +272,16 @@ static void submodule(BSParserContext* ctx, int subdir)
     BS_BEGIN_LUA_FUNC(ctx,0);
     nextToken(ctx); // keyword
     BSIdentDef id = identdef(ctx,&ctx->module);
+    lua_getfield(ctx->L,ctx->module.table,"#dummy");
+    if( !lua_isnil(ctx->L,-1) )
+    {
+        fprintf(stderr,"%s:%d:%d:ERR: submod declarations not allowed here\n",
+                ctx->filepath, id.loc.row, id.loc.col );
+        fflush(stderr);
+        lua_pushnil(ctx->L);
+        lua_error(ctx->L);
+    }else
+        lua_pop(ctx->L,1);
     const char* path = id.name;
     int pathlen = id.len;
     if( id.visi == BS_PublicDefault )
@@ -430,6 +440,10 @@ static void submodule(BSParserContext* ctx, int subdir)
     lua_setfield(ctx->L,module,"#dirname");
     lua_concat(ctx->L,3);
     lua_setfield(ctx->L,module,"#rdir"); // construct rdir from root by concatenating the subdir identdefs
+    lua_pushinteger(ctx->L,id.loc.row);
+    lua_setfield(ctx->L,module,"#row");
+    lua_pushinteger(ctx->L,id.loc.col);
+    lua_setfield(ctx->L,module,"#col");
 
     if( altpath )
     {
@@ -1525,6 +1539,32 @@ static void relpath(BSParserContext* ctx, int n, int row, int col)
     BS_END_LUA_FUNC(ctx);
 }
 
+static void modname(BSParserContext* ctx, int n, int row, int col)
+{
+    BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
+    if( n == 0 )
+    {
+        lua_getfield(ctx->L,ctx->module.table,"#label");
+        lua_getfield(ctx->L,ctx->builtins, "string");
+    }else if( n == 1 )
+    {
+        if( lua_isnil(ctx->L,-1) && lua_istable(ctx->L,-2) )
+        {
+            lua_getmetatable(ctx->L,-2);
+            lua_getfield(ctx->L,-1,"#kind");
+            if( lua_tointeger(ctx->L,-1) != BS_ModuleDef )
+                error(ctx, row, col,"invalid argument type" );
+            lua_pop(ctx->L,1);
+            lua_getfield(ctx->L,-1,"#label");
+            lua_replace(ctx->L,-2);
+            lua_getfield(ctx->L,ctx->builtins, "string");
+        }else
+            error(ctx, row, col,"invalid argument type" );
+    }else
+        error(ctx, row, col,"expecting zero or one arguments" );
+    BS_END_LUA_FUNC(ctx);
+}
+
 static void build_dir(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
@@ -1685,10 +1725,13 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
         switch( kind )
         {
         case 2:
+            fprintf(stderr,"%s:%d:%d:ERR: %s\n",ctx->label, row, col, lua_tostring(ctx->L,-1) );
+            fflush(stderr);
+            lua_pushnil(ctx->L);
             lua_error(ctx->L);
             break;
         case 1:
-            fprintf(stderr,"%s:%d:%d:WARNING: %s\n",ctx->label, row, col, lua_tostring(ctx->L,-1) );
+            fprintf(stderr,"%s:%d:%d:WRN: %s\n",ctx->label, row, col, lua_tostring(ctx->L,-1) );
             break;
         default:
             fprintf(stdout,"%s:%d:%d: %s\n", ctx->label, row, col, lua_tostring(ctx->L,-1) );
@@ -2111,6 +2154,9 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
         break;
     case 16:
         build_dir(ctx,n,lpar.loc.row, lpar.loc.col);
+        break;
+    case 17:
+        modname(ctx,n,lpar.loc.row, lpar.loc.col);
         break;
     default:
         error(ctx, lpar.loc.row, lpar.loc.col,"procedure not yet implemented" );
@@ -4029,6 +4075,32 @@ static int calcLevel(lua_State* L, int module)
     return level;
 }
 
+static void moduleerror(lua_State* L, int module, const char* format, ... )
+{
+    lua_getfield(L, module, "#row");
+    const int row = lua_tointeger(L,-1);
+    lua_getfield(L, module, "#col");
+    const int col = lua_tointeger(L,-1);
+    lua_pop(L,2);
+
+    lua_getfield(L,module,"^");
+    if( lua_istable(L,-1) )
+    {
+        lua_getfield(L,-1,"#rdir");
+        fprintf(stderr,"%s:%d:%d:ERR: ", lua_tostring(L,-1), row, col);
+        lua_pop(L,2);
+    }else
+        lua_pop(L,1);
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fprintf(stderr,"\n");
+    fflush(stderr);
+    lua_pushnil(L);
+    lua_error(L);
+}
+
 int bs_parse(lua_State* L)
 {
     if( lua_isnil(L,BS_Params) )
@@ -4066,9 +4138,11 @@ int bs_parse(lua_State* L)
     ctx.L = L;
     ctx.dirpath = lua_tostring(L,BS_PathToSourceRoot);
     if( strncmp(ctx.dirpath,"//",2) != 0 )
-        luaL_error(L,"expecting absolute, normalized directory path: %s", ctx.dirpath );
+        moduleerror(L,BS_NewModule,"expecting absolute, normalized directory path: %s", ctx.dirpath );
     ctx.builtins = builtins;
     ctx.label = calcLabel(ctx.dirpath,calcLevel(L,BS_NewModule)+1);
+    lua_pushstring(L,ctx.label);
+    lua_setfield(L,BS_NewModule, "#label");
     // BS_BEGIN_LUA_FUNC(&ctx,1); cannot use this here because module was created above already
     const int $stack = lua_gettop(L)+1;
 
@@ -4084,12 +4158,13 @@ int bs_parse(lua_State* L)
         if( lua_isnil(L,-1) )
             lua_pop(L,1);
         else if( !bs_exists( lua_tostring(L,-1) ) )
-            luaL_error(L,"neither can find '%s' nor alternative path '%s'", lua_tostring(L,-2), lua_tostring(L,-1) );
+            moduleerror(L,BS_NewModule,"neither can find '%s' nor alternative path '%s'",
+                        lua_tostring(L,-2), lua_tostring(L,-1) );
         else
             lua_replace(L,-2);
         lua_pushboolean(L,1);
         lua_setfield(L,BS_NewModule,"#dummy");
-        fprintf(stdout,"# analyzing %s on behalf of %s\n", lua_tostring(L,-1), ctx.dirpath);
+        // fprintf(stdout,"# analyzing %s on behalf of %s\n", lua_tostring(L,-1), ctx.dirpath);
     }else
         fprintf(stdout,"# analyzing %s\n", lua_tostring(L,-1));
     ctx.filepath = lua_tostring(L,-1);

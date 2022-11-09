@@ -338,6 +338,9 @@ static int bs_execute (lua_State *L)
                 if( visi == BS_PublicDefault )
                 {
                     foundAny = 1;
+                    lua_pushcfunction(L, bs_precheck);
+                    fetchInstOfDecl(L,-2);
+                    lua_call(L,1,0);
                     lua_pushcfunction(L, bs_run);
                     fetchInstOfDecl(L,-2);
                     lua_call(L,1,0);
@@ -362,6 +365,9 @@ static int bs_execute (lua_State *L)
                 lua_pop(L,1);
                 if( visi >= BS_Public )
                 {
+                    lua_pushcfunction(L, bs_precheck);
+                    fetchInstOfDecl(L,-2);
+                    lua_call(L,1,0);
                     lua_pushcfunction(L, bs_run);
                     fetchInstOfDecl(L,-2);
                     lua_call(L,1,0);
@@ -374,6 +380,25 @@ static int bs_execute (lua_State *L)
     }
     return 0;
 }
+
+#if 0
+static int bs_execute (lua_State *L)
+{
+    lua_pushcfunction(L,bs_executeImp);
+    lua_pushvalue(L,1);
+    lua_pushvalue(L,2);
+    if( lua_pcall(L,2,0,0) != 0 )
+    {
+        if( !lua_isnil(L,-1) )
+        {
+            fprintf(stderr,"%s\n",lua_tostring(L,-1));
+            fflush(stderr);
+        }
+        lua_pop(L,1);
+    }
+    return 0;
+}
+#endif
 
 static const luaL_Reg bslib[] = {
     {"compile",      bs_compile},

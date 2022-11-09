@@ -1546,7 +1546,7 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
 
     lua_getfield(L,inst,"outputs");
     const int outputs = lua_gettop(L);
-    const int len = lua_objlen(L,outputs);
+    const size_t len = lua_objlen(L,outputs);
     if( len == 0 )
     {
         lua_getfield(L,inst,"#decl");
@@ -1598,28 +1598,44 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
     assert( top == bottom );
 }
 
-static void message(lua_State* L,int inst, int cls, int builtins)
+static void message(lua_State* L,int inst, int precheck)
 {
     lua_getfield(L,inst,"msg_type");
     const int msg_type = lua_gettop(L);
+
+    // TODO: do we need this?
+    const int row = 0;
+    const int col = 0;
+    const char* label = 0;
+
     if( strcmp(lua_tostring(L,msg_type),"error") == 0 )
     {
-        lua_pushstring(L,"# ERR: ");
         lua_getfield(L,inst,"text");
-        lua_concat(L,2);
-        lua_error(L);
-    }else if( strcmp(lua_tostring(L,msg_type),"warning") == 0 )
-    {
-        lua_getfield(L,inst,"text");
-        fprintf(stderr,"# WRN: %s\n", lua_tostring(L,-1));
+        if( label )
+            fprintf(stderr,"# %s:%d:%d:ERR: %s\n", label, row, col, lua_tostring(L,-1));
+        else
+            fprintf(stderr,"# ERR: %s\n", lua_tostring(L,-1));
         fflush(stderr);
-    }else
+        lua_pushnil(L);
+        lua_error(L);
+    }else if( strcmp(lua_tostring(L,msg_type),"warning") == 0 && !precheck )
     {
         lua_getfield(L,inst,"text");
-        fprintf(stdout,"# %s\n", lua_tostring(L,lua_gettop(L)));
+        if( label )
+            fprintf(stderr,"# %s:%d:%d:WRN: %s\n", label, row, col, lua_tostring(L,-1));
+        else
+            fprintf(stderr,"# WRN: %s\n", lua_tostring(L,-1));
+        fflush(stderr);
+    }else if( !precheck )
+    {
+        lua_getfield(L,inst,"text");
+        if( label )
+            fprintf(stdout,"# %s:%d:%d: %s\n", label, row, col, lua_tostring(L,lua_gettop(L)));
+        else
+            fprintf(stdout,"# %s\n", lua_tostring(L,lua_gettop(L)));
         fflush(stdout);
     }
-    lua_pop(L,2); // msg_type, text
+    lua_pop(L,3); // msg_type, rdir, text
 }
 
 int bs_createBuildDirs(lua_State* L) // lua function; params: rootModuleDef, rootPath
@@ -1655,6 +1671,50 @@ int bs_createBuildDirs(lua_State* L) // lua function; params: rootModuleDef, roo
         }else
             lua_pop(L,2); // func, module
     }
+    return 0;
+}
+
+static void precheckdeps(lua_State* L, int inst)
+{
+    const int top = lua_gettop(L);
+
+    lua_getfield(L,inst,"deps");
+    const int deps = lua_gettop(L);
+    if( lua_isnil(L,deps) )
+        return;
+
+    const int ndeps = lua_objlen(L,deps);
+    int i;
+    for( i = 1; i <= ndeps; i++ )
+    {
+        // TODO: check for circular deps
+        lua_pushcfunction(L, bs_precheck);
+        lua_rawgeti(L,deps,i);
+        lua_call(L,1,0);
+    }
+    lua_pop(L,1); // deps
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+}
+
+int bs_precheck(lua_State* L) // args: productinst, no returns
+{
+    const int inst = 1;
+
+    precheckdeps(L,inst);
+
+    lua_getmetatable(L,inst);
+    const int cls = lua_gettop(L);
+
+    lua_getglobal(L, "require");
+    lua_pushstring(L, "builtins");
+    lua_call(L,1,1);
+    const int builtins = lua_gettop(L);
+
+    if( isa( L, builtins, cls, "Message") )
+        message(L,inst,1);
+
+    lua_pop(L,2); // cls, builtins
     return 0;
 }
 
@@ -1705,7 +1765,7 @@ int bs_run(lua_State* L) // args: productinst, returns: inst
     else if( isa( L, builtins, cls, "Copy") )
         copy(L,inst,cls,builtins);
     else if( isa( L, builtins, cls, "Message") )
-        message(L,inst,cls,builtins);
+        message(L,inst,0);
     else if( isa( L, builtins, cls, "Moc") )
         runmoc(L,inst,cls,builtins);
     else if( isa( L, builtins, cls, "Rcc") )

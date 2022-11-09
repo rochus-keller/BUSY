@@ -23,6 +23,7 @@
 #include "lua.h"
 
 extern int bs_run(lua_State* L);
+extern int bs_precheck(lua_State* L);
 extern int bs_createBuildDirs(lua_State* L);
 extern int bs_thisapp2(lua_State *L);
 

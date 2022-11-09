@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-11-08</div>
+2022-11-09</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -709,7 +709,7 @@ Modules are parsed and executed depth-first; when the parser meets a <b>submod</
 <div style="margin-left:45px"><span class="label"><a name="12589">2.10.10</a></span>
 A <b>submod</b> declaration may have a list of parameter names and optional value expressions. The value expressions are evaluated from left to right. The name identifier must correspond to a name of a <b>param</b> declaration in the submodule (see <a href="#12151">2.6 Variable declarations</a>). If the value expression is missing, <b>true</b> is assumed as value. Parameter values set by means provided by the compiler override the parameter values set via <b>submod</b> declaration.</div>
 <div style="margin-left:45px"><span class="label"><a name="12707">2.10.11</a></span>
-A <b>submod</b> declaration may have an optional <b>else</b> keyword followed by an alternative module file path. The file referenced by this path is parsed instead of the BUSY file in case the latter doesn't exist. </div>
+A <b>submod</b> declaration may have an optional <b>else</b> keyword followed by an alternative module file path. The file referenced by this path is parsed instead of the BUSY file in case the latter doesn't exist. An alternative module file itself must not include <b>submod</b> declarations.</div>
 <div style="margin-left:45px"><span class="label"><a name="12708">2.10.12</a></span><span class="ident">NOTE</span>
 The alternative module file path is useful if e.g. in a big source tree it should be possible to delete the modules not required by a given project; the alternative module file just makes a minimal set of declarations mimicking the original public module declarations, but issuing an error, if the build tries to use the module anyway.</div>
 <div style="margin-left:45px"><span class="label"><a name="12569">2.10.13</a></span>
@@ -1268,68 +1268,80 @@ Expects one or more string arguments. Prints the concatenated arguments to the c
 message</h4>
 <div style="margin-left:45px"><span class="label"><a name="12393">7.5.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stdout).</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12050">7.6</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12709">7.6</a></span>
+modname</h4>
+<div style="margin-left:45px"><span class="label"><a name="12715">7.6.1</a></span>
+Returns the hierarchical name of the module (similar to <a href="#12014">relpath</a>); the module associated with the root of the source tree is represented by the name of the corresponding file system directory; each successive name segment corresponds to the identifier used in the <b>submod</b> declaration in the corresponding BUSY file.</div>
+<div style="margin-left:45px"><span class="label"><a name="12711">7.6.2</a></span>
+<b>modname(): string</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12712">7.6.2.1</a></span>
+Returns the hierarchical name relative to the module associated with the root directory of the source tree.</div>
+<div style="margin-left:45px"><span class="label"><a name="12713">7.6.3</a></span>
+<b>modname(m: module): string</b></div>
+<div style="margin-left:63px"><span class="label"><a name="12714">7.6.3.1</a></span>
+Returns the hierarchical name of the designated module relative to the module associated with the root directory of the source tree.</div>
+<h4 style="margin-left:27px"><span class="label"><a name="12050">7.7</a></span>
 <b>readstring</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="12051">7.6.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12051">7.7.1</a></span>
 <b>readstring(from: path): string</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12052">7.6.1.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12052">7.7.1.1</a></span>
 Read the given file as UTF-8 string. Double quotes and \ are replaced by \" and \\. Line breaks and the like are replaced by space. Leading and trailing white space (blanks, line breaks) is stripped. The maximum supported file lengh is limited to 16'000 bytes.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12014">7.7</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12014">7.8</a></span>
 <b>relpath</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="12546">7.7.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12546">7.8.1</a></span>
 The returned path is a logical path; the module associated with the root of the source tree is represented by '.'; each successive name segment corresponds to the identifier used in the <b>submod</b> declaration; there is no requirement that the physical directory hierarchy is congruent with the module hierarchy; see <a href="#12169">2.10 Modules</a> for more information.</div>
-<div style="margin-left:45px"><span class="label"><a name="12019">7.7.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12019">7.8.2</a></span>
 <b>relpath(): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12017">7.7.2.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12017">7.8.2.1</a></span>
 Returns the path relative to the module associated with the root directory of the source tree.</div>
-<div style="margin-left:45px"><span class="label"><a name="12020">7.7.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12020">7.8.3</a></span>
 <b>relpath(m: module): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12021">7.7.3.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12021">7.8.3.1</a></span>
 Returns the path of the designated module relative to the module associated with the root directory of the source tree.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11997">7.8</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11997">7.9</a></span>
 samelist</h4>
-<div style="margin-left:45px"><span class="label"><a name="12395">7.8.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12395">7.9.1</a></span>
 Expects two arguments of the same list type and compares their elements one by one in order. Returns <b>false</b>, if the elements or their number differ, and <b>true</b> otherwise.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11998">7.9</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11998">7.10</a></span>
 sameset</h4>
-<div style="margin-left:45px"><span class="label"><a name="12396">7.9.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12396">7.10.1</a></span>
 Expects two arguments of the same list type and compares their elements. The lists are treated like sets, i.e. the order of elements is insignificant and multiple copies of the same element are counted as one. Returns <b>true</b>, if both lists contain the same elements, <b>false</b> otherwise.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11999">7.10</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11999">7.11</a></span>
 toint</h4>
-<div style="margin-left:45px"><span class="label"><a name="12397">7.10.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12397">7.11.1</a></span>
 Expects one argument of real type and returns the largest int less than or equal to a given real.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12000">7.11</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12000">7.12</a></span>
 toreal</h4>
-<div style="margin-left:45px"><span class="label"><a name="12398">7.11.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12398">7.12.1</a></span>
 Expects one argument of int type and returns the same number as real type.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12001">7.12</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12001">7.13</a></span>
 tostring</h4>
-<div style="margin-left:45px"><span class="label"><a name="12399">7.12.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12399">7.13.1</a></span>
 Expects one argument of base or enumeration type und returns the string representation or the argument.</div>
-<div style="margin-left:45px"><span class="label"><a name="12400">7.12.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12400">7.13.2</a></span>
 For bool type the strings "true" or "false" are returned.</div>
-<div style="margin-left:45px"><span class="label"><a name="12401">7.12.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12401">7.13.3</a></span>
 For path types, a <code>'//'</code> prefix is changed to "/" and for a <code>// letter ':'</code> prefix is changed the two leading slashes are removed.</div>
-<div style="margin-left:45px"><span class="label"><a name="12402">7.12.4</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12402">7.13.4</a></span>
 For symbols only the string part without <code>`</code> prefix is returned.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12002">7.13</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12002">7.14</a></span>
 topath</h4>
-<div style="margin-left:45px"><span class="label"><a name="12403">7.13.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12403">7.14.1</a></span>
 Expects one argument of type string. Tries to convert the string into a normalized representation as specified in <a href="#12080">2.3.8 Paths</a>. If that succeeds, the path is returned, otherwise the execution halts with an error.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12441">7.14</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12441">7.15</a></span>
 trycompile</h4>
-<div style="margin-left:45px"><span class="label"><a name="12450">7.14.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12450">7.15.1</a></span>
 This function compiles C code (without linking). Returns true, if the compiler returns with no error, false otherwise. The following versions of the function are available:</div>
-<div style="margin-left:45px"><span class="label"><a name="12442">7.14.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12442">7.15.2</a></span>
 <b>trycompile(code:string):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12452">7.14.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12452">7.15.3</a></span>
 <b>trycompile(code: string; defines: string[]):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12453">7.14.4</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12453">7.15.4</a></span>
 <b>trycompile(code: string; defines: string[]; include_dirs: path[]):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12443">7.14.5</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12443">7.15.5</a></span>
 <b>trycompile(code: string; defines: string[]; include_dirs: path[]; cflags: string[]):bool</b></div>
-<h4 style="margin-left:27px"><span class="label"><a name="12003">7.15</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12003">7.16</a></span>
 warning</h4>
-<div style="margin-left:45px"><span class="label"><a name="12394">7.15.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12394">7.16.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stderr).</div>
 </body></html>

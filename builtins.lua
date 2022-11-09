@@ -244,6 +244,7 @@ proc("relpath",13)
 proc("readstring",14)
 proc("trycompile",15)
 proc("build_dir",16)
+proc("modname",17)
 
 ---- built-in vars
 local function variable(name, type, ro)
