@@ -26,6 +26,7 @@ local pathToSource, pathToBuild
 local params = {}
 local products
 local checkOnly = false
+local generate
 
 local function parseParam(str)
 	if str == "" or str == nil then error("option -P expects a string of the form 'key=value' or 'key' (where '=true' is implicit)") end
@@ -66,9 +67,12 @@ while i <= #arg do
 		i = i + 1
 		-- passing values to parameters (either root or visible subdirs); e.g. '-P x.y=value' like cmake
 		parseParam(arg[i])
-	-- elseif arg[i] == "-G" then
-		-- TODO optionally specify generator; default immediately builds products; e.g. like cmake '-G ninja'
-	elseif arg[i] == "-c" then
+	elseif arg[i] == "-G" then
+		-- optionally specify generator; default immediately builds products; e.g. like cmake, or '-G ninja'
+		i = i + 1
+		if arg[i] == nil then error("expecting the name of a generator after -G, like '-G qmake'") end
+		generate = arg[i]
+	elseif arg[i] == "-c" then 
 		checkOnly = true
 	elseif arg[i]:sub(1,1) == "-" then
 		error("unknown option "..arg[i])
@@ -84,7 +88,9 @@ end
 
 local root = B.compile(pathToSource,pathToBuild,params)
 
-if not checkOnly then
+if generate ~= nil then
+	B.generate(generate,root,products)
+elseif not checkOnly then
 	B.execute(root,products)
 end
 

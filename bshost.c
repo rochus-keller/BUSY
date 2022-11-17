@@ -706,3 +706,69 @@ int bs_copy(const char* normalizedToPath, const char* normalizedFromPath)
     return res;
 #endif
 }
+
+BSPathStatus bs_makeRelative(const char* normalizedRefDir, const char* normalizedTarget)
+{
+    if( *normalizedRefDir != '/' || *normalizedTarget != '/' )
+        return BS_InvalidFormat;
+    const int refWin = bs_isWinRoot(normalizedRefDir);
+    const int tWin = bs_isWinRoot(normalizedTarget);
+    if( refWin ^ tWin )
+        return BS_InvalidFormat; // both must be Windows or Unix, but not mixed
+    if( ( refWin || tWin ) && strncmp(normalizedRefDir,normalizedTarget,4) != 0 )
+        return BS_NotSupported; // no relative path if on different drives
+
+    size_t head = 0;
+    while(1)
+    {
+        if( normalizedRefDir[head] == normalizedTarget[head] )
+            head++;
+        else
+            break;
+    }
+    // head is now on the first char which is different in normalizedSource and normalizedTarget
+    if( head < 2 )
+        return BS_NotSupported;
+
+    size_t level = 1;
+    size_t i = strlen(normalizedRefDir) - 1;
+    if( i == head-1 )
+        level = 0;
+    else
+        while( i >= head )
+        {
+            if( normalizedRefDir[i] == '/' )
+                level++;
+            i--;
+        }
+    if( level == 0 )
+    {
+        strcpy(s_buf, "./" );
+        if( head == 2 )
+            strcpy(s_buf + 2, normalizedTarget + head); // root directory
+        else
+            strcpy(s_buf + 2, normalizedTarget + head + 1);
+    }else
+    {
+        for( i = 0; i < level; i++ )
+            strcpy(s_buf + i*3, "../" );
+        strcpy(s_buf + level * 3, normalizedTarget + head);
+    }
+
+    return BS_OK;
+}
+
+int bs_isWinRoot(const char* normalizedPath)
+{
+    if( *normalizedPath == '/')
+    {
+        assert(normalizedPath[1] == '/');
+        const int len = strlen(normalizedPath);
+        if( len >= 4 )
+        {
+            if( normalizedPath[3] == ':' && isalpha(normalizedPath[2]) )
+                return 1;
+        }
+    }
+    return 0;
+}

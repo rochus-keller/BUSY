@@ -22,6 +22,7 @@
 #include "bslex.h"
 #include "bsparser.h"
 #include "bsrunner.h"
+#include "bsqmakegen.h"
 #include "bshost.h"
 #include "bsunicode.h"
 #include <ctype.h>
@@ -286,17 +287,76 @@ static int fetchInstOfDecl(lua_State* L, int decl)
     return 1;
 }
 
+static int findProductsToProcess(lua_State *L, int ROOT, int PRODS, int builtins )
+{
+    lua_createtable(L,10,0);
+    const int res = lua_gettop(L);
+    int n = 0;
+    if( lua_isnil(L,PRODS) )
+    {
+        // search for default products an run them
+        const int len = lua_objlen(L,ROOT);
+        int i;
+        for( i = 1; i <= len; i++ )
+        {
+            lua_rawgeti(L,ROOT,i);
+            const int decl = lua_gettop(L);
+            if( isproductvardecl(L,decl,builtins) )
+            {
+                lua_getfield(L,-1,"#visi");
+                const int visi = lua_tointeger(L,-1);
+                lua_pop(L,1);
+                if( visi == BS_PublicDefault )
+                {
+                    fetchInstOfDecl(L,decl);
+                    lua_rawseti(L,res,++n);
+                }
+            }
+            lua_pop(L,1); // decl
+        }
+        if( lua_objlen(L,res) == 0 )
+            luaL_error(L,"the module doesn't have any default product declarations");
+    }else
+    {
+        // run through all products in the set; get insts; error if not visible
+        lua_pushnil(L);
+        while (lua_next(L, PRODS) != 0)
+        {
+            resolvedesig(L,lua_tostring(L,-2),ROOT);
+            const int decl = lua_gettop(L);
+            if( isproductvardecl(L,decl,builtins) )
+            {
+                lua_getfield(L,-1,"#visi");
+                const int visi = lua_tointeger(L,-1);
+                lua_pop(L,1);
+                if( visi >= BS_Public )
+                {
+                    fetchInstOfDecl(L,decl);
+                    lua_rawseti(L,res,++n);
+                }else
+                    luaL_error(L,"the declaration is not visible from outside: %s", lua_tostring(L,-3));
+            }else
+                luaL_error(L,"no valid product declaration: %s", lua_tostring(L,-3));
+            lua_pop(L,2); // key, value
+        }
+    }
+    return 1; // leaves res on stack
+}
+
 // param: root module def
 // opt param: set of product desigs to be built
 static int bs_execute (lua_State *L)
 {
     enum { ROOT = 1, PRODS };
+    const int top = lua_gettop(L);
 
     if( !lua_istable(L,ROOT) )
         luaL_error(L,"expecting a module definition");
     lua_getfield(L,ROOT,"#kind");
     if( lua_tointeger(L,-1) != BS_ModuleDef )
         luaL_error(L,"expecting a module definition");
+    else
+        lua_pop(L,1); // kind
 
     lua_getglobal(L, "require");
     lua_pushstring(L, "builtins");
@@ -304,10 +364,12 @@ static int bs_execute (lua_State *L)
     const int builtins = lua_gettop(L);
 
     lua_getfield(L,ROOT,"#dir");
-    fprintf(stdout,"# running build for %s\n",lua_tostring(L,-1));
+    const int source_dir = lua_gettop(L);
+    fprintf(stdout,"# running build for %s\n",lua_tostring(L,source_dir));
     lua_getfield(L,builtins,"#inst");
-    lua_getfield(L,-1,"root_build_dir");
-    const int rootPath = lua_gettop(L);
+    const int binst = lua_gettop(L);
+    lua_getfield(L,binst,"root_build_dir");
+    const int build_dir = lua_gettop(L);
     fprintf(stdout,"# root build directory is %s\n",lua_tostring(L,-1));
     fflush(stdout);
 
@@ -315,97 +377,106 @@ static int bs_execute (lua_State *L)
     // mkdir errors if levels are (temporarily) missing.
     lua_pushcfunction(L, bs_createBuildDirs);
     lua_pushvalue(L,ROOT);
-    lua_pushvalue(L,rootPath);
+    lua_pushvalue(L,build_dir);
     lua_call(L,2,0);
 
-    lua_pop(L,3); // dir, inst, build_dir
+    lua_pop(L,3); // source_dir, binst, build_dir
 
-    if( lua_isnil(L,PRODS) )
+    findProductsToProcess(L,ROOT,PRODS,builtins);
+    lua_replace(L,PRODS);
+
+    lua_pop(L,1); // builtins
+
+    // build all products in the set; first check for error message dependents
+    size_t i;
+    for( i = 1; i <= lua_objlen(L,PRODS); i++ )
     {
-        int foundAny = 0;
-        // search for default products an run them
-        const int n = lua_objlen(L,ROOT);
-        int i;
-        for( i = 1; i <= n; i++ )
-        {
-            lua_rawgeti(L,ROOT,i);
-            const int hit = isproductvardecl(L,-1,builtins);
-            if( hit )
-            {
-                lua_getfield(L,-1,"#visi");
-                const int visi = lua_tointeger(L,-1);
-                lua_pop(L,1);
-                if( visi == BS_PublicDefault )
-                {
-                    foundAny = 1;
-                    lua_pushcfunction(L, bs_precheck);
-                    fetchInstOfDecl(L,-2);
-                    lua_call(L,1,0);
-                    lua_pushcfunction(L, bs_run);
-                    fetchInstOfDecl(L,-2);
-                    lua_call(L,1,0);
-                }
-            }
-            lua_pop(L,1);
-        }
-        if( !foundAny )
-            luaL_error(L,"the module doesn't have any default product declarations");
-    }else
-    {
-        // build all products in the set; error if not visible
-        lua_pushnil(L);
-        while (lua_next(L, PRODS) != 0)
-        {
-            resolvedesig(L,lua_tostring(L,-2),ROOT);
-            const int hit = isproductvardecl(L,-1,builtins);
-            if( hit )
-            {
-                lua_getfield(L,-1,"#visi");
-                const int visi = lua_tointeger(L,-1);
-                lua_pop(L,1);
-                if( visi >= BS_Public )
-                {
-                    lua_pushcfunction(L, bs_precheck);
-                    fetchInstOfDecl(L,-2);
-                    lua_call(L,1,0);
-                    lua_pushcfunction(L, bs_run);
-                    fetchInstOfDecl(L,-2);
-                    lua_call(L,1,0);
-                }else
-                    luaL_error(L,"the declaration is not visible from outside: %s", lua_tostring(L,-3));
-            }else
-                luaL_error(L,"no valid product declaration: %s", lua_tostring(L,-3));
-            lua_pop(L,2);
-        }
+        lua_pushcfunction(L, bs_precheck);
+        lua_rawgeti(L,PRODS,i);
+        lua_call(L,1,0);
     }
+    for( i = 1; i <= lua_objlen(L,PRODS); i++ )
+    {
+        lua_pushcfunction(L, bs_run);
+        lua_rawgeti(L,PRODS,i);
+        lua_call(L,1,0);
+    }
+
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
     return 0;
 }
 
-#if 0
-static int bs_execute (lua_State *L)
+// param: what, root module def
+// opt param: set of product desigs to be built
+static int bs_generate (lua_State *L)
 {
-    lua_pushcfunction(L,bs_executeImp);
-    lua_pushvalue(L,1);
-    lua_pushvalue(L,2);
-    if( lua_pcall(L,2,0,0) != 0 )
+    enum { WHAT = 1, ROOT, PRODS };
+    const int top = lua_gettop(L);
+
+    if( !lua_isstring(L,WHAT) )
+        luaL_error(L,"invalid generator selected");
+
+    if( !lua_istable(L,ROOT) )
+        luaL_error(L,"expecting a module definition");
+    lua_getfield(L,ROOT,"#kind");
+    if( lua_tointeger(L,-1) != BS_ModuleDef )
+        luaL_error(L,"expecting a module definition");
+    else
+        lua_pop(L,1); // kind
+
+    lua_getglobal(L, "require");
+    lua_pushstring(L, "builtins");
+    lua_call(L,1,1);
+    const int builtins = lua_gettop(L);
+
+    lua_getfield(L,ROOT,"#dir");
+    const int source_dir = lua_gettop(L);
+    fprintf(stdout,"# running generator '%s' for %s\n",lua_tostring(L,WHAT),lua_tostring(L,source_dir));
+    lua_getfield(L,builtins,"#inst");
+    const int binst = lua_gettop(L);
+    lua_getfield(L,binst,"root_build_dir");
+    const int build_dir = lua_gettop(L);
+    fprintf(stdout,"# root output directory is %s\n",lua_tostring(L,-1));
+    fflush(stdout);
+    lua_pop(L,3); // source_dir, binst, build_dir
+
+    findProductsToProcess(L,ROOT,PRODS,builtins);
+    lua_replace(L,PRODS);
+
+    lua_pop(L,1); // builtins
+
+    // generate all products in the set; first check for error message dependents
+    size_t i;
+    for( i = 1; i <= lua_objlen(L,PRODS); i++ )
     {
-        if( !lua_isnil(L,-1) )
-        {
-            fprintf(stderr,"%s\n",lua_tostring(L,-1));
-            fflush(stderr);
-        }
-        lua_pop(L,1);
+        lua_pushcfunction(L, bs_precheck);
+        lua_rawgeti(L,PRODS,i);
+        lua_call(L,1,0);
     }
+
+    if( strcmp(lua_tostring(L,WHAT),"qmake") == 0 )
+    {
+        lua_pushcfunction(L, bs_genQmake);
+        lua_pushvalue(L,ROOT);
+        lua_pushvalue(L,PRODS);
+        lua_call(L,2,0);
+    }else
+        luaL_error(L,"unknown generator '%s'", lua_tostring(L,WHAT));
+
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
     return 0;
 }
-#endif
 
 static const luaL_Reg bslib[] = {
     {"compile",      bs_compile},
     {"execute",      bs_execute},
+    {"generate",      bs_generate},
     {"dump",      bs_dump},
     {"getcwd",      bs_getcwd},
     {"thisapp",      thisapp},
+    {"moc", bs_runmoc},
     {"run", bs_run},
     {"cpu", host_cpu },
     {"os", host_os },

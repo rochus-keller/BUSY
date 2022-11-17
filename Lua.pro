@@ -56,7 +56,8 @@ HEADERS += \
     bslib.h \
     bsrunner.h \
     bshost.h \
-    bsdetect.h
+    bsdetect.h \
+    bsqmakegen.h
 
 SOURCES += \
     lapi.c \
@@ -95,7 +96,8 @@ SOURCES += \
     bsunicode.c \
     bslib.c \
     bsrunner.c \
-    bshost.c
+    bshost.c \
+    bsqmakegen.c
 
 
 

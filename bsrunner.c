@@ -24,7 +24,7 @@
 #include <assert.h>
 #include <string.h>
 
-static int calcdesig(lua_State* L, int decl)
+int bs_declpath(lua_State* L, int decl, const char* separator)
 {
     if( decl < 0 )
         decl += lua_gettop(L) + 1;
@@ -40,7 +40,7 @@ static int calcdesig(lua_State* L, int decl)
             lua_pop(L,1);
             break;
         }
-        lua_pushstring(L,".");
+        lua_pushstring(L,separator);
         lua_pushvalue(L,name);
         lua_concat(L,3);
         lua_replace(L,name);
@@ -49,6 +49,11 @@ static int calcdesig(lua_State* L, int decl)
     }
     lua_pop(L,1); // module
     return 1;
+}
+
+static int calcdesig(lua_State* L, int decl)
+{
+    return bs_declpath(L,decl,".");
 }
 
 static int isa(lua_State* L, int builtins, int cls, const char* what )
@@ -138,7 +143,7 @@ static void addPath(lua_State* L, int lhs, int rhs)
                    lua_tostring(L,lhs), lua_tostring(L,rhs) );
 }
 
-static int getModuleVarFrom(lua_State* L, int inst, const char* name )
+int bs_getModuleVar(lua_State* L, int inst, const char* name )
 {
     const int top = lua_gettop(L);
 
@@ -189,9 +194,8 @@ static void addall(lua_State* L,int inst,int cflags, int cflags_c, int cflags_cc
     addflags(L,-1,cflags_objcc);
     lua_pop(L,1);
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
-    const char* s = lua_tostring(L,absDir);
 
     lua_getfield(L,inst,"include_dirs");
     const int incls = lua_gettop(L);
@@ -248,16 +252,6 @@ static int getToolchain(lua_State* L, int builtinsInst)
     return toolchain;
 }
 
-typedef enum BSOutKind { // #kind
-    BS_Nothing,
-    BS_Mixed, // list of list of the other kinds
-    BS_ObjectFiles,
-    BS_StaticLib,
-    BS_DynamicLib,
-    BS_Executable,
-    BS_SourceFiles // in case of Moc
-} BSOutKind;
-
 static void copyItems(lua_State* L, int inlist, int outlist, BSOutKind what )
 {
     lua_getfield(L,inlist,"#kind");
@@ -305,10 +299,10 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
     lua_getfield(L,binst,"root_build_dir");
     const int rootOutDir = lua_gettop(L);
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
-    getModuleVarFrom(L,inst,"#rdir");
+    bs_getModuleVar(L,inst,"#rdir");
     const int relDir = lua_gettop(L);
 
     lua_pushstring(L,"");
@@ -371,19 +365,29 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
         const int src = lua_gettop(L);
 
         addPath(L,rootOutDir,relDir);
-        // only use the filename and suffix here, strip all path segments; otherwise subdirs have to be created;
+
+        // we need to prefix object files of separate products in the same module
+        // otherwise object files could overwrite each other
+        lua_pushstring(L,"/");
+        lua_getfield(L,inst,"#decl");
+        lua_getfield(L,-1,"#name");
+        lua_replace(L,-2);
+
+        // strip all path segments with bs_filename; otherwise subdirs have to be created for files accessed
+        // from other than the module directory
 #ifdef BS_HAVE_FILE_PREFIX
         // the name is actually not relevant, so we can just prefix it with a number to reduce name collisions
         // (possible when collecting  files from different directories in the same module)
-        lua_pushfstring(L,"/%d_%s",i,bs_filename(lua_tostring(L,file)));
+        lua_pushfstring(L,"_%d_%s",i,bs_filename(lua_tostring(L,file)));
 #else
-        lua_pushfstring(L,"/%s",bs_filename(lua_tostring(L,file)));
+        lua_pushfstring(L,"_%s",bs_filename(lua_tostring(L,file)));
 #endif
         if( toolchain == BS_msvc )
             lua_pushstring(L,".obj");
         else
             lua_pushstring(L,".o");
-        lua_concat(L,3);
+
+        lua_concat(L,5); // dir, slash, prefix, filename, ext
         const int out = lua_gettop(L);
 
         lua_pushvalue(L,out);
@@ -485,7 +489,7 @@ static void addall2(lua_State* L,int inst,int ldflags, int lib_dirs, int lib_nam
     addflags(L,-1,ldflags);
     lua_pop(L,1);
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
     lua_getfield(L,inst,"lib_dirs");
@@ -676,7 +680,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     lua_getfield(L,binst,"root_build_dir");
     const int rootOutDir = lua_gettop(L);
 
-    getModuleVarFrom(L,inst,"#rdir");
+    bs_getModuleVar(L,inst,"#rdir");
     const int relDir = lua_gettop(L);
 
     lua_pushstring(L,"");
@@ -892,7 +896,10 @@ static void builddeps(lua_State* L, int inst)
     lua_getfield(L,inst,"deps");
     const int deps = lua_gettop(L);
     if( lua_isnil(L,deps) )
+    {
+        lua_pop(L,1); // nil
         return;
+    }
 
     lua_createtable(L,0,0);
     lua_pushinteger(L,BS_Mixed);
@@ -1133,7 +1140,7 @@ static void script(lua_State* L,int inst, int cls, int builtins)
 #endif
     lua_setfield(L,inst,"#out");
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
     lua_getfield(L,inst,"script");
@@ -1187,7 +1194,7 @@ static void runforeach(lua_State* L,int inst, int cls, int builtins)
 #endif
     lua_setfield(L,inst,"#out");
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
     lua_getfield(L,inst,"script");
@@ -1256,6 +1263,102 @@ static void runforeach(lua_State* L,int inst, int cls, int builtins)
     assert( top == bottom );
 }
 
+int bs_runmoc(lua_State* L)
+{
+    // this is the version callable from Lua code used by the qmake generator
+    enum Params { MOC = 1, INFILE, OUTDIR, DEFINES };
+    const size_t numOfArgs = lua_gettop(L);
+
+    BSPathStatus res = bs_normalize_path2(lua_tostring(L,INFILE));
+    if( res != BS_OK )
+        luaL_error(L,"invalid file: %s", lua_tostring(L,INFILE) );
+    lua_pushstring(L, bs_global_buffer() );
+    const int source = lua_gettop(L);
+
+    res = bs_normalize_path2(lua_tostring(L,OUTDIR));
+    if( res != BS_OK )
+        luaL_error(L,"invalid output directory: %s", lua_tostring(L,OUTDIR) );
+    lua_pushstring(L, bs_global_buffer() );
+    const int outDir = lua_gettop(L);
+
+    lua_pushstring(L,"");
+    const int defines = lua_gettop(L); // TODO
+
+    size_t i;
+    for( i = DEFINES; i <= numOfArgs; i++ )
+    {
+        lua_pushvalue(L,defines);
+        if( strstr(lua_tostring(L,i),"\\\"") != NULL )
+            lua_pushfstring(L," -D \"%s\"", lua_tostring(L,i)); // strings can potentially include whitespace, thus quotes
+        else
+            lua_pushfstring(L," -D %s", lua_tostring(L,i));
+        lua_concat(L,2);
+        lua_replace(L,defines);
+    }
+
+    const int lang = guessLang(lua_tostring(L,source));
+
+    int len;
+    const char* name = bs_path_part(lua_tostring(L,source),BS_baseName,&len);
+    lua_pushlstring(L,name,len);
+    if( lang == BS_header )
+        // this file is automatically passed to the compiler over the deps chain; the user doesn't see it
+        lua_pushfstring(L,"%s/moc_%s.cpp",lua_tostring(L,outDir), lua_tostring(L,-1));
+    else
+        // this file has to be included at the bottom of the cpp file, so use the naming of the Qt documentation.
+        lua_pushfstring(L,"%s/%s.moc",lua_tostring(L,outDir), lua_tostring(L,-1));
+    lua_replace(L,-2);
+    const int outFile = lua_gettop(L);
+
+    // check if there is a {{source_dir}}/{{source_name_part}}_p.h and - if true - include it in the generated file
+    lua_pushstring(L,"{{source_dir}}/{{source_name_part}}_p.h");
+    bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
+    const int includePrivateHeader = bs_exists2(bs_global_buffer());
+    lua_pop(L,1);
+
+    lua_pushfstring(L, "%s %s -o %s%s", lua_tostring(L,MOC),
+                    bs_denormalize_path(lua_tostring(L,source) ),
+                    bs_denormalize_path(lua_tostring(L,outFile)),
+                    lua_tostring(L,defines));
+    if( includePrivateHeader && lang == BS_header )
+    {
+        lua_pushstring(L," -p {{source_dir}}");
+        bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
+        lua_pushstring(L, bs_global_buffer());
+        lua_replace(L,-2);
+        lua_pushstring(L," -b {{source_name_part}}_p.h");
+        bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
+        lua_pushstring(L, bs_global_buffer());
+        lua_replace(L,-2);
+        lua_concat(L,3);
+    }
+    const int cmd = lua_gettop(L);
+
+    const time_t srcExists = bs_exists(lua_tostring(L,source));
+    const time_t outExists = bs_exists(lua_tostring(L,outFile));
+
+    if( !outExists || outExists < srcExists )
+    {
+        //fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+        //fflush(stdout);
+        // only call if outfile is older than source
+        if( bs_exec(lua_tostring(L,cmd)) != 0 )
+        {
+            // stderr was already written to the console
+            lua_pushnil(L);
+            lua_error(L);
+        }
+    }
+
+    lua_pushvalue(L,outFile);
+    lua_replace(L,source);
+    lua_pop(L,4); // source, outDir, defines, outFile, cmd
+
+    assert( numOfArgs+1 == lua_gettop(L));
+    return 1;
+}
+
+#if 1
 static void runmoc(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
@@ -1267,14 +1370,98 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
     lua_pushvalue(L,outlist);
     lua_setfield(L,inst,"#out");
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
     lua_getfield(L,builtins,"#inst");
     const int binst = lua_gettop(L);
 
     lua_getfield(L,binst,"root_build_dir");
-    getModuleVarFrom(L,inst,"#rdir");
+    bs_getModuleVar(L,inst,"#rdir");
+    addPath(L,-2,-1);
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
+
+    lua_getfield(L,binst,"moc_path");
+    const int mocPath = lua_gettop(L);
+    if( lua_isnil(L,mocPath) || strcmp(".",lua_tostring(L,mocPath)) == 0 )
+    {
+        lua_pushstring(L,"moc");
+        lua_replace(L,mocPath);
+    }else if( *lua_tostring(L,mocPath) != '/' )
+        luaL_error(L,"moc_path cannot be relative: %s", lua_tostring(L,mocPath));
+
+    lua_getfield(L,inst,"sources");
+    const int sources = lua_gettop(L);
+    int n = 0;
+    size_t i;
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        lua_rawgeti(L,sources,i);
+        const int source = lua_gettop(L);
+        const int lang = guessLang(lua_tostring(L,source));
+
+        if( *lua_tostring(L,source) != '/' )
+        {
+            addPath(L,absDir,source);
+            lua_replace(L,source);
+        }
+
+        lua_pushcfunction(L, bs_runmoc);
+        // MOC, INFILE, OUTDIR, DEFINES
+        lua_pushstring(L,bs_denormalize_path(lua_tostring(L,mocPath)));
+        lua_pushstring(L,bs_denormalize_path(lua_tostring(L,source)));
+        lua_pushstring(L,bs_denormalize_path(lua_tostring(L,outDir)));
+
+        lua_getfield(L,inst,"defines");
+        const int defs = lua_gettop(L);
+        size_t j;
+        const size_t numOfDefs = lua_objlen(L,defs);
+        for( j = 1; i <= numOfDefs; i++ )
+        {
+            lua_rawgeti(L,defs,i);
+        }
+        lua_pop(L,1); // defs
+
+        lua_call(L,3+numOfDefs,1);
+        const char* str = lua_tostring(L,-1);
+
+        if( lang == BS_header )
+            lua_rawseti(L,outlist,++n);
+        else
+            lua_pop(L,1); // return
+
+        lua_pop(L,1); // source
+    }
+
+    lua_pop(L,6); // outlist absDir binst outDir mocPath sources
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+
+    // passes on one BS_SourceFiles
+}
+#else
+// old version, to delete
+static void runmoc(lua_State* L,int inst, int cls, int builtins)
+{
+    const int top = lua_gettop(L);
+
+    lua_createtable(L,0,0);
+    const int outlist = lua_gettop(L);
+    lua_pushinteger(L,BS_SourceFiles);
+    lua_setfield(L,outlist,"#kind");
+    lua_pushvalue(L,outlist);
+    lua_setfield(L,inst,"#out");
+
+    bs_getModuleVar(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    lua_getfield(L,builtins,"#inst");
+    const int binst = lua_gettop(L);
+
+    lua_getfield(L,binst,"root_build_dir");
+    bs_getModuleVar(L,inst,"#rdir");
     addPath(L,-2,-1);
     lua_replace(L,-3);
     lua_pop(L,1);
@@ -1395,6 +1582,7 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
 
     // passes on one BS_SourceFiles
 }
+#endif
 
 static void runrcc(lua_State* L,int inst, int cls, int builtins)
 {
@@ -1407,14 +1595,14 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
     lua_pushvalue(L,outlist);
     lua_setfield(L,inst,"#out");
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
     lua_getfield(L,builtins,"#inst");
     const int binst = lua_gettop(L);
 
     lua_getfield(L,binst,"root_build_dir");
-    getModuleVarFrom(L,inst,"#rdir");
+    bs_getModuleVar(L,inst,"#rdir");
     addPath(L,-2,-1);
     lua_replace(L,-3);
     lua_pop(L,1);
@@ -1496,13 +1684,13 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
     lua_pushnil(L);
     lua_setfield(L,inst,"#out");
 
-    getModuleVarFrom(L,inst,"#dir");
+    bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
     lua_getfield(L,builtins,"#inst");
     lua_getfield(L,-1,"root_build_dir");
     lua_replace(L,-2);
-    getModuleVarFrom(L,inst,"#rdir");
+    bs_getModuleVar(L,inst,"#rdir");
     addPath(L,-2,-1); // root_build_dir, rdir, root_build_dir+rdir
     lua_replace(L,-3);
     lua_pop(L,1);

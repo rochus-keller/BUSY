@@ -1,5 +1,5 @@
-#ifndef BSRUNNER_H
-#define BSRUNNER_H
+#ifndef BSQMAKEGEN_H
+#define BSQMAKEGEN_H
 
 /*
 * Copyright 2022 Rochus Keller <mailto:me@rochus-keller.ch>
@@ -22,25 +22,7 @@
 
 #include "lua.h"
 
-typedef enum BSOutKind { // #kind
-    BS_Nothing,
-    BS_Mixed, // list of list of the other kinds
-    BS_ObjectFiles,
-    BS_StaticLib,
-    BS_DynamicLib,
-    BS_Executable,
-    BS_SourceFiles // in case of Moc
-} BSOutKind;
-
-extern int bs_run(lua_State* L);
-extern int bs_precheck(lua_State* L);
-extern int bs_createBuildDirs(lua_State* L);
-extern int bs_thisapp2(lua_State *L);
-
-// helper:
-extern int bs_getModuleVar(lua_State* L, int inst, const char* name );
-extern int bs_declpath(lua_State* L, int decl, const char* separator);
-extern int bs_runmoc(lua_State* L);
+extern int bs_genQmake(lua_State* L);
 
 
-#endif // BSRUNNER_H
+#endif // BSQMAKEGEN_H
