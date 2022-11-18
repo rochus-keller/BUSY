@@ -65,9 +65,8 @@ static int isa(lua_State* L, int builtins, int cls, const char* what )
 }
 
 typedef enum BSToolchain {BS_msvc,BS_gcc,BS_clang} BSToolchain;
-typedef enum BSLanguage { BS_unknownLang, BS_c, BS_cc, BS_objc, BS_objcc, BS_header } BSLanguage;
 
-static int guessLang(const char* name)
+int bs_guessLang(const char* name)
 {
     const int len = strlen(name);
     const char* p = name + len - 1;
@@ -342,7 +341,7 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
     {
         lua_rawgeti(L,sources,i);
         const int file = lua_gettop(L);
-        const int lang = guessLang(lua_tostring(L,file));
+        const int lang = bs_guessLang(lua_tostring(L,file));
         if( lang == BS_unknownLang )
             luaL_error(L,"source file type not supported: %s",lua_tostring(L,file));
         if( lang == BS_header )
@@ -1296,7 +1295,7 @@ int bs_runmoc(lua_State* L)
         lua_replace(L,defines);
     }
 
-    const int lang = guessLang(lua_tostring(L,source));
+    const int lang = bs_guessLang(lua_tostring(L,source));
 
     int len;
     const char* name = bs_path_part(lua_tostring(L,source),BS_baseName,&len);
@@ -1400,7 +1399,7 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
     {
         lua_rawgeti(L,sources,i);
         const int source = lua_gettop(L);
-        const int lang = guessLang(lua_tostring(L,source));
+        const int lang = bs_guessLang(lua_tostring(L,source));
 
         if( *lua_tostring(L,source) != '/' )
         {
@@ -1408,31 +1407,30 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
             lua_replace(L,source);
         }
 
+        lua_getfield(L,inst,"defines");
+        const int defs = lua_gettop(L);
+
         lua_pushcfunction(L, bs_runmoc);
         // MOC, INFILE, OUTDIR, DEFINES
         lua_pushstring(L,bs_denormalize_path(lua_tostring(L,mocPath)));
         lua_pushstring(L,bs_denormalize_path(lua_tostring(L,source)));
         lua_pushstring(L,bs_denormalize_path(lua_tostring(L,outDir)));
 
-        lua_getfield(L,inst,"defines");
-        const int defs = lua_gettop(L);
         size_t j;
         const size_t numOfDefs = lua_objlen(L,defs);
-        for( j = 1; i <= numOfDefs; i++ )
+        for( j = 1; j <= numOfDefs; j++ )
         {
-            lua_rawgeti(L,defs,i);
+            lua_rawgeti(L,defs,j);
         }
-        lua_pop(L,1); // defs
 
         lua_call(L,3+numOfDefs,1);
-        const char* str = lua_tostring(L,-1);
 
         if( lang == BS_header )
             lua_rawseti(L,outlist,++n);
         else
             lua_pop(L,1); // return
 
-        lua_pop(L,1); // source
+        lua_pop(L,2); // source, defs
     }
 
     lua_pop(L,6); // outlist absDir binst outDir mocPath sources

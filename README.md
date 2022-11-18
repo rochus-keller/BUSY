@@ -156,7 +156,7 @@ BUSY conceptually runs in three phases (similar to BAZEL): the loading phase (pa
 
 ### Planned or work-in-progress features
 
-The current BUSY version is feature complete for the use with [LeanQt](https://github.com/rochus-keller/leanqt), the [Oberon+ OBXMC tool](https://github.com/rochus-keller/Oberon/) and the [NAppGUI framework](https://github.com/rochus-keller/nappgui), and successfully tested on Linux x86 and x86_64 (GCC), Windows 10 x86 and AMD64 (MSVC), Windows 7 x86 (MSVC), and macOS 10.11 x86_64 and 12.2 M1 (CLANG). 
+The current BUSY version is feature complete for the use with [LeanQt](https://github.com/rochus-keller/leanqt), the [Oberon+ OBXMC tool](https://github.com/rochus-keller/Oberon/) and the [NAppGUI framework](https://github.com/rochus-keller/nappgui), and successfully tested on Linux x86, x86_64 and ARMv7 (GCC), Windows 10 x86 and AMD64 (MSVC), Windows 7 x86 (MSVC), and macOS 10.11 x86_64 and 12.2 M1 (CLANG). 
 
 - [x] Statically typed build specification language, "as simple as possible"
 - [x] Support for unicode (UTF-8) in strings, symbols, paths, comments and identifiers
@@ -167,8 +167,8 @@ The current BUSY version is feature complete for the use with [LeanQt](https://g
 - [x] Check and adapt more concepts from GN as need be
 - [ ] Tutorials
 - [ ] Make a Mono CLR source tree version using BUSY
+- [x] Implement QMake backend (tested with LeanQt on Linux)
 - [ ] Implement Ninja backend
-- [ ] Implement QMake backend
 - [ ] Implement CMake backend
 
 ### Non-Goals

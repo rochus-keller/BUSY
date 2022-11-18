@@ -29,7 +29,8 @@ typedef enum BSOutKind { // #kind
     BS_StaticLib,
     BS_DynamicLib,
     BS_Executable,
-    BS_SourceFiles // in case of Moc
+    BS_SourceFiles, // in case of Moc
+    BS_IncludeFiles // in case of Moc
 } BSOutKind;
 
 extern int bs_run(lua_State* L);
@@ -41,6 +42,10 @@ extern int bs_thisapp2(lua_State *L);
 extern int bs_getModuleVar(lua_State* L, int inst, const char* name );
 extern int bs_declpath(lua_State* L, int decl, const char* separator);
 extern int bs_runmoc(lua_State* L);
+
+typedef enum BSLanguage { BS_unknownLang, BS_c, BS_cc, BS_objc, BS_objcc, BS_header } BSLanguage;
+extern int bs_guessLang(const char* name);
+
 
 
 #endif // BSRUNNER_H
