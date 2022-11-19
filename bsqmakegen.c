@@ -300,6 +300,53 @@ static void mocDep(lua_State* L, int inst)
     assert( top == lua_gettop(L) );
 }
 
+static void rccDep(lua_State* L, int inst)
+{
+    const int top = lua_gettop(L);
+    visitDeps(L,inst);
+
+    lua_getfield(L,inst,"#out");
+    const int out = lua_gettop(L);
+    if( lua_isnil(L,out) )
+    {
+        lua_createtable(L,0,0);
+        lua_replace(L,out);
+        lua_pushvalue(L,out);
+        lua_setfield(L,inst,"#out");
+    }
+
+    lua_getfield(L,inst,"#decl");
+    lua_getfield(L,-1,"#qmake");
+    lua_replace(L,-2);
+    const int declpath = lua_gettop(L);
+
+    lua_getfield(L,inst,"sources");
+    const int sources = lua_gettop(L);
+
+    size_t i;
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        lua_rawgeti(L,sources,i);
+        const int source = lua_gettop(L);
+
+        int len;
+        const char* name = bs_path_part(lua_tostring(L,source),BS_baseName,&len);
+        lua_pushlstring(L,name,len);
+        // this file is automatically passed to the compiler over the deps chain; the user doesn't see it
+        lua_pushfstring(L,"$$root_build_dir/%s/qrc_%s.cpp",lua_tostring(L,declpath), lua_tostring(L,-1));
+        lua_replace(L,-2);
+        const int outFile = lua_gettop(L);
+
+        addDep(L,out,BS_SourceFiles,outFile);
+
+        lua_pop(L,2); // source, outFile
+    }
+
+    lua_pop(L,3); // out, declpath, sources
+
+    assert( top == lua_gettop(L) );
+}
+
 static void mergeOut(lua_State* L, int toInst, int fromInst )
 {
     lua_getfield(L,fromInst,"#out");
@@ -400,7 +447,7 @@ static int calcDep(lua_State* L) // param: inst
     else if( isa( L, builtins, cls, "Moc") )
         mocDep(L,inst);
     else if( isa( L, builtins, cls, "Rcc") )
-        ; // TODO
+        rccDep(L,inst);
     else
     {
         lua_getfield(L,cls,"#name");
@@ -425,7 +472,6 @@ static void visitDeps(lua_State* L, int inst)
     size_t i;
     for( i = 1; i <= lua_objlen(L,deps); i++ )
     {
-        // TODO: check for circular deps
         lua_pushcfunction(L, calcDep);
         lua_rawgeti(L,deps,i);
         lua_call(L,1,0);
@@ -730,7 +776,6 @@ static void addIncludes(lua_State* L, int inst, int builtins, FILE* out, int hea
     {
         lua_rawgeti(L,configs,i);
         const int config = lua_gettop(L);
-        // TODO: check for circular deps
         addIncludes(L, config, builtins, out, 0 );
         lua_pop(L,1); // config
     }
@@ -801,7 +846,6 @@ static void addDefines(lua_State* L, int inst, FILE* out, int head)
     {
         lua_rawgeti(L,configs,i);
         const int config = lua_gettop(L);
-        // TODO: check for circular deps
         addDefines(L, config, out, 0 );
         lua_pop(L,1); // config
     }
@@ -863,7 +907,6 @@ static void addFlags(lua_State* L, int inst, FILE* out, int head, const char* he
     {
         lua_rawgeti(L,configs,i);
         const int config = lua_gettop(L);
-        // TODO: check for circular deps
         addFlags(L, config, out, 0, header, field );
         lua_pop(L,1); // config
     }
@@ -890,14 +933,19 @@ static void addFlags(lua_State* L, int inst, FILE* out, int head, const char* he
     assert( top ==  bottom);
 }
 
-static void addDepLibs(lua_State* L, int inst, int kind, FILE* out)
+static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out)
 {
     const int top = lua_gettop(L);
 
     const char* text = "LIBS +=";
     fwrite(text,1,strlen(text),out);
 
-    if( kind == BS_DynamicLib || kind == BS_Executable )
+    lua_getfield(L,builtins,"#inst");
+    const int binst = lua_gettop(L);
+    const int ts = bs_getToolchain(L, binst );
+    lua_pop(L,1); // binst
+
+    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && ( ts == BS_gcc || ts == BS_clang ) )
     {
         // NOTE: image_sources and gui_sources depend on each other; since SourceSets are static libs here
         // the linker complains. The order cannot be fixed since both orders have missing dependencies.
@@ -905,7 +953,7 @@ static void addDepLibs(lua_State* L, int inst, int kind, FILE* out)
         // NOTE: start-group/end-group must not mix cpp and c libraries, otherwise symbols cannot be found;
         // I had this issue when first -lxcb was included in the group
         fwrite(s_listFill1,1,strlen(s_listFill1),out);
-        const char* text3 = "-Wl,--start-group\""; // TODO: toolchain dependent
+        const char* text3 = "-Wl,--start-group\"";
         fwrite(text3,1,strlen(text3),out);
     }
 
@@ -919,10 +967,10 @@ static void addDepLibs(lua_State* L, int inst, int kind, FILE* out)
         iterateDeps(L,inst,BS_StaticLib,0,out,passOnDep);
     }
 
-    if( kind == BS_DynamicLib || kind == BS_Executable )
+    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && ( ts == BS_gcc || ts == BS_clang ) )
     {
         fwrite(s_listFill1,1,strlen(s_listFill1),out);
-        const char* text3 = "-Wl,--end-group\""; // TODO: toolchain dependent
+        const char* text3 = "-Wl,--end-group\"";
         fwrite(text3,1,strlen(text3),out);
     }
 
@@ -946,7 +994,6 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
     {
         lua_rawgeti(L,configs,i);
         const int config = lua_gettop(L);
-        // TODO: check for circular deps
         addLibs(L, config, kind, out, 0, ismsvc );
         mergeOut(L,inst,config);
         lua_pop(L,1); // config
@@ -1075,8 +1122,11 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int forc
     const int win32 = strcmp(lua_tostring(L,-1),"win32") == 0 || strcmp(lua_tostring(L,-1),"winrt") == 0;
     lua_pop(L,2); // target_os, binst
 
+    // TODO: this does not work yet if inst is a dynamic library; the static libs from the source set are
+    // added as expected, but the resulting dynamic library doesn't include the symbols of the static libraries.
+    // To work around this we have to add the object files of the source set instead of the static lib
     fwrite("\n",1,1,out);
-    addDepLibs(L,inst,lib_type,out);
+    addDepLibs(L,inst,builtins,lib_type,out);
     fwrite("\n\n",1,2,out);
 
     fwrite("\n",1,1,out);
@@ -1125,7 +1175,7 @@ static void genExe(lua_State* L, int inst, int builtins, FILE* out )
     lua_pop(L,2); // target_os, binst
 
     fwrite("\n",1,1,out);
-    addDepLibs(L,inst,BS_Executable,out);
+    addDepLibs(L,inst,builtins,BS_Executable,out);
     fwrite("\n\n",1,2,out);
 
     fwrite("\n",1,1,out);
@@ -1155,22 +1205,6 @@ static void genMoc(lua_State* L, int inst, FILE* out )
     const char* text = "QT -= core gui\n"
             "TEMPLATE = aux\n";
     fwrite(text,1,strlen(text),out);
-
-    /*
-    lua_getfield(L,inst,"name");
-    if( lua_isnil(L,-1) || lua_objlen(L,-1) == 0 )
-    {
-        lua_pop(L,1);
-        lua_getfield(L,inst,"#decl");
-        lua_getfield(L,-1,"#name");
-        lua_replace(L,-2);
-    }
-    const int name = lua_gettop(L);
-    const char* text2 = "TARGET = ";
-    fwrite(text2,1,strlen(text2),out);
-    fwrite(lua_tostring(L,name),1,lua_objlen(L,name),out);
-    fwrite("\n",1,1,out);
-    */
 
     fwrite("\n",1,1,out);
     addDefines(L,inst,out,1);
@@ -1209,6 +1243,38 @@ static void genMoc(lua_State* L, int inst, FILE* out )
     fwrite(" \n",1,1,out);
 
     //lua_pop(L,1); // name
+}
+
+static void genRcc(lua_State* L, int inst, FILE* out )
+{
+    const char* text = "QT -= core gui\n"
+            "TEMPLATE = aux\n";
+    fwrite(text,1,strlen(text),out);
+
+    const char* text7 = "RCC_SOURCES +=";
+    fwrite(text7,1,strlen(text7),out);
+    addSources2(L, inst, out);
+    fwrite("\n\n",1,2,out);
+
+    const char* text3 = "compiler.commands = "
+            "\\\"$$rcc_path\\\" "
+            "\\\"${QMAKE_FILE_IN}\\\" "
+            "-o \\\"$$shadowed($$PWD)/qrc_${QMAKE_FILE_BASE}.cpp\\\" "
+            "-name \"${QMAKE_FILE_BASE}\"";
+    fwrite(text3,1,strlen(text3),out);
+    fwrite("\n",1,1,out);
+
+    const char* text5 = "compiler.input = RCC_SOURCES";
+    fwrite(text5,1,strlen(text5),out);
+    fwrite("\n",1,1,out);
+
+    const char* text6 = "compiler.output = $$shadowed($$PWD)/qrc_${QMAKE_FILE_BASE}.cpp";
+    fwrite(text6,1,strlen(text6),out);
+    fwrite("\n",1,1,out);
+
+    const char* text4 = "QMAKE_EXTRA_COMPILERS += compiler";
+    fwrite(text4,1,strlen(text4),out);
+    fwrite(" \n",1,1,out);
 }
 
 static int genproduct(lua_State* L) // arg: prodinst
@@ -1273,7 +1339,7 @@ static int genproduct(lua_State* L) // arg: prodinst
     else if( isa( L, builtins, cls, "Moc") )
         genMoc(L,prodinst, out);
     else if( isa( L, builtins, cls, "Rcc") )
-        genAux(L,prodinst, out); // TODO;
+        genRcc(L,prodinst, out);
     else
     {
         fclose(out);
@@ -1433,6 +1499,29 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     fwrite(lua_tostring(L,mocPath),1,lua_objlen(L,mocPath),out);
     fwrite("\"\n",1,2,out);
 
+    const char* text8 = "rcc_path = \"";
+    fwrite(text8,1,strlen(text8),out);
+
+    lua_getfield(L,binst,"rcc_path");
+    const int rccPath = lua_gettop(L);
+    const char* defaultRccPath = "$$root_build_dir/rcc";
+    if( lua_isnil(L,rccPath) || strcmp(".",lua_tostring(L,rccPath)) == 0 )
+    {
+        lua_pushstring(L,defaultRccPath);
+        lua_replace(L,rccPath);
+    }else if( *lua_tostring(L,rccPath) != '/' )
+        luaL_error(L,"rcc_path cannot be relative: %s", lua_tostring(L,rccPath));
+    else
+    {
+        const char* cmd = bs_denormalize_path(lua_tostring(L,rccPath));
+        if( bs_exec(cmd) != 0 )
+            cmd = defaultRccPath;
+        lua_pushstring(L,cmd);
+        lua_replace(L,rccPath);
+    }
+    fwrite(lua_tostring(L,rccPath),1,lua_objlen(L,rccPath),out);
+    fwrite("\"\n",1,2,out);
+
     fclose(out);
 
     lua_pushvalue(L,buildDir);
@@ -1490,7 +1579,7 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     }
     fclose(out);
 
-    lua_pop(L,10); // order builtins, binst, buildDir, confPath, sourceDir, scriptPath, mocPath, proPath
+    lua_pop(L,11); // order builtins, binst, buildDir, confPath, sourceDir, scriptPath, mocPath, rccPath, proPath
     assert( top == lua_gettop(L) );
     return 0;
 }

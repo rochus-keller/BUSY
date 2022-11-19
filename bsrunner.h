@@ -46,6 +46,8 @@ extern int bs_runmoc(lua_State* L);
 typedef enum BSLanguage { BS_unknownLang, BS_c, BS_cc, BS_objc, BS_objcc, BS_header } BSLanguage;
 extern int bs_guessLang(const char* name);
 
+typedef enum BSToolchain {BS_msvc,BS_gcc,BS_clang} BSToolchain;
+extern int bs_getToolchain(lua_State* L, int builtinsInst);
 
 
 #endif // BSRUNNER_H

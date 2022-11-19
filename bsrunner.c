@@ -64,8 +64,6 @@ static int isa(lua_State* L, int builtins, int cls, const char* what )
     return res;
 }
 
-typedef enum BSToolchain {BS_msvc,BS_gcc,BS_clang} BSToolchain;
-
 int bs_guessLang(const char* name)
 {
     const int len = strlen(name);
@@ -235,7 +233,7 @@ static void addall(lua_State* L,int inst,int cflags, int cflags_c, int cflags_cc
 
 }
 
-static int getToolchain(lua_State* L, int builtinsInst)
+int bs_getToolchain(lua_State* L, int builtinsInst)
 {
     lua_getfield(L,builtinsInst,"target_toolchain");
     int toolchain;
@@ -293,7 +291,7 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
     lua_getfield(L,builtins,"#inst");
     const int binst = lua_gettop(L);
 
-    const int toolchain = getToolchain(L,binst);
+    const int toolchain = bs_getToolchain(L,binst);
 
     lua_getfield(L,binst,"root_build_dir");
     const int rootOutDir = lua_gettop(L);
@@ -669,7 +667,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     lua_getfield(L,builtins,"#inst");
     const int binst = lua_gettop(L);
 
-    const int toolchain = getToolchain(L,binst);
+    const int toolchain = bs_getToolchain(L,binst);
     lua_getfield(L,binst,"target_os");
     const int win32 = strcmp(lua_tostring(L,-1),"win32") == 0 || strcmp(lua_tostring(L,-1),"winrt") == 0;
     const int mac = strcmp(lua_tostring(L,-1),"darwin") == 0 || strcmp(lua_tostring(L,-1),"macos") == 0;
