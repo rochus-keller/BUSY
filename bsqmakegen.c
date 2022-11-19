@@ -151,7 +151,7 @@ static void pushExecutableName(lua_State* L, int inst, int builtins)
     assert( top + 1 == lua_gettop(L) );
 }
 
-static int pushLibraryName(lua_State* L, int inst, int builtins, int forceStatic)
+static int pushLibraryName(lua_State* L, int inst, int builtins, int isSourceSet)
 {
     const int top = lua_gettop(L);
 
@@ -165,7 +165,7 @@ static int pushLibraryName(lua_State* L, int inst, int builtins, int forceStatic
 
     lua_getfield(L,inst,"lib_type");
     const char* str = lua_tostring(L,-1);
-    const int lib_type = forceStatic || str == 0 ? BS_StaticLib :
+    const int lib_type = isSourceSet || str == 0 ? BS_StaticLib :
                                        strcmp(str,"shared") == 0 ? BS_DynamicLib : BS_StaticLib;
     lua_pop(L,1);
 
@@ -212,12 +212,33 @@ static int pushLibraryName(lua_State* L, int inst, int builtins, int forceStatic
     return lib_type;
 }
 
-static void libraryDep(lua_State* L, int inst, int builtins, int forceStatic)
+static void pushObjectFileName(lua_State* L, int declpath, int source, int toolchain)
+{
+    const int top = lua_gettop(L);
+
+    int len;
+    const char* name = bs_path_part(lua_tostring(L,source),BS_baseName,&len);
+    lua_pushlstring(L,name,len);
+    lua_pushfstring(L,"$$root_build_dir/%s/%s",lua_tostring(L,declpath), lua_tostring(L,-1));
+    lua_replace(L,-2);
+
+    if( toolchain == BS_msvc )
+        lua_pushstring(L,".obj");
+    else
+        lua_pushstring(L,".o");
+
+    lua_concat(L,2);
+
+    const int bottom = lua_gettop(L);
+    assert( top + 1 == bottom );
+}
+
+static void libraryDep(lua_State* L, int inst, int builtins, int isSourceSet)
 {
     const int top = lua_gettop(L);
     visitDeps(L,inst);
 
-    const int lib_type = pushLibraryName(L,inst,builtins,forceStatic);
+    const int lib_type = pushLibraryName(L,inst,builtins,isSourceSet);
     const int path = lua_gettop(L);
 
     lua_getfield(L,inst,"#out");
@@ -230,7 +251,73 @@ static void libraryDep(lua_State* L, int inst, int builtins, int forceStatic)
         lua_setfield(L,inst,"#out");
     }
 
-    addDep(L,out,lib_type,path);
+    if( isSourceSet )
+    {
+        addDep(L,out,BS_SourceSetLib,path);
+
+        lua_getfield(L,inst,"#decl");
+        lua_getfield(L,-1,"#qmake");
+        lua_replace(L,-2);
+        const int declpath = lua_gettop(L);
+
+        lua_getfield(L,builtins,"#inst");
+        const int binst = lua_gettop(L);
+        const int toolchain = bs_getToolchain(L,binst);
+        lua_pop(L,1); // binst
+
+        lua_getfield(L,inst,"sources");
+        const int sources = lua_gettop(L);
+        size_t i;
+        for( i = 1; i <= lua_objlen(L,sources); i++ )
+        {
+            lua_rawgeti(L,sources,i);
+            const int source = lua_gettop(L);
+            pushObjectFileName(L,declpath,source,toolchain);
+            const int name = lua_gettop(L);
+            addDep(L,out,BS_ObjectFiles,name);
+            lua_pop(L,2); // source, name
+        }
+        lua_pop(L,1); // sources
+
+        // for the BS_ObjectFiles you pass also consider BS_SourceFiles from deps
+        lua_getfield(L,inst,"deps");
+        const int deps = lua_gettop(L);
+        if( !lua_isnil(L,deps) )
+        {
+            for( i = 1; i <= lua_objlen(L,deps); i++ )
+            {
+                lua_rawgeti(L,deps,i);
+                const int dep = lua_gettop(L);
+                lua_getfield(L,dep,"#out");
+                const int res = lua_gettop(L);
+                if( !lua_isnil(L,res) )
+                {
+                    size_t j;
+                    for( j = lua_objlen(L,res); j > 0; j-- )
+                    {
+                        lua_rawgeti(L,res,j);
+                        const int item = lua_gettop(L);
+                        lua_getfield(L,item,"#kind");
+                        const int k = lua_tointeger(L,-1);
+                        lua_pop(L,1); // kind
+                        if( k == BS_SourceFiles )
+                        {
+                            lua_getfield(L,item,"#path");
+                            const int path = lua_gettop(L);
+                            pushObjectFileName(L,declpath,path,toolchain);
+                            const int name = lua_gettop(L);
+                            addDep(L,out,BS_ObjectFiles,name);
+                            lua_pop(L,2); // path, name
+                        }
+                        lua_pop(L,1); // item
+                    }
+                }
+                lua_pop(L,2); // dep, res
+            }
+        }
+        lua_pop(L,2); // deps, declpath
+    }else
+        addDep(L,out,lib_type,path);
 
     lua_pop(L,2); // path, out
 
@@ -282,6 +369,8 @@ static void mocDep(lua_State* L, int inst)
 
         if( lang == BS_header )
             addDep(L,out,BS_SourceFiles,outFile);
+#if 0
+        // no longer used because we remap the existing build_dir() paths instead to $$root_build_dir/declpath
         else
         {
             // for x.moc we also pass on the include dir which is then propagated all the way up.
@@ -291,6 +380,7 @@ static void mocDep(lua_State* L, int inst)
             addDep(L,out,BS_IncludeFiles,path);
             lua_pop(L,1);
         }
+#endif
 
         lua_pop(L,2); // source, outFile
     }
@@ -945,6 +1035,11 @@ static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out
     const int ts = bs_getToolchain(L, binst );
     lua_pop(L,1); // binst
 
+    if( kind == BS_DynamicLib )
+    {
+        iterateDeps(L,inst,BS_ObjectFiles,1,out,renderDep);
+    }
+
     if( ( kind == BS_DynamicLib || kind == BS_Executable ) && ( ts == BS_gcc || ts == BS_clang ) )
     {
         // NOTE: image_sources and gui_sources depend on each other; since SourceSets are static libs here
@@ -957,14 +1052,15 @@ static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out
         fwrite(text3,1,strlen(text3),out);
     }
 
-    if( kind == BS_Executable || kind == BS_DynamicLib )
+    if( kind == BS_DynamicLib )
     {
         iterateDeps(L,inst,BS_DynamicLib,1,out,renderDep);
         iterateDeps(L,inst,BS_StaticLib,1,out,renderDep);
-    }else if( kind == BS_StaticLib )
+    }else if( kind == BS_Executable )
     {
-        iterateDeps(L,inst,BS_DynamicLib,0,out,passOnDep);
-        iterateDeps(L,inst,BS_StaticLib,0,out,passOnDep);
+        iterateDeps(L,inst,BS_DynamicLib,1,out,renderDep);
+        iterateDeps(L,inst,BS_StaticLib,1,out,renderDep);
+        iterateDeps(L,inst,BS_SourceSetLib,0,out,renderDep);
     }
 
     if( ( kind == BS_DynamicLib || kind == BS_Executable ) && ( ts == BS_gcc || ts == BS_clang ) )
@@ -972,6 +1068,46 @@ static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out
         fwrite(s_listFill1,1,strlen(s_listFill1),out);
         const char* text3 = "-Wl,--end-group\"";
         fwrite(text3,1,strlen(text3),out);
+    }
+
+    const int bottom = lua_gettop(L);
+    assert( top ==  bottom);
+}
+
+enum { BS_ForwardSourceSet, BS_ForwardStatic, BS_ForwardShared };
+static void forwardDepLibs(lua_State* L, int inst, int kind, FILE* out)
+{
+    const int top = lua_gettop(L);
+
+    switch(kind)
+    {
+    case BS_ForwardShared:
+        // don't forward
+        // a dynamic lib (like an executable) is the endpoint of forwarding
+        break;
+    case BS_ForwardStatic:
+        // a true static library.
+
+        // dependend static libs are not merged with this static lib, but forwarded to the client
+        // to be used in parallel with this static lib
+        iterateDeps(L,inst,BS_StaticLib,0,out,passOnDep);
+
+        // this static lib cannot make use of dynamic libs and just forwards it
+        iterateDeps(L,inst,BS_DynamicLib,0,out,passOnDep);
+
+        // same reasoning as with BS_StaticLib
+        iterateDeps(L,inst,BS_SourceSetLib,0,out,passOnDep);
+
+        // we don't forward object files, since these could be added to this static lib, but we already
+        // have the static lib of the source set which we forward, so we don't have to also send the object files
+        break;
+    case BS_ForwardSourceSet:
+        // a source set just translates sources to object files and just passes through everything from its dependencies
+        iterateDeps(L,inst,BS_StaticLib,0,out,passOnDep);
+        iterateDeps(L,inst,BS_DynamicLib,0,out,passOnDep);
+        iterateDeps(L,inst,BS_SourceSetLib,0,out,passOnDep);
+        iterateDeps(L,inst,BS_ObjectFiles,0,out,passOnDep);
+        break;
     }
 
     const int bottom = lua_gettop(L);
@@ -1083,16 +1219,17 @@ static void genCommon(lua_State* L, int inst, int builtins, FILE* out )
     // TODO cflags_objc, cflags_objcc
 }
 
-static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int forceStatic )
+static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSourceSet )
 {
     const int top = lua_gettop(L);
     lua_getfield(L,inst,"lib_type");
-    const int lib_type = forceStatic ? BS_StaticLib :
+    const int lib_type = isSourceSet ? BS_StaticLib :
                                        strcmp(lua_tostring(L,-1),"shared") == 0 ? BS_DynamicLib : BS_StaticLib;
     lua_pop(L,1);
 
     const char* text = "QT -= core gui\n"
-            "TEMPLATE = lib\n";
+            "TEMPLATE = lib\n"
+            "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n";
     fwrite(text,1,strlen(text),out);
 
     lua_getfield(L,inst,"name");
@@ -1117,25 +1254,26 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int forc
 
     genCommon(L,inst,builtins,out);
 
-    lua_getfield(L,builtins,"#inst");
-    lua_getfield(L,-1,"target_os");
-    const int win32 = strcmp(lua_tostring(L,-1),"win32") == 0 || strcmp(lua_tostring(L,-1),"winrt") == 0;
-    lua_pop(L,2); // target_os, binst
+    forwardDepLibs(L,inst, (isSourceSet ? BS_ForwardSourceSet :
+                                          ( lib_type == BS_StaticLib ? BS_ForwardStatic :
+                                                                       BS_ForwardShared) ) , out);
 
-    // TODO: this does not work yet if inst is a dynamic library; the static libs from the source set are
-    // added as expected, but the resulting dynamic library doesn't include the symbols of the static libraries.
-    // To work around this we have to add the object files of the source set instead of the static lib
-    fwrite("\n",1,1,out);
-    addDepLibs(L,inst,builtins,lib_type,out);
-    fwrite("\n\n",1,2,out);
-
-    fwrite("\n",1,1,out);
-    addLibs(L,inst,lib_type,out,1,win32);
-    fwrite("\n\n",1,2,out);
-
-    if( !forceStatic )
+    if( !isSourceSet )
     {
-        pushLibraryName(L,inst,builtins,forceStatic);
+        lua_getfield(L,builtins,"#inst");
+        lua_getfield(L,-1,"target_os");
+        const int win32 = strcmp(lua_tostring(L,-1),"win32") == 0 || strcmp(lua_tostring(L,-1),"winrt") == 0;
+        lua_pop(L,2); // target_os, binst
+
+        fwrite("\n",1,1,out);
+        addDepLibs(L,inst,builtins,lib_type,out);
+        fwrite("\n\n",1,2,out);
+
+        fwrite("\n",1,1,out);
+        addLibs(L,inst,lib_type,out,1,win32);
+        fwrite("\n\n",1,2,out);
+
+        pushLibraryName(L,inst,builtins,isSourceSet);
         const int path = lua_gettop(L);
         lua_pushfstring(L,"QMAKE_POST_LINK += $$QMAKE_COPY $$quote(%s) $$quote($$root_build_dir)\n\n", lua_tostring(L,path));
         fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
@@ -1150,7 +1288,8 @@ static void genExe(lua_State* L, int inst, int builtins, FILE* out )
 {
     const int top = lua_gettop(L);
     const char* text = "QT -= core gui\n"
-            "TEMPLATE = app\n\n";
+            "TEMPLATE = app\n\n"
+            "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n";
     fwrite(text,1,strlen(text),out);
 
     lua_getfield(L,inst,"name");

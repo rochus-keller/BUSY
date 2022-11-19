@@ -30,7 +30,10 @@ typedef enum BSOutKind { // #kind
     BS_DynamicLib,
     BS_Executable,
     BS_SourceFiles, // in case of Moc
+#if 0
     BS_IncludeFiles // in case of Moc
+#endif
+    BS_SourceSetLib // in case of qmake gen, static lib representing the sources
 } BSOutKind;
 
 extern int bs_run(lua_State* L);
