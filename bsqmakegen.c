@@ -109,7 +109,7 @@ static void addDep(lua_State* L, int list, int kind, int path )
     lua_rawseti(L,list, lua_objlen(L,list)+1); // eats t
 }
 
-static void pushExecutableName(lua_State* L, int inst, int builtins)
+static void pushExecutableName(lua_State* L, int inst, int builtins, int nameOnly)
 {
     const int top = lua_gettop(L);
 
@@ -129,7 +129,10 @@ static void pushExecutableName(lua_State* L, int inst, int builtins)
     lua_getfield(L,decl,"#name");
     const int declname = lua_gettop(L);
 
-    lua_pushfstring(L,"$$root_build_dir/%s/", lua_tostring(L,declpath));
+    if( nameOnly )
+        lua_pushstring(L,"");
+    else
+        lua_pushfstring(L,"$$root_build_dir/%s/", lua_tostring(L,declpath));
     lua_getfield(L,inst,"name");
     if( lua_isnil(L,-1) || lua_objlen(L,-1) == 0 )
     {
@@ -151,7 +154,7 @@ static void pushExecutableName(lua_State* L, int inst, int builtins)
     assert( top + 1 == lua_gettop(L) );
 }
 
-static int pushLibraryName(lua_State* L, int inst, int builtins, int isSourceSet)
+static int pushLibraryPath(lua_State* L, int inst, int builtins, int isSourceSet, int nameOnly, int forLinking)
 {
     const int top = lua_gettop(L);
 
@@ -178,7 +181,14 @@ static int pushLibraryName(lua_State* L, int inst, int builtins, int isSourceSet
     lua_getfield(L,decl,"#name");
     const int declname = lua_gettop(L);
 
-    lua_pushfstring(L,"$$root_build_dir/%s/lib", lua_tostring(L,declpath));
+    if( nameOnly )
+        lua_pushstring(L,"");
+    else
+        lua_pushfstring(L,"$$root_build_dir/%s/", lua_tostring(L,declpath));
+    if( win32 )
+        lua_pushstring(L,"");
+    else
+        lua_pushstring(L,"lib"); // prefix
     lua_getfield(L,inst,"name");
     if( lua_isnil(L,-1) || lua_objlen(L,-1) == 0 )
     {
@@ -189,8 +199,12 @@ static int pushLibraryName(lua_State* L, int inst, int builtins, int isSourceSet
     if( lib_type == BS_DynamicLib )
     {
         if( win32 )
-            lua_pushstring(L,".dll");
-        else if(mac)
+        {
+            if( forLinking )
+                lua_pushstring(L,".lib");
+            else
+                lua_pushstring(L,".dll");
+        }else if(mac)
             lua_pushstring(L,".dylib");
         else
             lua_pushstring(L,".so");
@@ -201,7 +215,7 @@ static int pushLibraryName(lua_State* L, int inst, int builtins, int isSourceSet
         else
             lua_pushstring(L,".a");
     }
-    lua_concat(L,3);
+    lua_concat(L,4);
 
     lua_replace(L,decl);
 
@@ -238,7 +252,7 @@ static void libraryDep(lua_State* L, int inst, int builtins, int isSourceSet)
     const int top = lua_gettop(L);
     visitDeps(L,inst);
 
-    const int lib_type = pushLibraryName(L,inst,builtins,isSourceSet);
+    const int lib_type = pushLibraryPath(L,inst,builtins,isSourceSet,0,1);
     const int path = lua_gettop(L);
 
     lua_getfield(L,inst,"#out");
@@ -647,6 +661,8 @@ static void iterateDeps(lua_State* L, int inst, int filter, int inverse, FILE* o
     assert( top ==  bottom);
 }
 
+static int s_sourceCount = 0;
+
 static void renderDep(lua_State* L, int inst, int item, FILE* out)
 {
     fwrite(s_listFill1,1,strlen(s_listFill1),out);
@@ -655,15 +671,18 @@ static void renderDep(lua_State* L, int inst, int item, FILE* out)
     fwrite(path,1,strlen(path),out);
     fwrite("\"",1,1,out);
     lua_pop(L,1); // path
+    s_sourceCount++;
 }
 
-static void addSources(lua_State* L, int inst, FILE* out)
+static int addSources(lua_State* L, int inst, FILE* out)
 {
     const int top = lua_gettop(L);
     const char* text = "SOURCES +="; // TODO: OBJECTIVE_SOURCES for .mm
     fwrite(text,1,strlen(text),out);
 
+    s_sourceCount = 0;
     iterateDeps(L,inst,BS_SourceFiles, 0,out,renderDep);
+    int n = s_sourceCount; // RISK this works as long we don't use threads
 
     lua_getfield(L,inst,"sources");
     const int sources = lua_gettop(L);
@@ -672,7 +691,9 @@ static void addSources(lua_State* L, int inst, FILE* out)
     const int absDir = lua_gettop(L);
 
     size_t i;
-    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    const size_t len = lua_objlen(L,sources);
+    n += len;
+    for( i = 1; i <= len; i++ )
     {
         lua_rawgeti(L,sources,i);
         const int file = lua_gettop(L);
@@ -700,6 +721,8 @@ static void addSources(lua_State* L, int inst, FILE* out)
 
     const int bottom = lua_gettop(L);
     assert( top ==  bottom);
+
+    return n;
 }
 
 static void addSources2(lua_State* L, int inst, FILE* out)
@@ -1188,7 +1211,7 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
     assert( top ==  bottom);
 }
 
-static void genCommon(lua_State* L, int inst, int builtins, FILE* out )
+static void genCommon(lua_State* L, int inst, int builtins, int kind, FILE* out )
 {
     fwrite("\n",1,1,out);
     addDefines(L,inst,out,1);
@@ -1199,7 +1222,17 @@ static void genCommon(lua_State* L, int inst, int builtins, FILE* out )
     fwrite("\n\n",1,2,out);
 
     fwrite("\n",1,1,out);
-    addSources(L,inst,out);
+    const int nSources = addSources(L,inst,out);
+    if( nSources == 0 )
+    {
+        lua_getfield(L,builtins,"#inst");
+        lua_getfield(L,-1,"root_build_dir");
+        lua_pushfstring(L,"%s/dummy.c\"",lua_tostring(L,-1));
+        fwrite(s_listFill1,1,strlen(s_listFill1),out);
+        const char* path = bs_denormalize_path(lua_tostring(L,-1));
+        fwrite(path,1,strlen(path),out);
+        lua_pop(L,3);
+    }
     fwrite("\n\n",1,2,out);
 
     fwrite("\n",1,1,out);
@@ -1227,9 +1260,13 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
                                        strcmp(lua_tostring(L,-1),"shared") == 0 ? BS_DynamicLib : BS_StaticLib;
     lua_pop(L,1);
 
-    const char* text = "QT -= core gui\n"
+    const char* text =
+            "QT -= core gui\n"
             "TEMPLATE = lib\n"
-            "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n";
+            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
+            "CONFIG -= qt\n"
+            "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n"
+            "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
 
     lua_getfield(L,inst,"name");
@@ -1252,7 +1289,7 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
         fwrite(text,1,strlen(text),out);
     }
 
-    genCommon(L,inst,builtins,out);
+    genCommon(L,inst,builtins,lib_type,out);
 
     forwardDepLibs(L,inst, (isSourceSet ? BS_ForwardSourceSet :
                                           ( lib_type == BS_StaticLib ? BS_ForwardStatic :
@@ -1273,9 +1310,9 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
         addLibs(L,inst,lib_type,out,1,win32);
         fwrite("\n\n",1,2,out);
 
-        pushLibraryName(L,inst,builtins,isSourceSet);
+        pushLibraryPath(L,inst,builtins,isSourceSet,1,0);
         const int path = lua_gettop(L);
-        lua_pushfstring(L,"QMAKE_POST_LINK += $$QMAKE_COPY $$quote(%s) $$quote($$root_build_dir)\n\n", lua_tostring(L,path));
+        lua_pushfstring(L,"QMAKE_POST_LINK += $$QMAKE_COPY $$quote(%s) ..\n\n", lua_tostring(L,path));
         fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
         lua_pop(L,2);
     }
@@ -1287,9 +1324,16 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
 static void genExe(lua_State* L, int inst, int builtins, FILE* out )
 {
     const int top = lua_gettop(L);
-    const char* text = "QT -= core gui\n"
+    const char* text =
+            "QT -= core gui\n"
             "TEMPLATE = app\n\n"
-            "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n";
+            "CONFIG += console\n" // avoid that qmake adds /subsys:win on Windows;
+                                  // unfortunately it adds /subsys:console, so both a console and a window open
+                                  // if ldflags also include /subsys:win; TODO to avoid we need a new field in Executable
+            "CONFIG -= qt\n"
+            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
+            "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n"
+            "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
 
     lua_getfield(L,inst,"name");
@@ -1306,7 +1350,7 @@ static void genExe(lua_State* L, int inst, int builtins, FILE* out )
     fwrite("\n",1,1,out);
     lua_pop(L,1); // name
 
-    genCommon(L,inst, builtins,out);
+    genCommon(L,inst, builtins, BS_Executable,out);
 
     lua_getfield(L,builtins,"#inst");
     lua_getfield(L,-1,"target_os");
@@ -1321,9 +1365,9 @@ static void genExe(lua_State* L, int inst, int builtins, FILE* out )
     addLibs(L,inst,BS_Executable,out,1,win32);
     fwrite("\n\n",1,2,out);
 
-    pushExecutableName(L,inst,builtins);
+    pushExecutableName(L,inst,builtins,1);
     const int path = lua_gettop(L);
-    lua_pushfstring(L,"QMAKE_POST_LINK += $$QMAKE_COPY $$quote(%s) $$quote($$root_build_dir)\n\n", lua_tostring(L,path));
+    lua_pushfstring(L,"QMAKE_POST_LINK += $$QMAKE_COPY $$quote(%s) ..\n\n", lua_tostring(L,path));
     fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
     lua_pop(L,2);
 
@@ -1334,15 +1378,23 @@ static void genExe(lua_State* L, int inst, int builtins, FILE* out )
 static void genAux(lua_State* L, int inst, FILE* out )
 {
 
-    const char* text = "QT -= core gui\n"
-            "TEMPLATE = aux\n";
+    const char* text =
+            "QT -= core gui\n"
+            "TEMPLATE = aux\n"
+            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
+            "CONFIG -= qt\n"
+            "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
 }
 
 static void genMoc(lua_State* L, int inst, FILE* out )
 {
-    const char* text = "QT -= core gui\n"
-            "TEMPLATE = aux\n";
+    const char* text =
+            "QT -= core gui\n"
+            "TEMPLATE = aux\n"
+            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
+            "CONFIG -= qt\n"
+            "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
 
     fwrite("\n",1,1,out);
@@ -1386,8 +1438,12 @@ static void genMoc(lua_State* L, int inst, FILE* out )
 
 static void genRcc(lua_State* L, int inst, FILE* out )
 {
-    const char* text = "QT -= core gui\n"
-            "TEMPLATE = aux\n";
+    const char* text =
+            "QT -= core gui\n"
+            "TEMPLATE = aux\n"
+            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
+            "CONFIG -= qt\n"
+            "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
 
     const char* text7 = "RCC_SOURCES +=";
@@ -1674,6 +1730,7 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     const char* text7 = "# generated by BUSY, do not modify\n"
             "QT -= core gui\n"
             "TEMPLATE = subdirs\n"
+            "CONFIG -= qt\n"
             "CONFIG += ordered\n"
             "SUBDIRS += \\\n";
     fwrite(text7,1,strlen(text7),out);
@@ -1718,7 +1775,19 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     }
     fclose(out);
 
-    lua_pop(L,11); // order builtins, binst, buildDir, confPath, sourceDir, scriptPath, mocPath, rccPath, proPath
+    lua_pushvalue(L,buildDir);
+    lua_pushstring(L,"/dummy.c");
+    lua_concat(L,2);
+    const int dummyPath = lua_gettop(L);
+
+    out = bs_fopen(bs_denormalize_path(lua_tostring(L,dummyPath)),"w");
+    if( out == NULL )
+        luaL_error(L,"cannot open file for writing: %s", lua_tostring(L,dummyPath));
+    const char* text9 = "static int dummy() { return 0; }\n";
+    fwrite(text9,1,strlen(text9),out);
+    fclose(out);
+
+    lua_pop(L,12); // order builtins, binst, buildDir, confPath, sourceDir, scriptPath, mocPath, rccPath, proPath, dummyPath
     assert( top == lua_gettop(L) );
     return 0;
 }
