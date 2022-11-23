@@ -245,6 +245,7 @@ proc("readstring",14)
 proc("trycompile",15)
 proc("build_dir",16)
 proc("modname",17)
+proc("set_defaults",18)
 
 ---- built-in vars
 local function variable(name, type, ro)
@@ -271,6 +272,7 @@ variable("moc_path", globals.path, false)
 variable("rcc_path", globals.path, false)
 
 B = require("BUSY")
+-- preset global variables; inst is the instance of the globals declaration
 inst.busy_version = B.version()
 inst.host_cpu, inst.host_cpu_ver = B.cpu()
 inst.target_cpu, inst.target_cpu_ver = inst.host_cpu, inst.host_cpu_ver
@@ -282,6 +284,10 @@ inst.host_toolchain, inst.host_toolchain_ver = B.compiler()
 inst.target_toolchain, inst.target_toolchain_ver = inst.host_toolchain, inst.host_toolchain_ver
 inst.moc_path = "."
 inst.rcc_path = "."
+inst["#ctdefaults"] = {} -- a table with optional entries CompilerType->Config
+inst["#ctdefaults"]["gcc"] = { ["cflags"] = { "-O2" } }
+inst["#ctdefaults"]["clang"] = inst["#ctdefaults"]["gcc"]
+inst["#ctdefaults"]["msvc"] = { ["cflags"] = { "/O2", "/MD" } }
 
 
 return globals

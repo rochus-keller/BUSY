@@ -145,6 +145,8 @@ int bs_getModuleVar(lua_State* L, int inst, const char* name )
     const int top = lua_gettop(L);
 
     lua_getfield(L,inst,"#decl");
+    if( lua_isnil(L,-1) )
+        return 1; // apparently a predeclared global object
     lua_getfield(L,-1,"#owner");
     lua_replace(L,-2);
     lua_getfield(L,-1,name);
@@ -158,6 +160,8 @@ int bs_getModuleVar(lua_State* L, int inst, const char* name )
 static void addall(lua_State* L,int inst,int cflags, int cflags_c, int cflags_cc, int cflags_objc, int cflags_objcc,
                         int defines, int includes, int ismsvc)
 {
+    // TODO: avoid duplicates
+
     lua_getfield(L,inst,"configs");
     const int configs = lua_gettop(L);
     size_t i;
@@ -293,6 +297,12 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
 
     const int toolchain = bs_getToolchain(L,binst);
 
+    lua_getfield(L,binst,"#ctdefaults");
+    lua_getfield(L,binst,"target_toolchain");
+    lua_rawget(L,-2);
+    lua_replace(L,-2);
+    const int ctdefaults = lua_gettop(L);
+
     lua_getfield(L,binst,"root_build_dir");
     const int rootOutDir = lua_gettop(L);
 
@@ -317,6 +327,8 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
     lua_pushstring(L,"");
     const int includes = lua_gettop(L);
 
+    if( !lua_isnil(L,ctdefaults) )
+        addall(L,ctdefaults,cflags,cflags_c,cflags_cc,cflags_objc,cflags_objcc,defines,includes,toolchain == BS_msvc);
     addall(L,inst,cflags,cflags_c,cflags_cc,cflags_objc,cflags_objcc,defines,includes,toolchain == BS_msvc);
 
     size_t i;
@@ -411,8 +423,6 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             const int cmd = lua_gettop(L);
             lua_pushvalue(L,cmd);
             lua_pushvalue(L,cflags);
-            lua_pushvalue(L,includes);
-            lua_pushvalue(L,defines);
             switch(lang)
             {
             case BS_c:
@@ -427,19 +437,27 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             case BS_objcc:
                 lua_pushvalue(L,cflags_objcc);
                 break;
+            default:
+                lua_pushstring(L,"");
+                break;
             }
+            lua_pushvalue(L,defines);
+            lua_pushvalue(L,includes);
             switch(toolchain)
             {
             case BS_gcc:
             case BS_clang:
-                lua_pushstring(L," -O2 -c -o ");
+                lua_pushstring(L," -c -o ");
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,out) ) );
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,src) ) );
                 break;
             case BS_msvc:
-                lua_pushstring(L," /nologo /O2 /MD /c /Fo");
+                lua_pushstring(L," /nologo /c /Fo");
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,out) ) );
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,src) ) );
+                break;
+            default:
+                lua_pushstring(L,"");
                 break;
             }
             lua_concat(L,8);
@@ -458,7 +476,7 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
     }
     lua_pop(L,1); // sources
 
-    lua_pop(L,12); // outlist, binst, rootOutDir...relDir, cflags...includes
+    lua_pop(L,13); // outlist, binst, ctdefaults, rootOutDir...relDir, cflags...includes
 
     const int bottom = lua_gettop(L);
     assert( top == bottom );
@@ -1355,7 +1373,6 @@ int bs_runmoc(lua_State* L)
     return 1;
 }
 
-#if 1
 static void runmoc(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
@@ -1437,148 +1454,6 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
 
     // passes on one BS_SourceFiles
 }
-#else
-// old version, to delete
-static void runmoc(lua_State* L,int inst, int cls, int builtins)
-{
-    const int top = lua_gettop(L);
-
-    lua_createtable(L,0,0);
-    const int outlist = lua_gettop(L);
-    lua_pushinteger(L,BS_SourceFiles);
-    lua_setfield(L,outlist,"#kind");
-    lua_pushvalue(L,outlist);
-    lua_setfield(L,inst,"#out");
-
-    bs_getModuleVar(L,inst,"#dir");
-    const int absDir = lua_gettop(L);
-
-    lua_getfield(L,builtins,"#inst");
-    const int binst = lua_gettop(L);
-
-    lua_getfield(L,binst,"root_build_dir");
-    bs_getModuleVar(L,inst,"#rdir");
-    addPath(L,-2,-1);
-    lua_replace(L,-3);
-    lua_pop(L,1);
-    const int outDir = lua_gettop(L);
-
-    lua_getfield(L,binst,"moc_path");
-    const int app = lua_gettop(L);
-    if( lua_isnil(L,app) || strcmp(".",lua_tostring(L,app)) == 0 )
-    {
-        lua_pushstring(L,"moc");
-        lua_replace(L,app);
-    }else if( *lua_tostring(L,app) != '/' )
-    {
-        // relative path
-        addPath(L,absDir,app);
-        lua_replace(L,app);
-    }
-
-    lua_pushstring(L,"");
-    const int defines = lua_gettop(L);
-    lua_getfield(L,inst,"defines");
-    const int defs = lua_gettop(L);
-    size_t i;
-    for( i = 1; i <= lua_objlen(L,defs); i++ )
-    {
-        lua_rawgeti(L,defs,i);
-        lua_pushvalue(L,defines);
-        if( strstr(lua_tostring(L,-2),"\\\"") != NULL )
-            lua_pushfstring(L," \"-D %s\"", lua_tostring(L,-2)); // strings can potentially include whitespace, thus quotes
-        else
-            lua_pushfstring(L," -D %s", lua_tostring(L,-2));
-        lua_concat(L,2);
-        lua_replace(L,defines);
-        lua_pop(L,1); // def
-    }
-    lua_pop(L,1); // defs
-
-    lua_getfield(L,inst,"sources");
-    const int sources = lua_gettop(L);
-    int n = 0;
-    for( i = 1; i <= lua_objlen(L,sources); i++ )
-    {
-        lua_rawgeti(L,sources,i);
-        const int source = lua_gettop(L);
-        const int lang = guessLang(lua_tostring(L,source));
-
-        if( *lua_tostring(L,source) != '/' )
-        {
-            addPath(L,absDir,source);
-            lua_replace(L,source);
-        }
-
-        if( lang == BS_header )
-            // this file is automatically passed to the compiler over the deps chain; the user doesn't see it
-            lua_pushfstring(L,"%s/moc_%s.cpp",lua_tostring(L,outDir), bs_filename(lua_tostring(L,source)));
-        else
-        {
-            int len;
-            const char* name = bs_path_part(lua_tostring(L,source),BS_baseName,&len);
-            lua_pushlstring(L,name,len);
-            // this file has to be included at the bottom of the cpp file, so use the naming of the Qt documentation.
-            lua_pushfstring(L,"%s/%s.moc",lua_tostring(L,outDir), bs_filename(lua_tostring(L,-1)));
-            lua_replace(L,-2);
-        }
-        const int outFile = lua_gettop(L);
-
-        if( lang == BS_header )
-        {
-            lua_pushvalue(L,outFile);
-            lua_rawseti(L,outlist,++n);
-        }
-
-        // check if there is a {{source_dir}}/{{source_name_part}}_p.h and - if true - include it in the generated file
-        lua_pushstring(L,"{{source_dir}}/{{source_name_part}}_p.h");
-        bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
-        const int includePrivateHeader = bs_exists2(bs_global_buffer());
-        lua_pop(L,1);
-
-        lua_pushfstring(L, "%s %s -o %s%s", bs_denormalize_path(lua_tostring(L,app) ),
-                        bs_denormalize_path(lua_tostring(L,source) ),
-                        bs_denormalize_path(lua_tostring(L,outFile)),
-                        lua_tostring(L,defines));
-        if( includePrivateHeader && lang == BS_header )
-        {
-            lua_pushstring(L," -p {{source_dir}}");
-            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
-            lua_pushstring(L, bs_global_buffer());
-            lua_replace(L,-2);
-            lua_pushstring(L," -b {{source_name_part}}_p.h");
-            bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
-            lua_pushstring(L, bs_global_buffer());
-            lua_replace(L,-2);
-            lua_concat(L,3);
-        }
-        const int cmd = lua_gettop(L);
-
-        const time_t srcExists = bs_exists(lua_tostring(L,source));
-        const time_t outExists = bs_exists(lua_tostring(L,outFile));
-
-        if( !outExists || outExists < srcExists )
-        {
-            fprintf(stdout,"%s\n", lua_tostring(L,cmd));
-            fflush(stdout);
-            // only call if outfile is older than source
-            if( bs_exec(lua_tostring(L,cmd)) != 0 )
-            {
-                // stderr was already written to the console
-                lua_pushnil(L);
-                lua_error(L);
-            }
-        }
-        lua_pop(L,3); // cmd, source, outFile
-    }
-
-    lua_pop(L,7); // outlist absDir binst outDir defines app sources
-    const int bottom = lua_gettop(L);
-    assert( top == bottom );
-
-    // passes on one BS_SourceFiles
-}
-#endif
 
 static void runrcc(lua_State* L,int inst, int cls, int builtins)
 {

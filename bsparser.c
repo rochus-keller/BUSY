@@ -1747,6 +1747,49 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
     BS_END_LUA_FUNC(ctx);
 }
 
+static void set_defaults(BSParserContext* ctx, int n, int row, int col)
+{
+    BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
+    if( n != 2 )
+        error(ctx, row, col,"expecting two arguments" );
+
+    const int arg1 = lua_gettop(ctx->L) - 4 + 1;
+    const int arg2 = arg1 + 2;
+
+    lua_getfield(ctx->L,ctx->builtins,"CompilerType");
+    lua_getfield(ctx->L,arg1+1,"#kind");
+    lua_getfield(ctx->L,arg1+1,"#type");
+    if( !lua_equal(ctx->L,arg1+1,-3) &&
+            ( lua_tointeger(ctx->L,-2) != BS_BaseType || lua_tointeger(ctx->L,-1) != BS_symbol
+                || !isInEnum(ctx, -3, arg1) ) )
+        error(ctx, row, col,"first argument must be a CompilerType" );
+    lua_pop(ctx->L,3);
+
+    lua_getfield(ctx->L,ctx->builtins,"Config");
+    const int cls = lua_gettop(ctx->L);
+    lua_getfield(ctx->L,arg2+1,"#kind");
+    if( lua_tointeger(ctx->L,-1) != BS_ClassDecl || !isSameOrSubclass(ctx,cls, arg2+1) )
+        error(ctx, row, col,"second argument must be a Config instance");
+    lua_pop(ctx->L,2);
+
+    lua_getfield(ctx->L,ctx->builtins,"#inst");
+    const int binst = lua_gettop(ctx->L);
+
+    lua_getfield(ctx->L,binst,"#ctdefaults");
+    assert( lua_istable(ctx->L,-1) );
+    const int ctdefs = lua_gettop(ctx->L);
+
+    lua_pushvalue(ctx->L, arg1 );
+    lua_pushvalue(ctx->L, arg2 );
+    lua_rawset(ctx->L,ctdefs);
+
+    lua_pop(ctx->L,2);
+
+    lua_pushnil(ctx->L); // no return value and type
+    lua_pushnil(ctx->L);
+    BS_END_LUA_FUNC(ctx);
+}
+
 static int checkListType(BSParserContext* ctx, int n, int t)
 {
     lua_getfield(ctx->L,-1,"#kind");
@@ -2157,6 +2200,9 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
         break;
     case 17:
         modname(ctx,n,lpar.loc.row, lpar.loc.col);
+        break;
+    case 18:
+        set_defaults(ctx,n,lpar.loc.row, lpar.loc.col);
         break;
     default:
         error(ctx, lpar.loc.row, lpar.loc.col,"procedure not yet implemented" );

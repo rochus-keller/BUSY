@@ -1254,6 +1254,7 @@ static void genCommon(lua_State* L, int inst, int builtins, int kind, FILE* out 
 
 static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSourceSet )
 {
+    // TODO should we consider #ctdefaults here?
     const int top = lua_gettop(L);
     lua_getfield(L,inst,"lib_type");
     const int lib_type = isSourceSet ? BS_StaticLib :
@@ -1263,7 +1264,6 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
     const char* text =
             "QT -= core gui\n"
             "TEMPLATE = lib\n"
-            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
             "CONFIG -= qt\n"
             "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n"
             "CONFIG -= debug_and_release debug_and_release_target\n";
@@ -1323,6 +1323,7 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
 
 static void genExe(lua_State* L, int inst, int builtins, FILE* out )
 {
+    // TODO should we consider #ctdefaults here?
     const int top = lua_gettop(L);
     const char* text =
             "QT -= core gui\n"
@@ -1331,7 +1332,6 @@ static void genExe(lua_State* L, int inst, int builtins, FILE* out )
                                   // unfortunately it adds /subsys:console, so both a console and a window open
                                   // if ldflags also include /subsys:win; TODO to avoid we need a new field in Executable
             "CONFIG -= qt\n"
-            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
             "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n"
             "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
@@ -1381,7 +1381,6 @@ static void genAux(lua_State* L, int inst, FILE* out )
     const char* text =
             "QT -= core gui\n"
             "TEMPLATE = aux\n"
-            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
             "CONFIG -= qt\n"
             "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
@@ -1392,7 +1391,6 @@ static void genMoc(lua_State* L, int inst, FILE* out )
     const char* text =
             "QT -= core gui\n"
             "TEMPLATE = aux\n"
-            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
             "CONFIG -= qt\n"
             "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
@@ -1441,7 +1439,6 @@ static void genRcc(lua_State* L, int inst, FILE* out )
     const char* text =
             "QT -= core gui\n"
             "TEMPLATE = aux\n"
-            "CONFIG(debug, debug|release) { DEFINES += _DEBUG QT_DEBUG }\n"
             "CONFIG -= qt\n"
             "CONFIG -= debug_and_release debug_and_release_target\n";
     fwrite(text,1,strlen(text),out);
@@ -1549,6 +1546,28 @@ static int genproduct(lua_State* L) // arg: prodinst
     const int bottom = lua_gettop(L);
     assert(top == bottom);
     return 0;
+}
+
+static int tryrun(lua_State* L, int builtins, const char* cmd)
+{
+    lua_getfield(L,builtins,"#inst");
+    lua_getfield(L,-1,"host_os");
+    lua_replace(L,-2);
+    const int os = lua_gettop(L);
+
+    lua_pushstring(L,cmd);
+    if( strcmp(lua_tostring(L,os),"win32")==0 ||
+            strcmp(lua_tostring(L,os),"msdos")==0 ||
+            strcmp(lua_tostring(L,os),"winrt")==0 )
+        lua_pushstring(L," 2> nul");
+    else
+        lua_pushstring(L," 2>/dev/null");
+    lua_concat(L,2);
+    const int success = bs_exec(lua_tostring(L,-1)) == 0;
+
+    lua_pop(L,2);
+
+    return success;
 }
 
 int bs_genQmake(lua_State* L) // args: root module def, list of productinst
@@ -1686,7 +1705,7 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     else
     {
         const char* cmd = bs_denormalize_path(lua_tostring(L,mocPath));
-        if( bs_exec(cmd) != 0 )
+        if( !tryrun(L,builtins,cmd) )
             cmd = defaultPath;
         lua_pushstring(L,cmd);
         lua_replace(L,mocPath);
@@ -1709,7 +1728,7 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     else
     {
         const char* cmd = bs_denormalize_path(lua_tostring(L,rccPath));
-        if( bs_exec(cmd) != 0 )
+        if( !tryrun(L,builtins,cmd) )
             cmd = defaultRccPath;
         lua_pushstring(L,cmd);
         lua_replace(L,rccPath);
