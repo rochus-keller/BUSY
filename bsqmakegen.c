@@ -674,21 +674,29 @@ static void renderDep(lua_State* L, int inst, int item, FILE* out)
     s_sourceCount++;
 }
 
-static int addSources(lua_State* L, int inst, FILE* out)
+static int addSources(lua_State* L, int inst, FILE* out, int withHeaderDeps)
 {
     const int top = lua_gettop(L);
-    const char* text = "SOURCES +="; // TODO: OBJECTIVE_SOURCES for .mm
-    fwrite(text,1,strlen(text),out);
 
-    s_sourceCount = 0;
-    iterateDeps(L,inst,BS_SourceFiles, 0,out,renderDep);
-    int n = s_sourceCount; // RISK this works as long we don't use threads
+    int n = 0;
+    if( withHeaderDeps )
+    {
+        const char* text = "SOURCES +="; // NOTE: apparently separate OBJECTIVE_SOURCES for *.mm not necessary
+        fwrite(text,1,strlen(text),out);
+
+        s_sourceCount = 0;
+        iterateDeps(L,inst,BS_SourceFiles, 0,out,renderDep);
+        n = s_sourceCount; // RISK this works as long we don't use threads
+    }
 
     lua_getfield(L,inst,"sources");
     const int sources = lua_gettop(L);
 
     bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
+
+    bs_getModuleVar(L,inst,"#fsrdir");
+    const int relDir = lua_gettop(L);
 
     size_t i;
     const size_t len = lua_objlen(L,sources);
@@ -700,7 +708,16 @@ static int addSources(lua_State* L, int inst, FILE* out)
 
         if( *lua_tostring(L,file) != '/' )
         {
+#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
+            lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
+            lua_pushstring(L,"$$root_source_dir");
+            addPath(L,relDir,file);
+            lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
+            lua_replace(L,-2);
+            lua_concat(L,3);
+#else
             addPath(L,absDir,file);
+#endif
             lua_replace(L,file);
         }
 
@@ -712,7 +729,7 @@ static int addSources(lua_State* L, int inst, FILE* out)
         lua_pop(L,1); // file
     }
 
-    lua_pop(L,2); // sources, absDir
+    lua_pop(L,3); // sources, absDir, relDir
 
 #if 0 // doesn't work
     const char* text2 = "\n\nHEADERS += $$files(*.h)\n";
@@ -725,6 +742,8 @@ static int addSources(lua_State* L, int inst, FILE* out)
     return n;
 }
 
+#if 0
+// obsolete, replaced by addSources(..,0)
 static void addSources2(lua_State* L, int inst, FILE* out)
 {
     const int top = lua_gettop(L);
@@ -735,6 +754,9 @@ static void addSources2(lua_State* L, int inst, FILE* out)
     bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
+    bs_getModuleVar(L,inst,"#fsrdir");
+    const int relDir = lua_gettop(L);
+
     size_t i;
     for( i = 1; i <= lua_objlen(L,sources); i++ )
     {
@@ -743,7 +765,16 @@ static void addSources2(lua_State* L, int inst, FILE* out)
 
         if( *lua_tostring(L,file) != '/' )
         {
+#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
+            lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
+            lua_pushstring(L,"$$root_source_dir");
+            addPath(L,relDir,file);
+            lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
+            lua_replace(L,-2);
+            lua_concat(L,3);
+#else
             addPath(L,absDir,file);
+#endif
             lua_replace(L,file);
         }
 
@@ -755,11 +786,12 @@ static void addSources2(lua_State* L, int inst, FILE* out)
         lua_pop(L,1); // file
     }
 
-    lua_pop(L,2); // sources, absDir
+    lua_pop(L,3); // sources, absDir, relDir
 
     const int bottom = lua_gettop(L);
     assert( top ==  bottom);
 }
+#endif
 
 static void passOnDep(lua_State* L, int inst, int item, FILE* out)
 {
@@ -900,6 +932,9 @@ static void addIncludes(lua_State* L, int inst, int builtins, FILE* out, int hea
     bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
 
+    bs_getModuleVar(L,inst,"#fsrdir");
+    const int relDir = lua_gettop(L);
+
     lua_getfield(L,builtins,"#inst");
     lua_getfield(L,-1,"root_build_dir");
     lua_replace(L,-2);
@@ -914,7 +949,16 @@ static void addIncludes(lua_State* L, int inst, int builtins, FILE* out, int hea
         if( *lua_tostring(L,include) != '/' )
         {
             // relative path
+#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
+            lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
+            lua_pushstring(L,"$$root_source_dir");
+            addPath(L,relDir,include);
+            lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
+            lua_replace(L,-2);
+            lua_concat(L,3);
+#else
             addPath(L,absDir,include);
+#endif
             lua_replace(L,include);
         }
         if( strncmp(lua_tostring(L,rootBuildDir),lua_tostring(L,include),rbdlen) == 0 )
@@ -936,7 +980,7 @@ static void addIncludes(lua_State* L, int inst, int builtins, FILE* out, int hea
         lua_pop(L,1); // include
     }
 
-    lua_pop(L,3); // includes, absDir, rootBuildDir
+    lua_pop(L,4); // includes, absDir, relDir, rootBuildDir
 
     const int bottom = lua_gettop(L);
     assert( top ==  bottom);
@@ -1054,16 +1098,16 @@ static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out
     fwrite(text,1,strlen(text),out);
 
     lua_getfield(L,builtins,"#inst");
-    const int binst = lua_gettop(L);
-    const int ts = bs_getToolchain(L, binst );
-    lua_pop(L,1); // binst
+    lua_getfield(L,-1,"target_os");
+    const int isLinux = strcmp(lua_tostring(L,-1),"linux") == 0;
+    lua_pop(L,2); // binst, target_os
 
     if( kind == BS_DynamicLib )
     {
         iterateDeps(L,inst,BS_ObjectFiles,1,out,renderDep);
     }
 
-    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && ( ts == BS_gcc || ts == BS_clang ) )
+    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && isLinux )
     {
         // NOTE: image_sources and gui_sources depend on each other; since SourceSets are static libs here
         // the linker complains. The order cannot be fixed since both orders have missing dependencies.
@@ -1086,7 +1130,7 @@ static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out
         iterateDeps(L,inst,BS_SourceSetLib,0,out,renderDep);
     }
 
-    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && ( ts == BS_gcc || ts == BS_clang ) )
+    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && isLinux )
     {
         fwrite(s_listFill1,1,strlen(s_listFill1),out);
         const char* text3 = "-Wl,--end-group\"";
@@ -1164,6 +1208,9 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
         bs_getModuleVar(L,inst,"#dir");
         const int absDir = lua_gettop(L);
 
+        bs_getModuleVar(L,inst,"#fsrdir");
+        const int relDir = lua_gettop(L);
+
         lua_getfield(L,inst,"lib_dirs");
         const int ldirs = lua_gettop(L);
 
@@ -1174,7 +1221,16 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
             if( *lua_tostring(L,-1) != '/' )
             {
                 // relative path
+#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
+                lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
+                lua_pushstring(L,"$$root_source_dir");
+                addPath(L,relDir,path);
+                lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
+                lua_replace(L,-2);
+                lua_concat(L,3);
+#else
                 addPath(L,absDir,path);
+#endif
                 lua_replace(L,path);
             }
             if(ismsvc)
@@ -1202,8 +1258,18 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
             fwrite("\"",1,1,out);
             lua_pop(L,2); // name, string
         }
-        lua_pop(L,3); // ldirs, absDir, lnames
-        // TODO: frameworks, def_file, lib_files
+        lua_getfield(L,inst,"frameworks");
+        const int fworks = lua_gettop(L);
+        for( i = 1; i <= lua_objlen(L,fworks); i++ )
+        {
+            fwrite(s_listFill1,1,strlen(s_listFill1),out);
+            lua_rawgeti(L,fworks,i);
+            lua_pushfstring(L,"-framework %s\"", lua_tostring(L,-1));
+            fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
+            lua_pop(L,2); // name, string
+        }
+        lua_pop(L,5); // ldirs, absDir, relDir, lnames, fworks
+        // TODO: def_file, lib_files
     }
 
 
@@ -1213,6 +1279,9 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
 
 static void genCommon(lua_State* L, int inst, int builtins, int kind, FILE* out )
 {
+    // NOTE we don't consider #ctdefaults (i.e. set_defaults) here, since setting
+    // these low-level, generic stuff is the business of qmake
+
     fwrite("\n",1,1,out);
     addDefines(L,inst,out,1);
     fwrite("\n\n",1,2,out);
@@ -1222,16 +1291,22 @@ static void genCommon(lua_State* L, int inst, int builtins, int kind, FILE* out 
     fwrite("\n\n",1,2,out);
 
     fwrite("\n",1,1,out);
-    const int nSources = addSources(L,inst,out);
+    const int nSources = addSources(L,inst,out,1);
     if( nSources == 0 )
     {
+        fwrite(s_listFill1,1,strlen(s_listFill1),out);
+#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
+        lua_pushstring(L,"$$root_project_dir/dummy.c\"");
+        fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
+        lua_pop(L,1);
+#else
         lua_getfield(L,builtins,"#inst");
         lua_getfield(L,-1,"root_build_dir");
         lua_pushfstring(L,"%s/dummy.c\"",lua_tostring(L,-1));
-        fwrite(s_listFill1,1,strlen(s_listFill1),out);
         const char* path = bs_denormalize_path(lua_tostring(L,-1));
         fwrite(path,1,strlen(path),out);
         lua_pop(L,3);
+#endif
     }
     fwrite("\n\n",1,2,out);
 
@@ -1254,7 +1329,6 @@ static void genCommon(lua_State* L, int inst, int builtins, int kind, FILE* out 
 
 static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSourceSet )
 {
-    // TODO should we consider #ctdefaults here?
     const int top = lua_gettop(L);
     lua_getfield(L,inst,"lib_type");
     const int lib_type = isSourceSet ? BS_StaticLib :
@@ -1323,7 +1397,6 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
 
 static void genExe(lua_State* L, int inst, int builtins, FILE* out )
 {
-    // TODO should we consider #ctdefaults here?
     const int top = lua_gettop(L);
     const char* text =
             "QT -= core gui\n"
@@ -1331,6 +1404,7 @@ static void genExe(lua_State* L, int inst, int builtins, FILE* out )
             "CONFIG += console\n" // avoid that qmake adds /subsys:win on Windows;
                                   // unfortunately it adds /subsys:console, so both a console and a window open
                                   // if ldflags also include /subsys:win; TODO to avoid we need a new field in Executable
+            "CONFIG -= app_bundle\n"
             "CONFIG -= qt\n"
             "CONFIG += unversioned_libname skip_target_version_ext unversioned_soname\n"
             "CONFIG -= debug_and_release debug_and_release_target\n";
@@ -1401,7 +1475,7 @@ static void genMoc(lua_State* L, int inst, FILE* out )
 
     const char* text7 = "MOC_SOURCES +=";
     fwrite(text7,1,strlen(text7),out);
-    addSources2(L, inst, out);
+    addSources(L, inst, out,0);
     fwrite("\n\n",1,2,out);
 
     const char* text3 = "compiler.commands = $$lua_path "
@@ -1445,7 +1519,7 @@ static void genRcc(lua_State* L, int inst, FILE* out )
 
     const char* text7 = "RCC_SOURCES +=";
     fwrite(text7,1,strlen(text7),out);
-    addSources2(L, inst, out);
+    addSources(L, inst, out,0);
     fwrite("\n\n",1,2,out);
 
     const char* text3 = "compiler.commands = "
@@ -1669,7 +1743,7 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
             "# note that there is a possibly hidden .qmake.conf which includes this file\n"
             "root_source_dir = \"";
     fwrite(text6,1,strlen(text6),out);
-    const int res = bs_makeRelative(lua_tostring(L,buildDir),lua_tostring(L,sourceDir));
+    int res = bs_makeRelative(lua_tostring(L,buildDir),lua_tostring(L,sourceDir));
     if( res == BS_OK )
     {
         fwrite(bs_global_buffer(),1,strlen(bs_global_buffer()),out);
@@ -1681,14 +1755,22 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
         fwrite("\"\n",1,2,out);
     }
 
-    if( bs_thisapp() == BS_OK )
+    const char* text2 = "lua_path = \"";
+    fwrite(text2,1,strlen(text2),out);
+    bs_thisapp2(L);
+    const int thisapp = lua_gettop(L);
+    res = bs_makeRelative(lua_tostring(L,buildDir), lua_tostring(L,thisapp));
+    if( res == BS_OK )
     {
-        const char* text2 = "lua_path = \"";
-        fwrite(text2,1,strlen(text2),out);
-        const char* path = bs_denormalize_path(bs_global_buffer());
-        fwrite(path,1,strlen(path),out);
-        fwrite("\"\n",1,2,out);
+        lua_pushstring(L,"$$root_project_dir/");
+        lua_pushstring(L, bs_global_buffer());
+        lua_concat(L,2);
+        lua_replace(L,thisapp);
     }
+    const char* path = bs_denormalize_path(lua_tostring(L,thisapp));
+    fwrite(path,1,strlen(path),out);
+    fwrite("\"\n",1,2,out);
+    lua_pop(L,1); // thisapp
 
     const char* text5 = "moc_path = \"";
     fwrite(text5,1,strlen(text5),out);

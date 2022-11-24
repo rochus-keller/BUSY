@@ -461,6 +461,9 @@ BSCompiler bs_host_compiler()
     res.name = "bor";   // - Borland/Turbo C++
 #elif defined(Q_CC_WAT)
     res.name = "wat";   // - Watcom C++
+#elif defined(Q_CC_CLANG)
+    res.name = "clang";   // - C++ front-end for the LLVM compiler
+    res.ver = Q_CC_CLANG;
 #elif defined(Q_CC_GNU)
     res.name = "gcc";   // - GNU C++
     res.ver = Q_CC_GNU;
@@ -495,9 +498,6 @@ BSCompiler bs_host_compiler()
     res.name = "ghs";   // - Green Hills Optimizing C++ Compilers
 #elif defined(Q_CC_RVCT)
     res.name = "rvct";   // - ARM Realview Compiler Suite
-#elif defined(Q_CC_CLANG)
-    res.name = "clang";   // - C++ front-end for the LLVM compiler
-    res.ver = Q_CC_CLANG;
 #else
 #error "unknown compiler"
 #endif

@@ -39,7 +39,7 @@ typedef enum BSOutKind { // #kind
 extern int bs_run(lua_State* L);
 extern int bs_precheck(lua_State* L);
 extern int bs_createBuildDirs(lua_State* L);
-extern int bs_thisapp2(lua_State *L);
+extern int bs_thisapp2(lua_State *L); // pushes a path on stack or throws error
 
 // helper:
 extern int bs_getModuleVar(lua_State* L, int inst, const char* name );

@@ -1,6 +1,6 @@
 ## Welcome to the BUSY build system
 
-BUSY (for *BU*ild *SY*stem) is a lean, cross-platform build system for the GCC, CLANG and MSVC toolchains, with very little system requirements and easy bootsrapping.
+BUSY (for *BU*ild *SY*stem) is a lean, cross-platform build system for the GCC, Clang and MSVC toolchains, with very little system requirements and easy bootsrapping.
 
 Compared to other build systems like CMake, QMake, Meson or GN, BUSY is characterized by a **statically typed** build specification language, and by the possibility to build a project directly from scratch without any further requirements to the host system; BUSY is so lean that it is even suited to be directly integrated with the source tree of a project. 
 
@@ -163,11 +163,10 @@ The current BUSY version is feature complete for the use with [LeanQt](https://g
 - [x] Support C as well as Pascal flair syntax versions
 - [x] Able to directly run the build (i.e. independently of Make, NMake or Ninja)
 - [x] Language specification
-- [x] Make a lean Qt source tree version using BUSY
-- [x] Check and adapt more concepts from GN as need be
+- [x] Make a lean Qt source tree version using BUSY (see [LeanQt](https://github.com/rochus-keller/LeanQt))
+- [x] QMake backend (tested with LeanQt on Linux, Windows and Mac with QtCreator 3 and 4)
 - [ ] Tutorials
 - [ ] Make a Mono CLR source tree version using BUSY
-- [x] Implement QMake backend (tested with LeanQt on Linux)
 - [ ] Implement Ninja backend
 - [ ] Implement CMake backend
 
