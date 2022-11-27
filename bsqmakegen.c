@@ -731,10 +731,6 @@ static int addSources(lua_State* L, int inst, FILE* out, int withHeaderDeps)
 
     lua_pop(L,3); // sources, absDir, relDir
 
-#if 0 // doesn't work
-    const char* text2 = "\n\nHEADERS += $$files(*.h)\n";
-    fwrite(text2,1,strlen(text2),out);
-#endif
 
     const int bottom = lua_gettop(L);
     assert( top ==  bottom);
@@ -742,56 +738,28 @@ static int addSources(lua_State* L, int inst, FILE* out, int withHeaderDeps)
     return n;
 }
 
-#if 0
-// obsolete, replaced by addSources(..,0)
-static void addSources2(lua_State* L, int inst, FILE* out)
+static void addHeaders(lua_State* L, int inst, FILE* out)
 {
     const int top = lua_gettop(L);
 
-    lua_getfield(L,inst,"sources");
-    const int sources = lua_gettop(L);
-
-    bs_getModuleVar(L,inst,"#dir");
-    const int absDir = lua_gettop(L);
-
+#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
     bs_getModuleVar(L,inst,"#fsrdir");
     const int relDir = lua_gettop(L);
 
-    size_t i;
-    for( i = 1; i <= lua_objlen(L,sources); i++ )
-    {
-        lua_rawgeti(L,sources,i);
-        const int file = lua_gettop(L);
-
-        if( *lua_tostring(L,file) != '/' )
-        {
-#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
-            lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
-            lua_pushstring(L,"$$root_source_dir");
-            addPath(L,relDir,file);
-            lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
-            lua_replace(L,-2);
-            lua_concat(L,3);
+    lua_pushfstring(L, "HEADERS += $$files(../$$root_source_dir%s/*.h)", lua_tostring(L,relDir)+1 ); // +1: remove '.' from './'
 #else
-            addPath(L,absDir,file);
+    bs_getModuleVar(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    lua_pushfstring(L, "HEADERS += $$files(%s/*.h)", bs_denormalize_path(lua_tostring(L,absDir)) );
 #endif
-            lua_replace(L,file);
-        }
+    fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
 
-        const char* str = bs_denormalize_path(lua_tostring(L,file));
-        fwrite(s_listFill1,1,strlen(s_listFill1),out);
-        fwrite(str,1,strlen(str),out);
-        fwrite("\"",1,1,out);
-
-        lua_pop(L,1); // file
-    }
-
-    lua_pop(L,3); // sources, absDir, relDir
+    lua_pop(L,2); // relDir, fstring
 
     const int bottom = lua_gettop(L);
     assert( top ==  bottom);
 }
-#endif
 
 static void passOnDep(lua_State* L, int inst, int item, FILE* out)
 {
@@ -1288,6 +1256,10 @@ static void genCommon(lua_State* L, int inst, int builtins, int kind, FILE* out 
 
     fwrite("\n",1,1,out);
     addIncludes(L,inst, builtins,out,1);
+    fwrite("\n\n",1,2,out);
+
+    fwrite("\n",1,1,out);
+    addHeaders(L,inst,out);
     fwrite("\n\n",1,2,out);
 
     fwrite("\n",1,1,out);
