@@ -477,6 +477,7 @@ static const luaL_Reg bslib[] = {
     {"getcwd",      bs_getcwd},
     {"thisapp",      thisapp},
     {"moc", bs_runmoc},
+    {"moc_name", bs_mocname},
     {"run", bs_run},
     {"cpu", host_cpu },
     {"os", host_os },

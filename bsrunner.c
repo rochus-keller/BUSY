@@ -820,7 +820,11 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
                 lua_pushfstring(L,"llvm-lib /nologo /out:\"%s\" @\"%s\"",
                             bs_denormalize_path(lua_tostring(L,out)),
                             bs_denormalize_path(lua_tostring(L,rsp)) );
-            else
+            else if( mac )
+            {
+                useRsp = 0; // dito, see above
+                lua_pushfstring(L,"ar r \"%s\" ", bs_denormalize_path(lua_tostring(L,out)) );
+            }else
                 lua_pushfstring(L,"ar r \"%s\" @\"%s\"",
                                 bs_denormalize_path(lua_tostring(L,out)),
                                 bs_denormalize_path(lua_tostring(L,rsp)) );
@@ -1278,6 +1282,33 @@ static void runforeach(lua_State* L,int inst, int cls, int builtins)
     assert( top == bottom );
 }
 
+int bs_mocname(lua_State* L)
+{
+    // this is the version callable from Lua code used by the qmake generator
+    enum Params { INFILE = 1 };
+
+    BSPathStatus res = bs_normalize_path2(lua_tostring(L,INFILE));
+    if( res != BS_OK )
+        luaL_error(L,"invalid file: %s", lua_tostring(L,INFILE) );
+    lua_pushstring(L, bs_global_buffer() );
+    const int source = lua_gettop(L);
+
+    // NOTE: compiler.output_function only needs the filename without path! If a path is provided the generated
+    // Makefile doesn't work anymore
+    const int lang = bs_guessLang(lua_tostring(L,source));
+
+    int len;
+    const char* name = bs_path_part(lua_tostring(L,source),BS_baseName,&len);
+    lua_pushlstring(L,name,len);
+    if( lang == BS_header )
+        lua_pushfstring(L,"moc_%s.cpp",lua_tostring(L,-1));
+    else
+        lua_pushfstring(L,"%s.moc",lua_tostring(L,-1));
+    lua_replace(L,-2);
+
+    return 1;
+}
+
 int bs_runmoc(lua_State* L)
 {
     // this is the version callable from Lua code used by the qmake generator
@@ -1369,7 +1400,7 @@ int bs_runmoc(lua_State* L)
     lua_replace(L,source);
     lua_pop(L,4); // source, outDir, defines, outFile, cmd
 
-    assert( numOfArgs+1 == lua_gettop(L));
+    assert( numOfArgs+1 == (size_t)lua_gettop(L));
     return 1;
 }
 
