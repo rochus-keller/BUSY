@@ -2798,6 +2798,13 @@ int bs_add_path(lua_State* L, int lhs, int rhs)
         return 1; // right side cannot be an absolute path
     int llen = strlen(lstr);
 
+    if( strcmp(lstr,".") == 0 )
+    {
+        // if lhs="." then result is rhs
+        lua_pushvalue(L,rhs);
+        return 0;
+    }
+
     if( strncmp(rstr,"..", 2 ) == 0 )
     {
         // TODO: this treats root windows paths like unix paths, i.e. //c: + ../x becomes //x
