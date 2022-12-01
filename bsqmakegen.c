@@ -937,7 +937,7 @@ static void addIncludes(lua_State* L, int inst, int builtins, FILE* out, int hea
             size_t j;
             for(j=n; j>0; j--)
             {
-                lua_pushfstring(L,"$$root_build_dir/%s", lua_tostring(L, lua_gettop(L) - n + 1));
+                lua_pushfstring(L,"$$root_build_dir/%s", lua_tostring(L, lua_gettop(L) - j + 1));
                 renderQuotedPath(L,-1,out);
                 lua_pop(L,1);
             }
