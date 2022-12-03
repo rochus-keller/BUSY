@@ -1812,9 +1812,12 @@ static void set_defaults(BSParserContext* ctx, int n, int row, int col)
     assert( lua_istable(ctx->L,-1) );
     const int ctdefs = lua_gettop(ctx->L);
 
-    lua_pushvalue(ctx->L, arg1 );
-    lua_pushvalue(ctx->L, arg2 );
-    lua_rawset(ctx->L,ctdefs);
+    if( !ctx->skipMode )
+    {
+        lua_pushvalue(ctx->L, arg1 );
+        lua_pushvalue(ctx->L, arg2 );
+        lua_rawset(ctx->L,ctdefs);
+    }
 
     lua_pop(ctx->L,2);
 
