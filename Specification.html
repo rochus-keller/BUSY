@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-11-23</div>
+2022-12-05</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -829,7 +829,7 @@ Moc</h4>
 <div style="margin-left:81px"><span class="label"><a name="12626">3.2.5.3.1</a></span>
 <b>Main</b>: <a href="#11885">sources</a>, <a href="#11741">defines</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12634">3.2.5.3.2</a></span>
-Calls the Qt moc executable to which the predeclared moc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked.</div>
+Calls the Qt <b>moc</b> executable from the directory given by the moc_path variable and generates the corresponding cpp file. If moc_path is not set (i.e. points to '.') <b>moc</b> is called without a path prefix. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked.</div>
 <div style="margin-left:81px"><span class="label"><a name="12642">3.2.5.3.3</a></span>
 Note that usually Q_OBJECT marked classes are in header files; if instead a .cpp file is added to <a href="#11885">sources</a> a c++ file with the same name but the suffix .moc is generated, which has to be included at the bottom of the .cpp file (see <a href="https://doc.qt.io/qt-5/moc.html"><u>the original Qt moc documentation</u></a> for more information).</div>
 <h4 style="margin-left:63px"><span class="label"><a name="12635">3.2.5.4</a></span>
@@ -837,7 +837,7 @@ Note that usually Q_OBJECT marked classes are in header files; if instead a .cp
 <div style="margin-left:81px"><span class="label"><a name="12636">3.2.5.4.1</a></span>
 <b>Main</b>: <a href="#11885">sources</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12637">3.2.5.4.2</a></span>
-Calls the Qt rcc executable to which the predeclared rcc_path variable points and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked (see <a href="https://doc.qt.io/qt-5/rcc.html"><u>the original Qt rcc documentation</u></a> for more information).</div>
+Calls the Qt <b>rcc</b> executable from the directory given by the rcc_path variable and generates the corresponding cpp file. If rcc_path is not set (i.e. points to '.') <b>rcc</b> is called without a path prefix. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked (see <a href="https://doc.qt.io/qt-5/rcc.html"><u>the original Qt rcc documentation</u></a> for more information).</div>
 <h4 style="margin-left:63px"><span class="label"><a name="11893">3.2.5.5</a></span>
 <b>Copy</b></h4>
 <div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.5.1</a></span>
@@ -872,11 +872,13 @@ cflags are compiler flags passed to all invocations of the C, C++, Objective C, 
 Each element of the list is passed verbatim to the compiler in charge, i.e. cflags doesn't absctract away specific compiler command line syntax.</div>
 <div style="margin-left:45px"><span class="label"><a name="11700">4.2.4</a></span>
 To target one of these variants individually, use <a href="#11703">cflags_c</a>, <a href="#11705">cflags_cc</a>, <a href="#11707">cflags_objc</a>, and <a href="#11709">cflags_objcc</a>, respectively. These variant-specific versions of cflags* will be appended on the compiler command line after "cflags".</div>
-<div style="margin-left:45px"><span class="label"><a name="11711">4.2.5</a></span>
-Order of application:</div>
-<div style="margin-left:63px"><span class="label"><a name="11714">4.2.5.1</a></span>
+<h4 style="margin-left:45px"><span class="label"><a name="11711">4.2.5</a></span>
+Order of application:</h4>
+<div style="margin-left:63px"><span class="label"><a name="12818">4.2.5.1</a></span>
+TODO: check</div>
+<div style="margin-left:63px"><span class="label"><a name="11714">4.2.5.2</a></span>
 Those set on the current target (not in a config).</div>
-<div style="margin-left:63px"><span class="label"><a name="11715">4.2.5.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="11715">4.2.5.3</a></span>
 Those set on the <a href="#11812">configs</a> on the product in order that the configs appear in the list. </div>
 <h4 style="margin-left:27px"><span class="label"><a name="11703">4.3</a></span>
 cflags_c</h4>
@@ -937,24 +939,26 @@ deps</h4>
 <div style="margin-left:45px"><span class="label"><a name="11832">4.10.1</a></span>
 <b>deps: Product[]</b></div>
 <div style="margin-left:45px"><span class="label"><a name="11833">4.10.2</a></span>
-Specifies compile-time dependencies of a product. Such dependencies are propagated up the dependency tree and linked to dependent products, but do not grant the ability to include headers from the dependency. </div>
-<h4 style="margin-left:45px"><span class="label"><a name="11834">4.10.3</a></span>
+The deps field specifies compile-time dependencies of a Product instance. Products and dependencies must form a tree; cycles are not allowed. </div>
+<div style="margin-left:45px"><span class="label"><a name="12817">4.10.3</a></span>
+The dependency tree is processed depth-first. When processed, the results of each dependent Product instance are propagated up the dependency tree.</div>
+<h4 style="margin-left:45px"><span class="label"><a name="11834">4.10.4</a></span>
 <a href=""><b>D</b></a><b>etails of dependency propagation</b></h4>
-<div style="margin-left:63px"><span class="label"><a name="12668">4.10.3.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12668">4.10.4.1</a></span>
 The results of <a href="#11633">Executable</a>, <a href="#11662">Library</a>, <a href="#11647">SourceSet</a>, <a href="#11671">Group</a>, <a href="#12625">Moc</a> and <a href="#12635">Rcc</a> will be propagated up the dependency tree.</div>
-<div style="margin-left:63px"><span class="label"><a name="12670">4.10.3.2</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12670">4.10.4.2</a></span>
 <a href="#11671">Group</a> is special in that it just passes on all results of its dependencies.</div>
-<div style="margin-left:63px"><span class="label"><a name="12671">4.10.3.3</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12671">4.10.4.3</a></span>
 <a href="#11647">SourceSet</a> consumes sources from its dependencies and propagates object files up the dependency tree; object files and libraries from its dependencies are passed through.</div>
-<div style="margin-left:63px"><span class="label"><a name="12672">4.10.3.4</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12672">4.10.4.4</a></span>
 <a href="#11662">Library</a> consumes sources, object files and libraries from its dependencies and passes the resulting library up the dependency tree.</div>
-<div style="margin-left:63px"><span class="label"><a name="12673">4.10.3.5</a></span>
-<a href="#11633">Executable</a> consumes sources, object files and libraries from its dependencies and passes the resulting executable up the dependency tree.</div>
-<div style="margin-left:63px"><span class="label"><a name="12674">4.10.3.6</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12673">4.10.4.5</a></span>
+<a href="#11633">Executable</a> consumes sources, object files and librarijes from its dependencies and passes the resulting executable up the dependency tree.</div>
+<div style="margin-left:63px"><span class="label"><a name="12674">4.10.4.6</a></span>
 <a href="#12625">Moc</a> and <a href="#12635">Rcc</a> don't consume or pass through anything from their dependencies, but pass the resulting source files up the dependency tree.</div>
-<div style="margin-left:63px"><span class="label"><a name="12677">4.10.3.7</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12677">4.10.4.7</a></span>
 <a href="#11893">Copy</a> includes the file types listed in <a href="#12679">use_deps</a> from its dependencies in its source list, but doesn't pass anything up the dependency tree.</div>
-<div style="margin-left:63px"><span class="label"><a name="12675">4.10.3.8</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12675">4.10.4.8</a></span>
 <a href="#11679">LuaScript</a>, <a href="#11681">LuaScriptForeach</a> and <a href="#12590">Message</a> don't consume or pass through anything from their dependencies.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11825">4.11</a></span>
 frameworks</h4>
@@ -1203,11 +1207,11 @@ The path of the source tree root directory; either a default value or an explici
 <div style="margin-left:27px"><span class="label"><a name="12632">6.10</a></span>
 <b>var moc_path: path</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12652">6.10.1</a></span>
-initialized with '.' which translates to calling moc found on the search path or halting with error. Any other relative path than '.' is illegal.</div>
+The file system directory path where the moc executable is supposed to be.</div>
 <div style="margin-left:27px"><span class="label"><a name="12633">6.11</a></span>
 <b>var rcc_path: path</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12653">6.11.1</a></span>
-initialized with '.' which translates to calling rcc found on the search path or halting with error.</div>
+The file system directory path where the rcc executable is supposed to be.</div>
 <div style="margin-left:27px"><span class="label"><a name="11927">6.12</a></span>
 <b>var target_cpu: CpuType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12646">6.12.1</a></span>

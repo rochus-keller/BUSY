@@ -1795,10 +1795,13 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
         luaL_error(L,"moc_path cannot be relative: %s", lua_tostring(L,mocPath));
     else
     {
-        const char* cmd = bs_denormalize_path(lua_tostring(L,mocPath));
+        lua_pushfstring(L,"%s/moc", bs_denormalize_path(lua_tostring(L,mocPath)));
+        const char* cmd = lua_tostring(L,-1);
         if( !tryrun(L,builtins,cmd) )
-            cmd = defaultPath;
-        lua_pushstring(L,cmd);
+        {
+            lua_pop(L,1);
+            lua_pushstring(L,defaultPath);
+        }
         lua_replace(L,mocPath);
     }
     fwrite(lua_tostring(L,mocPath),1,lua_objlen(L,mocPath),out);
@@ -1818,10 +1821,13 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
         luaL_error(L,"rcc_path cannot be relative: %s", lua_tostring(L,rccPath));
     else
     {
-        const char* cmd = bs_denormalize_path(lua_tostring(L,rccPath));
+        lua_pushfstring(L,"%s/rcc", bs_denormalize_path(lua_tostring(L,rccPath)));
+        const char* cmd = lua_tostring(L,-1);
         if( !tryrun(L,builtins,cmd) )
-            cmd = defaultRccPath;
-        lua_pushstring(L,cmd);
+        {
+            lua_pop(L,1);
+            lua_pushstring(L,defaultRccPath);
+        }
         lua_replace(L,rccPath);
     }
     fwrite(lua_tostring(L,rccPath),1,lua_objlen(L,rccPath),out);

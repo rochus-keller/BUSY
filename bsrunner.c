@@ -329,6 +329,7 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
 
     if( !lua_isnil(L,ctdefaults) )
         addall(L,ctdefaults,cflags,cflags_c,cflags_cc,cflags_objc,cflags_objcc,defines,includes,toolchain == BS_msvc);
+    // TODO: fix order according to specs
     addall(L,inst,cflags,cflags_c,cflags_cc,cflags_objc,cflags_objcc,defines,includes,toolchain == BS_msvc);
 
     size_t i;
@@ -336,17 +337,21 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
     lua_getfield(L,inst,"sources");
     const int sources = lua_gettop(L);
     lua_createtable(L,lua_objlen(L,sources),0);
+    const int tmp = lua_gettop(L);
+    copyItems(L,inlist,tmp, BS_SourceFiles);
+    int n = lua_objlen(L,tmp);
     for( i = 1; i <= lua_objlen(L,sources); i++ )
     {
         // copy all sources to a new table to avoid changing the original sources
         lua_rawgeti(L,sources,i);
-        lua_rawseti(L,-2,i);
+        lua_rawseti(L,tmp,++n);
     }
-    lua_replace(L,-2);
-    copyItems(L,inlist,sources, BS_SourceFiles);
+    lua_replace(L,sources);
+
+    // the result of source files received via dependencies appeares before the results of this source files
     copyItems(L,inlist,outlist, BS_ObjectFiles);
 
-    int n = lua_objlen(L,outlist);
+    n = lua_objlen(L,outlist);
     for( i = 1; i <= lua_objlen(L,sources); i++ )
     {
         lua_rawgeti(L,sources,i);
@@ -611,7 +616,7 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
     switch(k)
     {
     case BS_Mixed:
-        for( i = lua_objlen(L,list); i >= 1; i-- )
+        for( i = lua_objlen(L,list); i >= 1; i-- ) // turn dependency order for rendering Products in reverse order
         {
             lua_rawgeti(L,list,i);
             const int sublist = lua_gettop(L);
@@ -623,7 +628,7 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
         }
         break;
     case BS_ObjectFiles:
-        for( i = lua_objlen(L,list); i >= 1; i-- )
+        for( i = 1; i <= lua_objlen(L,list); i++ ) // keep original order
         {
             lua_rawgeti(L,list,i);
             const int path = lua_gettop(L);
@@ -1436,6 +1441,11 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
         lua_replace(L,mocPath);
     }else if( *lua_tostring(L,mocPath) != '/' )
         luaL_error(L,"moc_path cannot be relative: %s", lua_tostring(L,mocPath));
+    else
+    {
+        lua_pushfstring(L,"%s/moc", lua_tostring(L,mocPath));
+        lua_replace(L,mocPath);
+    }
 
     lua_getfield(L,inst,"sources");
     const int sources = lua_gettop(L);
@@ -1517,9 +1527,10 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
         lua_pushstring(L,"rcc");
         lua_replace(L,app);
     }else if( *lua_tostring(L,app) != '/' )
+        luaL_error(L,"rcc_path cannot be relative: %s", lua_tostring(L,app));
+    else
     {
-        // relative path
-        addPath(L,absDir,app);
+        lua_pushfstring(L,"%s/rcc", lua_tostring(L,app));
         lua_replace(L,app);
     }
 
