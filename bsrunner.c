@@ -1433,8 +1433,13 @@ static void runmoc(lua_State* L,int inst, int cls, int builtins)
     lua_pop(L,1);
     const int outDir = lua_gettop(L);
 
-    lua_getfield(L,binst,"moc_path");
+    lua_getfield(L,inst,"tool_dir");
     const int mocPath = lua_gettop(L);
+    if( lua_isnil(L,mocPath) || strcmp(".",lua_tostring(L,mocPath)) == 0 )
+    {
+        lua_getfield(L,binst,"moc_path");
+        lua_replace(L,mocPath);
+    }
     if( lua_isnil(L,mocPath) || strcmp(".",lua_tostring(L,mocPath)) == 0 )
     {
         lua_pushstring(L,"moc");
@@ -1520,8 +1525,13 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
     lua_pop(L,1);
     const int outDir = lua_gettop(L);
 
-    lua_getfield(L,binst,"rcc_path");
+    lua_getfield(L,inst,"tool_dir");
     const int app = lua_gettop(L);
+    if( lua_isnil(L,app) || strcmp(".",lua_tostring(L,app)) == 0 )
+    {
+        lua_getfield(L,binst,"rcc_path");
+        lua_replace(L,app);
+    }
     if( lua_isnil(L,app) || strcmp(".",lua_tostring(L,app)) == 0 )
     {
         lua_pushstring(L,"rcc");

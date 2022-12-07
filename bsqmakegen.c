@@ -29,6 +29,8 @@
 
 static const char* s_listFill1 = " \\\n\t\"";
 
+//#define BS_QMAKE_GEN_ABS_SOURCE_PATHS
+
 static int mark(lua_State* L) // args: productinst, order, no returns
 {
     const int inst = 1;
@@ -710,9 +712,9 @@ static int addSources(lua_State* L, int inst, FILE* out, int withHeaderDeps)
         {
 #ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
             lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
-            lua_pushstring(L,"$$root_source_dir");
+            lua_pushstring(L,"$$root_source_dir/");
             addPath(L,relDir,file);
-            lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
+            lua_pushstring(L,lua_tostring(L,-1));
             lua_replace(L,-2);
             lua_concat(L,3);
 #else
@@ -746,7 +748,7 @@ static void addHeaders(lua_State* L, int inst, FILE* out)
     bs_getModuleVar(L,inst,"#fsrdir");
     const int relDir = lua_gettop(L);
 
-    lua_pushfstring(L, "HEADERS += $$files(../$$root_source_dir%s/*.h)", lua_tostring(L,relDir)+1 ); // +1: remove '.' from './'
+    lua_pushfstring(L, "HEADERS += $$files(../$$root_source_dir/%s/*.h)", lua_tostring(L,relDir) );
 #else
     bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
@@ -919,9 +921,9 @@ static void addIncludes(lua_State* L, int inst, int builtins, FILE* out, int hea
             // relative path
 #ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
             lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
-            lua_pushstring(L,"$$root_source_dir");
+            lua_pushstring(L,"$$root_source_dir/");
             addPath(L,relDir,include);
-            lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
+            lua_pushstring(L,lua_tostring(L,-1));
             lua_replace(L,-2);
             lua_concat(L,3);
 #else
@@ -1191,9 +1193,9 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
                 // relative path
 #ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
                 lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
-                lua_pushstring(L,"$$root_source_dir");
+                lua_pushstring(L,"$$root_source_dir/");
                 addPath(L,relDir,path);
-                lua_pushstring(L,lua_tostring(L,-1)+1); // remove '.' from './'
+                lua_pushstring(L,lua_tostring(L,-1));
                 lua_replace(L,-2);
                 lua_concat(L,3);
 #else
@@ -1460,6 +1462,18 @@ static void genMoc(lua_State* L, int inst, FILE* out )
     fwrite(text8,1,strlen(text8),out);
 #endif
 
+#if 0
+    lua_getfield(L,inst,"tool_dir");
+    const int tool_dir = lua_gettop(L);
+    if( !lua_isnil(L,tool_dir) && strcmp(".",lua_tostring(L,tool_dir)) != 0 )
+    {
+        lua_pushfstring(L,"moc_path = %s/moc\n", bs_denormalize_path(lua_tostring(L,tool_dir)));
+        fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
+        lua_pop(L,1); // string
+    }
+    lua_pop(L,1); // tool_dir
+#endif
+
     const char* text3 = "compiler.commands = $$lua_path "
             "\\\"$$root_project_dir/moc.lua\\\" "
             "\\\"$$moc_path\\\" "
@@ -1500,6 +1514,18 @@ static void genRcc(lua_State* L, int inst, FILE* out )
     addSources(L, inst, out,0);
     fwrite("\n\n",1,2,out);
 
+#if 0
+    lua_getfield(L,inst,"tool_dir");
+    const int tool_dir = lua_gettop(L);
+    if( !lua_isnil(L,tool_dir) && strcmp(".",lua_tostring(L,tool_dir)) != 0 )
+    {
+        lua_pushfstring(L,"rcc_path = %s/rcc\n", bs_denormalize_path(lua_tostring(L,tool_dir)));
+        fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
+        lua_pop(L,1); // string
+    }
+    lua_pop(L,1); // tool_dir
+#endif
+
     const char* text3 = "compiler.commands = "
             "\\\"$$rcc_path\\\" "
             "\\\"${QMAKE_FILE_IN}\\\" "
@@ -1508,17 +1534,14 @@ static void genRcc(lua_State* L, int inst, FILE* out )
     fwrite(text3,1,strlen(text3),out);
     fwrite("\n",1,1,out);
 
-    const char* text5 = "compiler.input = RCC_SOURCES";
+    const char* text5 = "compiler.input = RCC_SOURCES\n";
     fwrite(text5,1,strlen(text5),out);
-    fwrite("\n",1,1,out);
 
-    const char* text6 = "compiler.output = $$shadowed($$PWD)/qrc_${QMAKE_FILE_BASE}.cpp";
+    const char* text6 = "compiler.output = $$shadowed($$PWD)/qrc_${QMAKE_FILE_BASE}.cpp\n";
     fwrite(text6,1,strlen(text6),out);
-    fwrite("\n",1,1,out);
 
-    const char* text4 = "QMAKE_EXTRA_COMPILERS += compiler";
+    const char* text4 = "QMAKE_EXTRA_COMPILERS += compiler\n";
     fwrite(text4,1,strlen(text4),out);
-    fwrite(" \n",1,1,out);
 }
 
 static int genproduct(lua_State* L) // arg: prodinst

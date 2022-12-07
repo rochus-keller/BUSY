@@ -218,9 +218,11 @@ class("Message", globals.Action)
 class("Moc", globals.Action)
 	field("sources", listOf(globals.path))
 	field("defines", listOf(globals.string))
+	field("tool_dir", globals.path)
 
 class("Rcc", globals.Action)
 	field("sources", listOf(globals.path))
+	field("tool_dir", globals.path)
 
 ---- predeclared procs
 
