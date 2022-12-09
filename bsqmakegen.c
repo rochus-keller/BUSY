@@ -508,6 +508,72 @@ static void groupDep(lua_State* L, int inst)
     lua_pop(L,1); // deps
 }
 
+typedef enum BS_Class { BS_NoClass, BS_LibraryClass, BS_ExecutableClass, BS_SourceSetClass,
+                        BS_GroupClass, BS_ConfigClass,
+                        BS_LuaScriptClass, BS_LuaScriptForEachClass, BS_CopyClass, BS_MessageClass,
+                        BS_MocClass, BS_RccClass } BS_Class;
+static const char* getClassName(int cls)
+{
+    switch( cls )
+    {
+    case BS_LibraryClass:
+        return "Library";
+    case BS_ExecutableClass:
+        return "Executable";
+    case BS_SourceSetClass:
+        return "SourceSet";
+    case BS_GroupClass:
+        return "Group";
+    case BS_ConfigClass:
+        return "Config";
+    case BS_LuaScriptClass:
+        return "LuaScript";
+    case BS_LuaScriptForEachClass:
+        return "LuaScriptForEach";
+    case BS_CopyClass:
+        return "Copy";
+    case BS_MessageClass:
+        return "Message";
+    case BS_MocClass:
+        return "Moc";
+    case BS_RccClass:
+        return "Rcc";
+    default:
+        return "<unknown>";
+    }
+}
+
+static int getClass(lua_State* L, int prodinst, int builtins)
+{
+    lua_getmetatable(L,prodinst);
+    const int cls = lua_gettop(L);
+    int res = BS_NoClass;
+    if( isa( L, builtins, cls, "Library" ) )
+        res = BS_LibraryClass;
+    else if( isa( L, builtins, cls, "Executable") )
+        res = BS_ExecutableClass;
+    else if( isa( L, builtins, cls, "SourceSet") )
+        res = BS_SourceSetClass;
+    else if( isa( L, builtins, cls, "Group") )
+        res = BS_GroupClass;
+    else if( isa( L, builtins, cls, "Config") )
+        res = BS_ConfigClass;
+    else if( isa( L, builtins, cls, "LuaScript") )
+        res = BS_LuaScriptClass;
+    else if( isa( L, builtins, cls, "LuaScriptForeach") )
+        res = BS_LuaScriptForEachClass;
+    else if( isa( L, builtins, cls, "Copy") )
+        res = BS_CopyClass;
+    else if( isa( L, builtins, cls, "Message") )
+        res = BS_MessageClass;
+    else if( isa( L, builtins, cls, "Moc") )
+        res = BS_MocClass;
+    else if( isa( L, builtins, cls, "Rcc") )
+        res = BS_RccClass;
+    lua_pop(L,1); // cls
+    return res;
+}
+
 static int calcDep(lua_State* L) // param: inst
 {
     const int inst = 1;
@@ -532,32 +598,34 @@ static int calcDep(lua_State* L) // param: inst
     lua_getmetatable(L,inst);
     const int cls = lua_gettop(L);
 
-    if( isa( L, builtins, cls, "Library" ) )
-        libraryDep(L,inst,builtins,0);
-    else if( isa( L, builtins, cls, "Executable") )
-        ; // NOP
-    else if( isa( L, builtins, cls, "SourceSet") )
-        libraryDep(L,inst,builtins,1);
-    else if( isa( L, builtins, cls, "Group") )
-        groupDep(L,inst);
-    else if( isa( L, builtins, cls, "Config") )
-        ; // NOP
-    else if( isa( L, builtins, cls, "LuaScript") )
-        ; // NOP
-    else if( isa( L, builtins, cls, "LuaScriptForeach") )
-        ; // NOP
-    else if( isa( L, builtins, cls, "Copy") )
-        ; // NOP
-    else if( isa( L, builtins, cls, "Message") )
-        ; // NOP
-    else if( isa( L, builtins, cls, "Moc") )
-        mocDep(L,inst);
-    else if( isa( L, builtins, cls, "Rcc") )
-        rccDep(L,inst);
-    else
+    switch( getClass(L,inst,builtins) )
     {
+    case BS_LibraryClass:
+        libraryDep(L,inst,builtins,0);
+        break;
+    case BS_ExecutableClass:
+    case BS_ConfigClass:
+    case BS_LuaScriptClass:
+    case BS_LuaScriptForEachClass:
+    case BS_CopyClass:
+    case BS_MessageClass:
+        break; // NOP
+    case BS_SourceSetClass:
+        libraryDep(L,inst,builtins,1);
+        break;
+    case BS_GroupClass:
+        groupDep(L,inst);
+        break;
+    case BS_MocClass:
+        mocDep(L,inst);
+        break;
+    case BS_RccClass:
+        rccDep(L,inst);
+        break;
+    default:
         lua_getfield(L,cls,"#name");
         luaL_error(L,"don't know how to process instances of class '%s'", lua_tostring(L,-1));
+        break;
     }
 
     lua_pop(L,2); // builtins, cls
@@ -722,6 +790,8 @@ static int addSources(lua_State* L, int inst, FILE* out, int withHeaderDeps)
 #endif
             lua_replace(L,file);
         }
+        // TODO: file could be a path which points to BUSY root_build_dir and has to be remapped
+        // as seen in NappGUI/src/gui
 
         const char* str = bs_denormalize_path(lua_tostring(L,file));
         fwrite(s_listFill1,1,strlen(s_listFill1),out);
@@ -869,6 +939,35 @@ static void renderQuotedPath(lua_State* L, int include, FILE* out)
     fwrite(str,1,strlen(str),out);
     fwrite("\"",1,1,out);
 }
+
+#if 0
+// TODO
+static int remapPath(lua_State* L, int builtins, int path)
+{
+    lua_getfield(L,builtins,"#inst");
+    lua_getfield(L,-1,"root_build_dir");
+    lua_replace(L,-2);
+    const int rootBuildDir = lua_gettop(L);
+    const size_t rbdlen = strlen(lua_tostring(L,rootBuildDir));
+
+    if( strncmp(lua_tostring(L,rootBuildDir),lua_tostring(L,path),rbdlen) == 0 )
+    {
+        // we have an include pointing to build_dir(); remap it to $$root_build_dir/qmake
+        const char* str = lua_tostring(L,path) + rbdlen + 1; // skip first '/'
+        const int n = findModulePath(L,inst,builtins,path);
+        size_t j;
+        for(j=n; j>0; j--)
+        {
+            lua_pushfstring(L,"$$root_build_dir/%s", lua_tostring(L, lua_gettop(L) - j + 1));
+            renderQuotedPath(L,-1,out);
+            lua_pop(L,1);
+        }
+        lua_pop(L,n);
+    }else
+        renderQuotedPath(L,include,out);
+
+}
+#endif
 
 static void addIncludes(lua_State* L, int inst, int builtins, FILE* out, int head)
 {
@@ -1204,14 +1303,13 @@ static void addLibs(lua_State* L, int inst, int kind, FILE* out, int head, int i
                 lua_replace(L,path);
             }
             if(ismsvc)
-                lua_pushfstring(L,"/libpath:\"%s\"", bs_denormalize_path(lua_tostring(L,path)) );
+                lua_pushfstring(L,"/libpath:%s", bs_denormalize_path(lua_tostring(L,path)) );
             else
-                lua_pushfstring(L,"-L\"%s\"", bs_denormalize_path(lua_tostring(L,path)) );
-            lua_concat(L,2);
+                lua_pushfstring(L,"-L%s", bs_denormalize_path(lua_tostring(L,path)) );
             fwrite(s_listFill1,1,strlen(s_listFill1),out);
             fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
             fwrite("\"",1,1,out);
-            lua_pop(L,1); // path
+            lua_pop(L,2); // path, string
         }
 
         lua_getfield(L,inst,"lib_names");
@@ -1434,6 +1532,79 @@ static void genAux(lua_State* L, int inst, FILE* out )
     fwrite(text,1,strlen(text),out);
 }
 
+static void genScript(lua_State* L, int inst, FILE* out )
+{
+
+    const char* text =
+            "QT -= core gui\n"
+            "TEMPLATE = aux\n"
+            "CONFIG -= qt\n"
+            "CONFIG -= debug_and_release debug_and_release_target\n\n";
+    fwrite(text,1,strlen(text),out);
+
+    lua_getfield(L,inst,"script");
+    const int script = lua_gettop(L);
+
+    bs_getModuleVar(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    bs_getModuleVar(L,inst,"#fsrdir");
+    const int relDir = lua_gettop(L);
+
+    const char* text7 = "SCRIPT = ";
+    fwrite(text7,1,strlen(text7),out);
+    if( *lua_tostring(L,script) != '/' )
+    {
+#ifndef BS_QMAKE_GEN_ABS_SOURCE_PATHS
+        lua_pushstring(L,"../"); // we're always in a subdir of root_project_dir
+        lua_pushstring(L,"$$root_source_dir/");
+        addPath(L,relDir,script);
+        lua_pushstring(L,lua_tostring(L,-1));
+        lua_replace(L,-2);
+        lua_concat(L,3);
+#else
+        addPath(L,absDir,file);
+#endif
+        lua_replace(L,script);
+    }
+    const char* str = bs_denormalize_path(lua_tostring(L,script));
+    fwrite("\"",1,1,out);
+    fwrite(str,1,strlen(str),out);
+    fwrite("\"\n",1,2,out);
+
+    lua_pushstring(L,"");
+    const int str2 = lua_gettop(L);
+    lua_getfield(L,inst,"args");
+    const int args = lua_gettop(L);
+    size_t i;
+    for( i = 1; i <= lua_objlen(L,args); i++ )
+    {
+        lua_pushvalue(L,str2);
+        lua_pushstring(L," ");
+        lua_rawgeti(L,args,i);
+        lua_concat(L,3);
+        lua_replace(L,str2);
+    }
+    lua_pop(L,1); // args
+
+    // TODO: args can be denormalized paths which could point to BUSY root_build_dir and have to be remapped
+    // as seen in NappGUI/src/gui
+    const char* text3 = "lua.commands = $$lua_path \\\"${QMAKE_FILE_IN}\\\" ";
+    fwrite(text3,1,strlen(text3),out);
+    fwrite(lua_tostring(L,str2),1,lua_objlen(L,str2),out);
+    fwrite("\n",1,1,out);
+
+    const char* text6 = "lua.input = SCRIPT\n"
+            "lua.output = ${QMAKE_FILE_BASE}.output\n";
+    fwrite(text6,1,strlen(text6),out);
+
+
+    const char* text4 = "QMAKE_EXTRA_COMPILERS += lua\n";
+    fwrite(text4,1,strlen(text4),out);
+
+    lua_pop(L,4); // script, absDir, relDir, str2
+}
+
 static void genMoc(lua_State* L, int inst, FILE* out )
 {
     const char* text =
@@ -1580,43 +1751,32 @@ static int genproduct(lua_State* L) // arg: prodinst
     const char* text = "# generated by BUSY, do not modify\n";
     fwrite(text,1,strlen(text),out);
 
-    visitDeps(L,prodinst);
-
-    lua_getmetatable(L,prodinst);
-    const int cls = lua_gettop(L);
-
-    if( isa( L, builtins, cls, "Library" ) )
-        genLibrary(L,prodinst, builtins, out, 0);
-    else if( isa( L, builtins, cls, "Executable") )
-        genExe(L,prodinst,builtins,out);
-    else if( isa( L, builtins, cls, "SourceSet") )
-        genLibrary(L,prodinst, builtins, out, 1);
-    else if( isa( L, builtins, cls, "Group") )
-        genAux(L,prodinst, out);
-    else if( isa( L, builtins, cls, "Config") )
-        genAux(L,prodinst, out);
-    else if( isa( L, builtins, cls, "LuaScript") )
-        genAux(L,prodinst, out); // TODO;
-    else if( isa( L, builtins, cls, "LuaScriptForeach") )
-        genAux(L,prodinst, out); // TODO
-    else if( isa( L, builtins, cls, "Copy") )
-        genAux(L,prodinst, out); // TODO
-    else if( isa( L, builtins, cls, "Message") )
-        genAux(L,prodinst, out); // TODO
-    else if( isa( L, builtins, cls, "Moc") )
-        genMoc(L,prodinst, out);
-    else if( isa( L, builtins, cls, "Rcc") )
-        genRcc(L,prodinst, out);
-    else
+    switch( getClass(L,prodinst,builtins) )
     {
+    case BS_LibraryClass:
+        genLibrary(L,prodinst, builtins, out, 0);
+        break;
+    case BS_ExecutableClass:
+        genExe(L,prodinst,builtins,out);
+        break;
+    case BS_SourceSetClass:
+        genLibrary(L,prodinst, builtins, out, 1);
+        break;
+    case BS_MocClass:
+        genMoc(L,prodinst, out);
+        break;
+    case BS_RccClass:
+        genRcc(L,prodinst, out);
+        break;
+    default:
         fclose(out);
-        lua_getfield(L,cls,"#name");
-        luaL_error(L,"don't know how to build instances of class '%s'", lua_tostring(L,-1));
+        assert(0);
+        break;
     }
 
     fclose(out);
 
-    lua_pop(L,7); // decl, builtins, binst, rootOutDir, name, proPath, cls
+    lua_pop(L,6); // decl, builtins, binst, rootOutDir, name, proPath
 
     const int bottom = lua_gettop(L);
     assert(top == bottom);
@@ -1882,35 +2042,53 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
 
         lua_getfield(L,decl,"#qmake");
         const int qmake = lua_gettop(L);
-        fprintf(stdout,"# generating %s\n", lua_tostring(L,-1));
-        fflush(stdout);
-
-        lua_pushfstring(L,"%s/%s", lua_tostring(L,buildDir), lua_tostring(L,qmake));
-        const int path = lua_gettop(L);
-
-        if( !bs_exists(lua_tostring(L,path)) )
-        {
-            if( bs_mkdir(lua_tostring(L,path)) != 0 )
-                luaL_error(L,"error creating directory %s", lua_tostring(L,path));
-        }
-
-        fwrite("\t",1,1,out);
-        fwrite(lua_tostring(L,qmake),1,lua_objlen(L,qmake),out);
-        fwrite(" ",1,1,out);
-        if( i < len )
-            fwrite("\\",1,1,out);
-        fwrite("\n",1,1,out);
 
         lua_getfield(L,decl,"#owner");
-        lua_getfield(L,-1,"#inst");
-        lua_replace(L,-2);
-        const int modinst = lua_gettop(L);
-        lua_pushcfunction(L,genproduct);
-        lua_getfield(L,decl,"#name");
-        lua_rawget(L,modinst);
-        lua_call(L,1,0);
+        lua_getfield(L,-1,"#inst"); // owner, modinst
+        lua_replace(L,-2); // modinst
+        lua_getfield(L,decl,"#name"); // modinst, name
+        lua_rawget(L,-2); // modinst, prodinst
+        lua_replace(L,-2); // prodinst
+        const int prodinst = lua_gettop(L);
 
-        lua_pop(L,4); // prodinst, qmake, path, modinst
+        visitDeps(L,prodinst);
+
+        const int cls = getClass(L,prodinst,builtins);
+        if( cls == BS_LibraryClass || cls == BS_ExecutableClass || cls == BS_SourceSetClass ||
+                cls == BS_MocClass || cls == BS_RccClass )
+        {
+            fprintf(stdout,"# generating %s\n", lua_tostring(L,qmake));
+            fflush(stdout);
+
+            lua_pushfstring(L,"%s/%s", lua_tostring(L,buildDir), lua_tostring(L,qmake));
+            const int path = lua_gettop(L);
+
+            if( !bs_exists(lua_tostring(L,path)) )
+            {
+                if( bs_mkdir(lua_tostring(L,path)) != 0 )
+                    luaL_error(L,"error creating directory %s", lua_tostring(L,path));
+            }
+
+            fwrite("\t",1,1,out);
+            fwrite(lua_tostring(L,qmake),1,lua_objlen(L,qmake),out);
+            fwrite(" ",1,1,out);
+            if( i < len )
+                fwrite("\\",1,1,out);
+            fwrite("\n",1,1,out);
+
+            lua_pushcfunction(L,genproduct);
+            lua_pushvalue(L,prodinst);
+            lua_call(L,1,0);
+            lua_pop(L,1); // path
+        }else if( cls == BS_LuaScriptClass || cls == BS_LuaScriptForEachClass ||
+                  cls == BS_CopyClass || cls == BS_MessageClass )
+        {
+            fprintf(stdout,"# not generating \"%s\" because class \"%s\" is not supported by qmake generator\n",
+                    lua_tostring(L,qmake), getClassName(cls));
+            fflush(stdout);
+        }
+
+        lua_pop(L,3); // decl, qmake, prodinst
     }
     fclose(out);
 
