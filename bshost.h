@@ -24,27 +24,40 @@
 #include <time.h>
 
 extern FILE* bs_fopen(const char* path, const char* modes);
+
 extern const char* bs_global_buffer();
 extern int bs_global_buffer_len();
-extern time_t bs_exists(const char* normalizedPath); // changed time if exists, 0 if not
-extern time_t bs_exists2(const char* denormalizedPath); // changed time if exists, 0 if not
-extern int bs_mkdir(const char* normalizedPath);
-extern int bs_exec(const char* cmd); // returns 0 on success
-extern int bs_copy(const char* normalizedToPath, const char* normalizedFromPath );
 
 typedef enum BSPathStatus { BS_OK, BS_NotSupported, BS_InvalidFormat, BS_OutOfSpace, BS_NOP } BSPathStatus;
 extern BSPathStatus bs_normalize_path(const char* in, char* out, int outlen); // OS path to normalized path
 extern BSPathStatus bs_normalize_path2(const char* in);
-extern BSPathStatus bs_cwd();
-extern BSPathStatus bs_thisapp();
-extern BSPathStatus bs_apply_source_expansion(const char* normalizedPath, const char* string, int onlyFileParts); // returns denormalized
 extern BSPathStatus bs_makeRelative(const char* normalizedRefDir, const char* normalizedTarget);
 extern const char* bs_denormalize_path(const char* path);
 extern int bs_isWinRoot(const char* normalizedPath); // 1..yes, 0..no
-typedef enum BSPathPart { BS_all, BS_fileName, BS_filePath, BS_baseName, BS_completeBaseName, BS_extension } BSPathPart;
+extern int bs_isWinRoot2(const char* denormalizedPath); // 1..yes, 0..no
+
+extern time_t bs_exists(const char* normalizedPath); // changed time if exists, 0 if not
+extern time_t bs_exists2(const char* denormalizedPath); // changed time if exists, 0 if not
+extern BSPathStatus bs_thisapp();
+
+extern BSPathStatus bs_apply_source_expansion(const char* normalizedPath, const char* string, int onlyFileParts); // returns denormalized
+typedef enum BSPathPart { BS_NoPathPart, BS_all, BS_fileName, BS_filePath, BS_baseName, BS_completeBaseName, BS_extension,
+                        BS_RootBuildDir, BS_CurBuildDir } BSPathPart;
 extern const char* bs_path_part(const char* normalizedPath, BSPathPart what, int* len ); // returns denormalized
+extern BSPathStatus bs_findToken(const char* str, int* offset, int* len);
+extern BSPathPart bs_tokenType(const char* str, int len);
+
+extern BSPathStatus bs_cwd();
+extern int bs_mkdir(const char* normalizedPath);
+extern int bs_mkdir2(const char* denormalizedPath);
+extern int bs_mkrdir2(const char* denormalizedPath);
+
+extern int bs_exec(const char* cmd); // returns 0 on success
+extern int bs_copy(const char* normalizedToPath, const char* normalizedFromPath );
+
 extern const char* bs_filename(const char* path);
 extern int bs_forbidden_fschar(unsigned int ch);
+
 extern int bs_little_endian(); // 1..little, 0..big
 extern int bs_wordsize(); // number of bytes
 extern const char* bs_host_os();

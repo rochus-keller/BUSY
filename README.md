@@ -125,7 +125,7 @@ With the `-P` option parameter values can be set; the syntax is `-P x.y=value`, 
 
 With the `-c` option only the parser/analyzer is run to check the BUSY files. No build is run, no files or directories are generated.
 
-In a future version of BUSY, with the `-G` option the backend can be set, e.g. like `-G ninja`.
+With the `-G` option you can tell BUSY to generate code for another build system. Currently the option `-G qmake` is supported to generate the project files required to use QtCreator with the project. In a future version of BUSY, other backends like `-G ninja` will be supported. If no `-G` option is provided, BUSY just runs the build itself.
 
 ### Specifying builds
 

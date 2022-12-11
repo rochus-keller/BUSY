@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-12-06</div>
+2022-12-11</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -805,11 +805,15 @@ This target type allows you to create meta-targets that just collect a set of de
 <h4 style="margin-left:63px"><span class="label"><a name="11949">3.2.5.1</a></span>
 Script</h4>
 <div style="margin-left:81px"><span class="label"><a name="11682">3.2.5.1.1</a></span>
-<b>Main</b>: <a href="#11917">args</a>, <a href="#11901">script</a></div>
+<b>Main</b>: <a href="#11917">args</a>, <a href="#11901">script</a>, <a href="#11907">outputs</a></div>
 <h4 style="margin-left:81px"><span class="label"><a name="11679">3.2.5.1.2</a></span>
 <b>LuaScript</b></h4>
 <div style="margin-left:99px"><span class="label"><a name="11680">3.2.5.1.2.1</a></span>
-This product type allows you to run a Lua script a single time to produce one or more output files. If you want to run a script once for each of a set of input files, see <a href="#11681">LuaScriptForeach</a>.</div>
+This product type allows you to run a Lua script a single time to produce one or more output files. </div>
+<div style="margin-left:99px"><span class="label"><a name="12823">3.2.5.1.2.2</a></span>
+If the script produces source files which have to be compiled by a dependent Product (and only then) list these source files (and only those) in the <a href="#11907">outputs</a> list. This list might be redundant to what you specify in <a href="#11917">args</a>, but allows the build system to recognize and properly process the generated output of the script.</div>
+<div style="margin-left:99px"><span class="label"><a name="12828">3.2.5.1.2.3</a></span>
+<a href="#11917">args</a> makes use of <a href="#12603">Source Expansion</a>; the place-holders <a href="#12835">{{root_build_dir}}</a> and <a href="#12837">{{current_build_dir}}</a> are available.</div>
 <h4 style="margin-left:81px"><span class="label"><a name="11681">3.2.5.1.3</a></span>
 <b>LuaScriptForeach</b></h4>
 <div style="margin-left:99px"><span class="label"><a name="11685">3.2.5.1.3.1</a></span>
@@ -848,11 +852,9 @@ Copy the files explicitly listed in <a href="#11885">sources</a> or received fro
 <a href="#11907">outputs</a> makes use of <a href="#12603">Source Expansion</a>; the place-holders <a href="#12610">{{source_file_part}}</a>, <a href="#12612">{{source_name_part}}</a> and <a href="#12621">{{source_ext}}</a> are available.</div>
 <div style="margin-left:81px"><span class="label"><a name="12684">3.2.5.5.4</a></span>
 <a href="#11885">sources</a> and <a href="#11907">outputs</a> can include as many files as you want; each entry in <a href="#11885">sources</a> is copied to all places in <a href="#11907">outputs</a>.</div>
-<div style="margin-left:81px"><span class="label"><a name="12687">3.2.5.5.5</a></span><span class="ident">NOTE</span>
-For security reasons <a href="#11907">outputs</a> only accepts relative paths.</div>
-<div style="margin-left:81px"><span class="label"><a name="12688">3.2.5.5.6</a></span>
-Each file path in <a href="#11907">outputs</a> is interpreted relative to <b>build_dir()</b>.</div>
-<div style="margin-left:81px"><span class="label"><a name="12685">3.2.5.5.7</a></span><span class="ident">NOTE</span>
+<div style="margin-left:81px"><span class="label"><a name="12842">3.2.5.5.5</a></span>
+The file system directories on the paths referenced by <a href="#11907">outputs</a> are recursively created if they don't exist yet.  </div>
+<div style="margin-left:81px"><span class="label"><a name="12685">3.2.5.5.6</a></span><span class="ident">NOTE</span>
 If the output file exists it is overwritten without warning.</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11697">4</a></span>
 <b>Predeclared Field Reference</b></h4>
@@ -862,6 +864,14 @@ args</h4>
 <b>args: string[]</b></div>
 <div style="margin-left:45px"><span class="label"><a name="11919">4.1.2</a></span>
 For <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> targets, args is the list of arguments to pass to the script. </div>
+<h4 style="margin-left:45px"><span class="label"><a name="12826">4.1.3</a></span>
+Argument Expansion</h4>
+<div style="margin-left:63px"><span class="label"><a name="12827">4.1.3.1</a></span>
+Argument expansion is used for the <a href="#11681">LuaScriptForeach</a> and <a href="#11679">LuaScript</a> action types. Strings can include one or more of the following placeholders. The result is the string representation of the given data type, as if <a href="#12001">tostring</a> would have been called. </div>
+<h4 style="margin-left:63px"><span class="label"><a name="12829">4.1.3.2</a></span>
+Placeholders</h4>
+<div style="margin-left:81px"><span class="label"><a name="12834">4.1.3.2.1</a></span>
+TODO: build_dir(designator to a declaration starting from root)</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11698">4.2</a></span>
 <b>cflags</b></h4>
 <div style="margin-left:45px"><span class="label"><a name="11701">4.2.1</a></span>
@@ -873,7 +883,7 @@ Each element of the list is passed verbatim to the compiler in charge, i.e. cfla
 <div style="margin-left:45px"><span class="label"><a name="11700">4.2.4</a></span>
 To target one of these variants individually, use <a href="#11703">cflags_c</a>, <a href="#11705">cflags_cc</a>, <a href="#11707">cflags_objc</a>, and <a href="#11709">cflags_objcc</a>, respectively. These variant-specific versions of cflags* will be appended on the compiler command line after "cflags".</div>
 <h4 style="margin-left:45px"><span class="label"><a name="11711">4.2.5</a></span>
-Order of application:</h4>
+<b>Order of application</b></h4>
 <div style="margin-left:63px"><span class="label"><a name="12818">4.2.5.1</a></span>
 TODO: check</div>
 <div style="margin-left:63px"><span class="label"><a name="11714">4.2.5.2</a></span>
@@ -917,7 +927,7 @@ A target has no visibility into a config's sub-configs. Target code only sees th
 <div style="margin-left:81px"><span class="label"><a name="11823">4.7.3.2.2</a></span>
 You can get duplication of values if a config is listed twice, say, on a target and in a sub-config that also applies. In other cases, the configs applying to a target are de-duped. It's expected that if a config is listed as a sub-config that it is only used in that context. (Note that it's possible to fix this and de-dupe, but it's not normally relevant and complicates the implementation.)</div>
 <div style="margin-left:45px"><span class="label"><a name="11824">4.7.4</a></span>
-see <a href="#11711">Order of application:</a></div>
+see <a href="#11711">Order of application</a></div>
 <h4 style="margin-left:27px"><span class="label"><a name="11741">4.8</a></span>
 defines</h4>
 <div style="margin-left:45px"><span class="label"><a name="11759">4.8.1</a></span>
@@ -927,7 +937,7 @@ string syntax "&lt;ident&gt; [ = &lt;value&gt; ]", so without the -D</div>
 <div style="margin-left:45px"><span class="label"><a name="11743">4.8.3</a></span>
 These strings will be passed to the C/C++ compiler as #defines. The strings may or may not include an "=" to assign a value.</div>
 <div style="margin-left:45px"><span class="label"><a name="11748">4.8.4</a></span>
-see <a href="#11711">Order of application:</a></div>
+see <a href="#11711">Order of application</a></div>
 <h4 style="margin-left:27px"><span class="label"><a name="11975">4.9</a></span>
 def_file</h4>
 <div style="margin-left:45px"><span class="label"><a name="11976">4.9.1</a></span>
@@ -945,7 +955,7 @@ The dependency tree is processed depth-first. When processed, the results of eac
 <h4 style="margin-left:45px"><span class="label"><a name="11834">4.10.4</a></span>
 <a href=""><b>D</b></a><b>etails of dependency propagation</b></h4>
 <div style="margin-left:63px"><span class="label"><a name="12668">4.10.4.1</a></span>
-The results of <a href="#11633">Executable</a>, <a href="#11662">Library</a>, <a href="#11647">SourceSet</a>, <a href="#11671">Group</a>, <a href="#12625">Moc</a> and <a href="#12635">Rcc</a> will be propagated up the dependency tree.</div>
+The results of <a href="#11633">Executable</a>, <a href="#11662">Library</a>, <a href="#11647">SourceSet</a>, <a href="#11671">Group</a>, <a href="#12625">Moc</a>, <a href="#12635">Rcc</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> will be propagated up the dependency tree.</div>
 <div style="margin-left:63px"><span class="label"><a name="12670">4.10.4.2</a></span>
 <a href="#11671">Group</a> is special in that it just passes on all results of its dependencies.</div>
 <div style="margin-left:63px"><span class="label"><a name="12671">4.10.4.3</a></span>
@@ -956,10 +966,14 @@ The results of <a href="#11633">Executable</a>, <a href="#11662">Library</a>, <a
 <a href="#11633">Executable</a> consumes sources, object files and librarijes from its dependencies and passes the resulting executable up the dependency tree.</div>
 <div style="margin-left:63px"><span class="label"><a name="12674">4.10.4.6</a></span>
 <a href="#12625">Moc</a> and <a href="#12635">Rcc</a> don't consume or pass through anything from their dependencies, but pass the resulting source files up the dependency tree.</div>
-<div style="margin-left:63px"><span class="label"><a name="12677">4.10.4.7</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12824">4.10.4.7</a></span>
+<a href="#11679">LuaScript</a> doesn't consume or pass through anything from its dependencies, but passes the source files listed in the <a href="#11907">outputs</a> field up the dependency tree.</div>
+<div style="margin-left:63px"><span class="label"><a name="12825">4.10.4.8</a></span>
+TODO <a href="#11681">LuaScriptForeach</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12677">4.10.4.9</a></span>
 <a href="#11893">Copy</a> includes the file types listed in <a href="#12679">use_deps</a> from its dependencies in its source list, but doesn't pass anything up the dependency tree.</div>
-<div style="margin-left:63px"><span class="label"><a name="12675">4.10.4.8</a></span>
-<a href="#11679">LuaScript</a>, <a href="#11681">LuaScriptForeach</a> and <a href="#12590">Message</a> don't consume or pass through anything from their dependencies.</div>
+<div style="margin-left:63px"><span class="label"><a name="12675">4.10.4.10</a></span>
+<a href="#12590">Message</a> doesn't consume or pass through anything from their dependencies.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11825">4.11</a></span>
 frameworks</h4>
 <div style="margin-left:45px"><span class="label"><a name="11826">4.11.1</a></span>
@@ -981,7 +995,7 @@ The directories in this list will be added to the include path for the files in 
 <div style="margin-left:45px"><span class="label"><a name="11985">4.12.4</a></span>
 Relative paths are always resolved relative to the module where the object was initially declared.</div>
 <div style="margin-left:45px"><span class="label"><a name="11762">4.12.5</a></span>
-see <a href="#11711">Order of application:</a></div>
+see <a href="#11711">Order of application</a></div>
 <h4 style="margin-left:27px"><span class="label"><a name="11772">4.13</a></span>
 ldflags</h4>
 <div style="margin-left:45px"><span class="label"><a name="11773">4.13.1</a></span>
@@ -991,7 +1005,7 @@ These flags are passed on the command-line to the linker and generally specify v
 <div style="margin-left:45px"><span class="label"><a name="11775">4.13.3</a></span>
 ldflags are NOT pushed to dependents, so applying ldflags to source sets or static libraries will be a no-op. If you want to apply ldflags to dependent targets, put them in a config and set it in the <a href="xoid://11878@003526b9-5a79-4133-afbf-9bcd57214e0c">&lt;null reference&gt;</a> or <a href="xoid://11865@003526b9-5a79-4133-afbf-9bcd57214e0c">&lt;null reference&gt;</a>.</div>
 <div style="margin-left:45px"><span class="label"><a name="11777">4.13.4</a></span>
-see <a href="#11711">Order of application:</a></div>
+see <a href="#11711">Order of application</a></div>
 <h4 style="margin-left:27px"><span class="label"><a name="11776">4.14</a></span>
 <a href=""><b>l</b></a><b>ib_dirs</b></h4>
 <div style="margin-left:45px"><span class="label"><a name="11778">4.14.1</a></span>
@@ -1001,7 +1015,7 @@ Specifies additional directories passed to the linker for searching for the requ
 <div style="margin-left:45px"><span class="label"><a name="11780">4.14.3</a></span>
 <a href="#11799">lib_names</a><b>, </b><a href="#11782">lib_files</a><b>,</b> and lib_dirs work differently than other flags in two respects. First, they are inherited across static library boundaries until a shared library or executable target is reached. Second, they are uniquified so each one is only passed once (the first instance of it will be the one used).</div>
 <div style="margin-left:45px"><span class="label"><a name="11783">4.14.4</a></span>
-see <a href="#11711">Order of application:</a></div>
+see <a href="#11711">Order of application</a></div>
 <div style="margin-left:45px"><span class="label"><a name="11781">4.14.5</a></span>
 For <a href="#11799">lib_names</a>, <a href="#11782">lib_files</a>, <a href="#11825">frameworks</a> and lib_dirs only, the values propagated from dependencies (as described above) are applied last assuming they are not already in the list.</div>
 <div style="margin-left:45px"><span class="label"><a name="11986">4.14.6</a></span>
@@ -1067,11 +1081,19 @@ outputs</h4>
 <div style="margin-left:45px"><span class="label"><a name="11908">4.20.1</a></span>
 <b>outputs: path[]</b></div>
 <div style="margin-left:45px"><span class="label"><a name="11909">4.20.2</a></span>
-Outputs is valid for <a href="#11893">Copy</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> target types and indicates the resulting files. Outputs must always refer to files in the build directory.</div>
-<div style="margin-left:45px"><span class="label"><a name="11910">4.20.3</a></span>
+The <a href="#11907">outputs</a> list is available for <a href="#11893">Copy</a>, <a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a> product types and indicates the resulting files. The paths added to the <a href="#11907">outputs</a> list always refer to files in the build directory.</div>
+<div style="margin-left:45px"><span class="label"><a name="12822">4.20.3</a></span><span class="ident">NOTE</span>
+For security reasons <a href="#11907">outputs</a> only accepts relative paths.</div>
+<div style="margin-left:45px"><span class="label"><a name="11910">4.20.4</a></span>
 <a href="#11893">Copy</a></div>
-<div style="margin-left:63px"><span class="label"><a name="11911">4.20.3.1</a></span>
-Copy targets should have exactly one entry in the outputs list. If there is exactly one source, this can be a literal file name or a source expansion. If there is more than one source, this must contain a source expansion to map a single input name to a single output name. </div>
+<div style="margin-left:63px"><span class="label"><a name="11911">4.20.4.1</a></span>
+Copy targets should have exactly one entry in the outputs list. If there is exactly one source, this can be a literal file name or a <a href="#12603">Source Expansion</a>. If there is more than one source, this must contain a <a href="#12603">Source Expansion</a> to map a single input name to a single output name. </div>
+<div style="margin-left:63px"><span class="label"><a name="12845">4.20.4.2</a></span>
+The paths added to the <a href="#11907">outputs</a> list are relative to root_build_dir. This can be used to add known places in an otherwise implementation specific (i.e. non-deterministic) build tree.</div>
+<div style="margin-left:45px"><span class="label"><a name="12843">4.20.5</a></span>
+<a href="#11679">LuaScript</a> and <a href="#11681">LuaScriptForeach</a></div>
+<div style="margin-left:63px"><span class="label"><a name="12844">4.20.5.1</a></span>
+The paths added to the <a href="#11907">outputs</a> list are relative to where the specific product declaration is represented in the build directory. This location is implementation specific. It could correspond to the result of build_dir(), but there is no guarantee.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11901">4.21</a></span>
 script</h4>
 <div style="margin-left:45px"><span class="label"><a name="11902">4.21.1</a></span>
@@ -1107,7 +1129,7 @@ The sources are the files which have to be processed by moc or rcc.</div>
 <h4 style="margin-left:45px"><span class="label"><a name="12603">4.22.5</a></span>
 Source Expansion</h4>
 <div style="margin-left:63px"><span class="label"><a name="12605">4.22.5.1</a></span>
-Source expansion is used for the <a href="#11681">LuaScriptForeach</a> and <a href="#11893">Copy</a> action types. Strings can include one or more of the following placeholders. The result is the string representation of the path, as if <a href="#12001">tostring</a> would have been called.</div>
+Source expansion is used for the <a href="#11681">LuaScriptForeach</a>, <a href="#11679">LuaScript</a> and <a href="#11893">Copy</a> action types. Paths or strings can include one or more of the following placeholders. The result is the string representation of the path, as if <a href="#12001">tostring</a> would have been called.</div>
 <h4 style="margin-left:63px"><span class="label"><a name="12607">4.22.5.2</a></span>
 Placeholders</h4>
 <div style="margin-left:81px"><span class="label"><a name="12608">4.22.5.2.1</a></span>
@@ -1129,7 +1151,15 @@ The absolute path of the directory containing the source file with no trailing s
 <div style="margin-left:81px"><span class="label"><a name="12621">4.22.5.2.5</a></span>
 <pre><code>{{source_ext}}</code></pre></div>
 <div style="margin-left:99px"><span class="label"><a name="12615">4.22.5.2.5.1</a></span>
-The extension of the source file, e.g. "//foo/bar/baz.tar.gz" =&gt; "gz"</div>
+The extension of the source file including the dot, e.g. "//foo/bar/baz.tar.gz" =&gt; ".gz"</div>
+<div style="margin-left:81px"><span class="label"><a name="12835">4.22.5.2.6</a></span>
+<code>{{root_build_dir}}</code></div>
+<div style="margin-left:99px"><span class="label"><a name="12836">4.22.5.2.6.1</a></span>
+The string representation of the root file system directory of the build tree.</div>
+<div style="margin-left:81px"><span class="label"><a name="12837">4.22.5.2.7</a></span>
+<code>{{current_build_dir}}</code></div>
+<div style="margin-left:99px"><span class="label"><a name="12838">4.22.5.2.7.1</a></span>
+The string representation of the file system directory associated with the current instance of <a href="#11681">LuaScriptForeach</a> and <a href="#11679">LuaScript</a>. </div>
 <h4 style="margin-left:27px"><span class="label"><a name="12597">4.23</a></span>
 text</h4>
 <div style="margin-left:45px"><span class="label"><a name="12598">4.23.1</a></span>
@@ -1268,6 +1298,8 @@ build_dir</h4>
 <b>build_dir(): path</b></div>
 <div style="margin-left:63px"><span class="label"><a name="12645">7.2.1.1</a></span>
 The result corresponds to <code>root_build_dir + relpath()</code></div>
+<div style="margin-left:45px"><span class="label"><a name="12846">7.2.2</a></span><span class="ident">NOTE</span>
+This function should be used with care because the structure of the build directory is implementation specific; there is no guarantee that build_dir() point to a valid path. Consider using <a href="#11893">Copy</a> to copy executables and libraries to a known place in the build tree and use paths relative to <code>root_build_dir</code>.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12006">7.3</a></span>
 dump</h4>
 <div style="margin-left:45px"><span class="label"><a name="12391">7.3.1</a></span>

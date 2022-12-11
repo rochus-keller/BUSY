@@ -31,6 +31,7 @@
 #include <direct.h>
 #include <libloaderapi.h>
 #include <sys/stat.h>
+#include <errno.h>
 #define getcwd _getcwd
 #define stat _stat
 #define PATH_MAX MAX_PATH
@@ -42,10 +43,14 @@ static int appPath(char* buf, int len)
 }
 
 // https://stackoverflow.com/questions/23427804/cant-find-mkdir-function-in-dirent-h-for-windows
-int bs_mkdir(const char* normalizedPath)
+int bs_mkdir2(const char* denormalizedPath)
 {
     // TODO: is the Windows version expecting ANSI or UTF-8?
-    return _mkdir(bs_denormalize_path(normalizedPath));
+    const int res = _mkdir(denormalizedPath);
+    if( res == -1 && errno == EEXIST )
+        return 0;
+    else
+        return res;
 }
 
 #else // Unix and the like
@@ -53,6 +58,7 @@ int bs_mkdir(const char* normalizedPath)
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 // https://stackoverflow.com/questions/933850/how-do-i-find-the-location-of-the-executable-in-c
 static int appPath(char* buf, int len)
@@ -73,12 +79,40 @@ static int appPath(char* buf, int len)
 }
 
 // https://stackoverflow.com/questions/23427804/cant-find-mkdir-function-in-dirent-h-for-windows
-int bs_mkdir(const char* normalizedPath)
+int bs_mkdir2(const char* denormalizedPath)
 {
-    return mkdir(bs_denormalize_path(normalizedPath),0777); // returns 0 on success, -1 otherwise
+    const int res = mkdir(denormalizedPath,0777); // returns 0 on success, -1 otherwise
+    if( res == -1 && errno == EEXIST )
+        return 0;
+    else
+        return res;
 }
 
 #endif
+
+int bs_mkrdir2(const char* denormalizedPath)
+{
+    // https://stackoverflow.com/questions/2336242/recursive-mkdir-system-call-on-unix
+    assert(denormalizedPath && *denormalizedPath);
+    char* path = (char*)denormalizedPath;
+    char* p;
+    for( p = strchr(path + ( bs_isWinRoot2(path) ? 3: 1 ), '/'); p; p = strchr(p + 1, '/') )
+    {
+        *p = '\0';
+        if( bs_mkdir2(path) == -1 )
+        {
+            *p = '/';
+            return -1;
+        }
+        *p = '/';
+    }
+    return bs_mkdir2(path);
+}
+
+int bs_mkdir(const char* normalizedPath)
+{
+    return bs_mkdir2(bs_denormalize_path(normalizedPath));
+}
 
 static char s_buf[PATH_MAX];
 // https://stackoverflow.com/questions/833291/is-there-an-equivalent-to-winapis-max-path-under-linux-unix
@@ -613,7 +647,7 @@ const char* bs_path_part(const char* path, BSPathPart what, int* len )
         if( *p == '.' )
         {
             *len = q - p;
-            return p + 1;
+            return p;
         }
     }
 
@@ -645,31 +679,42 @@ BSPathStatus bs_apply_source_expansion(const char* source, const char* string, i
     char* q = s_buf + PATH_MAX;
     while( *s && p < q )
     {
-        if( *s == '{' && s[1] == '{' )
+        int offset, len;
+        const BSPathStatus res = bs_findToken( s, &offset, &len );
+        if( res == BS_OK )
         {
-            s += 2;
-            if( *s == '}' )
-                return BS_InvalidFormat;
-            const char* start = s;
-            while( *s != '}' && *s != 0 )
-                s++;
-            if( *s != '}' || s[1] != '}' )
-                return BS_InvalidFormat;
-            int len = s - start;
-            const char* val = path_part(source,start, &len, onlyFileParts );
-            if( len < 0 )
+            if( p + offset >= q )
+                return BS_OutOfSpace;
+            strncpy(p,s,offset); // copy part before token
+            p += offset;
+
+            const char* start = s + offset + 2; // skip {{
+            const BSPathPart t = bs_tokenType(start, len - 4);
+            if( t == BS_NoPathPart || t > BS_extension )
                 return BS_NotSupported;
+            if( onlyFileParts && ( t == BS_all || t == BS_filePath ) )
+                return BS_NotSupported;
+            int len2;
+            const char* val = bs_path_part(source,t,&len2);
+            if( len2 < 0 )
+                return BS_NotSupported;
+            if( p + len2 >= q )
+                return BS_OutOfSpace;
+
+            strncpy(p,val,len2);
+            s += offset + len;
+            p += len2;
+        }else if( res == BS_NOP )
+        {
+            // copy rest of string
+            len = strlen(s);
             if( p + len >= q )
                 return BS_OutOfSpace;
-            strncpy(p,val,len);
-            s += 2;
+            strncpy(p,s,len);
+            s += len;
             p += len;
         }else
-        {
-            *p = *s;
-            p++;
-            s++;
-        }
+            return res;
     }
     *p = 0;
     return BS_OK;
@@ -686,6 +731,9 @@ time_t bs_exists2(const char* denormalizedPath)
 
 int bs_copy(const char* normalizedToPath, const char* normalizedFromPath)
 {
+    bs_apply_source_expansion(normalizedToPath,"{{source_dir}}",0);
+    bs_mkrdir2(bs_global_buffer());
+
 #ifdef _WIN32
     return CopyFileA(bs_denormalize_path(normalizedFromPath), bs_denormalize_path(normalizedToPath), FALSE ) ? 0 : -1; // returns 0 on success, -1 otherwise
 #else
@@ -772,3 +820,61 @@ int bs_isWinRoot(const char* normalizedPath)
     }
     return 0;
 }
+
+int bs_isWinRoot2(const char* denormalizedPath)
+{
+    const int len = strlen(denormalizedPath);
+    if( len >= 2 && denormalizedPath[1] == ':' && isalpha(denormalizedPath[0]) )
+            return 1;
+    return 0;
+}
+
+BSPathStatus bs_findToken(const char* str, int* offset, int* len)
+{
+    assert( offset );
+    assert( len );
+
+    const char* s = str;
+    while( *s )
+    {
+        if( *s == '{' && s[1] == '{' )
+        {
+            *offset = s - str;
+            s += 2;
+            if( *s == '}' )
+                return BS_InvalidFormat;
+            while( *s != '}' && *s != 0 )
+                s++;
+            if( *s != '}' || s[1] != '}' )
+                return BS_InvalidFormat;
+            s += 2;
+            *len = s - str - *offset;
+            return BS_OK;
+        }else
+            s++;
+    }
+    return BS_NOP; // nothing found
+}
+
+BSPathPart bs_tokenType(const char* what, int len)
+{
+    if( len == 6 && strncmp(what,"source", 6) == 0 )
+        return BS_all;
+    if( len == 16 && strncmp(what,"source_file_part", 16) == 0 )
+        return BS_fileName;
+    if( len == 16 && strncmp(what,"source_name_part", 16) == 0 )
+        return BS_completeBaseName;
+    if( len == 10 && strncmp(what,"source_dir", 10) == 0 )
+        return BS_filePath;
+    if( len == 10 && strncmp(what,"source_ext", 10) == 0 )
+        return BS_extension;
+    if( len == 14 && strncmp(what,"root_build_dir", 10) == 0 )
+        return BS_RootBuildDir;
+    if( len == 17 && strncmp(what,"current_build_dir", 10) == 0 )
+        return BS_CurBuildDir;
+    return BS_NoPathPart;
+}
+
+
+
+

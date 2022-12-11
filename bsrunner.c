@@ -1151,21 +1151,116 @@ int bs_thisapp2(lua_State *L)
     return 1;
 }
 
+static void concatReplace(lua_State* L, int to, const char* from, int fromLen)
+{
+    lua_pushvalue(L,to);
+    lua_pushlstring(L,from,fromLen);
+    lua_concat(L,2);
+    lua_replace(L,to);
+}
+
+static BSPathStatus apply_arg_expansion(lua_State* L,int inst, int builtins, const char* source, const char* string)
+{
+    const char* s = string;
+    lua_pushstring(L,"");
+    const int out = lua_gettop(L);
+    while( *s )
+    {
+        int offset, len;
+        const BSPathStatus res = bs_findToken( s, &offset, &len );
+        if( res == BS_OK )
+        {
+            concatReplace(L,out,s,offset);
+
+            const char* start = s + offset + 2; // skip {{
+            const BSPathPart t = bs_tokenType(start, len - 4);
+            if( t == BS_NoPathPart )
+                return BS_NotSupported;
+            if( t <= BS_extension )
+            {
+                if( source )
+                {
+                    int len2;
+                    const char* val = bs_path_part(source,t,&len2);
+                    if( len2 < 0 )
+                        return BS_NotSupported;
+                    concatReplace(L,out,val,len2);
+                }else
+                    return BS_NotSupported;
+            }else if( t == BS_RootBuildDir || t == BS_CurBuildDir )
+            {
+                lua_getfield(L,builtins,"#inst");
+                lua_getfield(L,-1,"root_build_dir");
+                lua_replace(L,-2);
+                if( t == BS_RootBuildDir )
+                {
+                    const char* str = bs_denormalize_path(lua_tostring(L,-1));
+                    concatReplace(L,out,str,strlen(str));
+                    lua_pop(L,1);
+                }else
+                {
+                    bs_getModuleVar(L,inst,"#rdir");
+                    addPath(L,-2,-1); // root_build_dir, rdir, root_build_dir+rdir
+                    const char* str = bs_denormalize_path(lua_tostring(L,-1));
+                    concatReplace(L,out,str,strlen(str));
+                    lua_pop(L,3);
+                }
+            }
+            s += offset + len;
+        }else if( res == BS_NOP )
+        {
+            // copy rest of string
+            len = strlen(s);
+            concatReplace(L,out,s,len);
+            s += len;
+        }else
+            return res;
+    }
+    return BS_OK;
+}
+
 static void script(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
 
-#if 0
     lua_createtable(L,0,0);
-    lua_pushinteger(L,BS_Nothing);
-    lua_setfield(L,-2,"#kind");
-#else
-    lua_pushnil(L);
-#endif
+    const int out = lua_gettop(L);
+    lua_pushinteger(L,BS_SourceFiles);
+    lua_setfield(L,out,"#kind");
+    lua_pushvalue(L,out);
     lua_setfield(L,inst,"#out");
 
     bs_getModuleVar(L,inst,"#dir");
     const int absDir = lua_gettop(L);
+
+    lua_getfield(L,builtins,"#inst");
+    lua_getfield(L,-1,"root_build_dir");
+    lua_replace(L,-2);
+    bs_getModuleVar(L,inst,"#rdir");
+    addPath(L,-2,-1); // root_build_dir, rdir, root_build_dir+rdir
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
+
+    lua_getfield(L,inst,"outputs");
+    const int outputs = lua_gettop(L);
+    size_t j;
+    for( j = 1; j <= lua_objlen(L,outputs); j++ )
+    {
+        lua_rawgeti(L,outputs,j);
+        const int src = lua_gettop(L);
+
+        if( *lua_tostring(L,src) != '/' )
+        {
+            addPath(L,outDir,src);
+            lua_replace(L,src);
+        }else
+            luaL_error(L,"the 'outputs' field requires relative paths");
+
+        lua_rawseti(L,out,j);
+    }
+    lua_pop(L,2); // outDir, outputs
+
 
     lua_getfield(L,inst,"script");
     const int script = lua_gettop(L);
@@ -1183,8 +1278,20 @@ static void script(lua_State* L,int inst, int cls, int builtins)
     const int args = lua_gettop(L);
 
     lua_getfield(L,inst,"args");
-    addflags(L,-1,args);
-    lua_pop(L,1);
+    const int arglist = lua_gettop(L);
+    for( j = 1; j <= lua_objlen(L,arglist); j++ )
+    {
+        lua_pushvalue(L,args);
+        lua_pushstring(L," ");
+        lua_rawgeti(L,arglist,j);
+        if( apply_arg_expansion(L,inst,builtins,0,lua_tostring(L,-1)) != BS_OK )
+            luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
+        lua_replace(L,-2);
+        lua_concat(L,3);
+        lua_replace(L,args);
+    }
+    lua_pop(L,1); // arglist
+
 
     lua_pushfstring(L, "%s %s %s", bs_denormalize_path(lua_tostring(L,app) ),
                     bs_denormalize_path(lua_tostring(L,script) ),
@@ -1200,7 +1307,7 @@ static void script(lua_State* L,int inst, int cls, int builtins)
         lua_error(L);
     }
 
-    lua_pop(L,5); // abDir, script, app, args, cmd
+    lua_pop(L,6); // out, abDir, script, app, args, cmd
     const int bottom = lua_gettop(L);
     assert( top == bottom );
 }
@@ -1257,10 +1364,9 @@ static void runforeach(lua_State* L,int inst, int cls, int builtins)
             lua_pushvalue(L,args);
             lua_pushstring(L," ");
             lua_rawgeti(L,arglist,j);
-            if( bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0) != BS_OK )
+            if( apply_arg_expansion(L,inst,builtins,lua_tostring(L,source),lua_tostring(L,-1)) != BS_OK )
                 luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
-            lua_pop(L,1);
-            lua_pushstring(L,bs_global_buffer());
+            lua_replace(L,-2);
             lua_concat(L,3);
             lua_replace(L,args);
         }
@@ -1613,10 +1719,6 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
     lua_getfield(L,builtins,"#inst");
     lua_getfield(L,-1,"root_build_dir");
     lua_replace(L,-2);
-    bs_getModuleVar(L,inst,"#rdir");
-    addPath(L,-2,-1); // root_build_dir, rdir, root_build_dir+rdir
-    lua_replace(L,-3);
-    lua_pop(L,1);
     const int outDir = lua_gettop(L);
 
     size_t i;

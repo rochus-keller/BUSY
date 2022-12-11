@@ -29,6 +29,27 @@
 #include <string.h>
 #include <assert.h>
 
+static int copy(lua_State* L)
+{
+    enum Params { FROMFILE = 1, TOFILE };
+
+    BSPathStatus res = bs_normalize_path2(lua_tostring(L,FROMFILE));
+    if( res != BS_OK )
+        luaL_error(L,"invalid from-file: %s", lua_tostring(L,FROMFILE) );
+    lua_pushstring(L, bs_global_buffer() );
+    const int fromFile = lua_gettop(L);
+
+    res = bs_normalize_path2(lua_tostring(L,TOFILE));
+    if( res != BS_OK )
+        luaL_error(L,"invalid to-file: %s", lua_tostring(L,TOFILE) );
+    lua_pushstring(L, bs_global_buffer() );
+    const int toFile = lua_gettop(L);
+
+    bs_copy(lua_tostring(L,toFile),lua_tostring(L,fromFile));
+
+    return 0;
+}
+
 static int bs_version(lua_State *L)
 {
     lua_pushstring(L,BS_BSVERSION);
@@ -478,6 +499,7 @@ static const luaL_Reg bslib[] = {
     {"thisapp",      thisapp},
     {"moc", bs_runmoc},
     {"moc_name", bs_mocname},
+    {"copy", copy},
     {"run", bs_run},
     {"cpu", host_cpu },
     {"os", host_os },

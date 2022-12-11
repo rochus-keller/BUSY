@@ -200,6 +200,7 @@ class("Script", globals.Action)
 	--field("inputs", listOf(globals.Product))
 	field("script", globals.path)
 	--field("data", listOf(globals.path))
+	field("outputs", listOf(globals.path))
 
 class("LuaScript", globals.Script)
 
