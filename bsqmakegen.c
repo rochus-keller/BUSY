@@ -1940,8 +1940,7 @@ static void genRcc(lua_State* L, int inst, int builtins, FILE* out )
     lua_pop(L,1); // tool_dir
 #endif
 
-    const char* text3 = "compiler.commands = "
-            "\\\"$$rcc_path\\\" "
+    const char* text3 = "compiler.commands = $$rcc_path " // quoting $$rcc_path gives error on windows
             "\\\"${QMAKE_FILE_IN}\\\" "
             "-o \\\"$$shadowed($$PWD)/qrc_${QMAKE_FILE_BASE}.cpp\\\" "
             "-name \"${QMAKE_FILE_BASE}\"";
