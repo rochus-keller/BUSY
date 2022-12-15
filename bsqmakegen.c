@@ -708,7 +708,7 @@ static void visitDeps(lua_State* L, int inst)
     lua_pop(L,1); // deps
 }
 
-static void iterateDeps(lua_State* L, int inst, int filter, int inverse, FILE* out,
+static int iterateDeps(lua_State* L, int inst, int filter, int inverse, FILE* out,
                         void (*iterator)(lua_State* L, int inst, int item, FILE* out))
 {
     const int top = lua_gettop(L);
@@ -718,10 +718,11 @@ static void iterateDeps(lua_State* L, int inst, int filter, int inverse, FILE* o
     if( lua_isnil(L,deps) )
     {
         lua_pop(L,1); // nil
-        return;
+        return 0;
     }
 
     size_t i;
+    int n = 0;
     if( inverse )
     {
         for( i = lua_objlen(L,deps); i > 0; i-- )
@@ -743,7 +744,10 @@ static void iterateDeps(lua_State* L, int inst, int filter, int inverse, FILE* o
                     const int k = lua_tointeger(L,-1);
                     lua_pop(L,1);
                     if( k == filter )
+                    {
+                        n++;
                         iterator(L,inst, item, out);
+                    }
                     lua_pop(L,1); // item
                 }
             }
@@ -771,7 +775,10 @@ static void iterateDeps(lua_State* L, int inst, int filter, int inverse, FILE* o
                     const int k = lua_tointeger(L,-1);
                     lua_pop(L,1);
                     if( k == filter )
+                    {
+                        n++;
                         iterator(L,inst, item, out);
+                    }
                     lua_pop(L,1); // item
                 }
             }
@@ -784,6 +791,7 @@ static void iterateDeps(lua_State* L, int inst, int filter, int inverse, FILE* o
 
     const int bottom = lua_gettop(L);
     assert( top ==  bottom);
+    return n;
 }
 
 static int s_sourceCount = 0;
@@ -1223,7 +1231,9 @@ static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out
         iterateDeps(L,inst,BS_ObjectFiles,1,out,renderDep);
     }
 
-    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && isLinux )
+    const int hasWl = ( kind == BS_DynamicLib || kind == BS_Executable ) && isLinux;
+
+    if( hasWl )
     {
         // NOTE: image_sources and gui_sources depend on each other; since SourceSets are static libs here
         // the linker complains. The order cannot be fixed since both orders have missing dependencies.
@@ -1246,10 +1256,38 @@ static void addDepLibs(lua_State* L, int inst, int builtins, int kind, FILE* out
         iterateDeps(L,inst,BS_SourceSetLib,0,out,renderDep);
     }
 
-    if( ( kind == BS_DynamicLib || kind == BS_Executable ) && isLinux )
+    if( hasWl )
     {
         fwrite(s_listFill1,1,strlen(s_listFill1),out);
         const char* text3 = "-Wl,--end-group\"";
+        fwrite(text3,1,strlen(text3),out);
+    }
+
+    // NOTE: qmake adds dependencies between projects, but apparently libqtgui is still not built
+    // when e.g. modifying qxcbcursor.cpp; gui.xcb.sources makefile runs and updates qxcbcursor.o,
+    // but libqtgui has no dependency yet to qxcbcursor.o
+    // DEPENDPATH in libqtgui doesn't fix it.
+    // PRE_TARGETDEPS in libqtgui explicitly listing qxcbcursor.o fixes it.
+    // because of -Wl we cannot simply set PRE_TARGETDEPS+=$$LIBS, so we just add all deps again
+    const char* text2 = "\n\n"
+            "PRE_TARGETDEPS +=";
+    fwrite(text2,1,strlen(text2),out);
+    if( hasWl )
+    {
+        if( kind == BS_DynamicLib )
+        {
+            iterateDeps(L,inst,BS_ObjectFiles,1,out,renderDep);
+            iterateDeps(L,inst,BS_DynamicLib,1,out,renderDep);
+            iterateDeps(L,inst,BS_StaticLib,1,out,renderDep);
+        }else if( kind == BS_Executable )
+        {
+            iterateDeps(L,inst,BS_DynamicLib,1,out,renderDep);
+            iterateDeps(L,inst,BS_StaticLib,1,out,renderDep);
+            iterateDeps(L,inst,BS_SourceSetLib,0,out,renderDep);
+        }
+    }else
+    {
+        const char* text3 = " $$LIBS";
         fwrite(text3,1,strlen(text3),out);
     }
 
@@ -1503,12 +1541,15 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
         addLibs(L,inst,lib_type,out,1,win32);
         fwrite("\n\n",1,2,out);
 
-#ifndef BS_QMAKE_HAVE_COPY
-        pushLibraryPath(L,inst,builtins,isSourceSet,1,0);
-        const int path = lua_gettop(L);
-        lua_pushfstring(L,"QMAKE_POST_LINK += $$QMAKE_COPY $$quote(%s) ..\n\n", lua_tostring(L,path));
-        fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
-        lua_pop(L,2);
+#if 1 // ifndef BS_QMAKE_HAVE_COPY
+        if( BS_DynamicLib )
+        {
+            pushLibraryPath(L,inst,builtins,isSourceSet,1,0);
+            const int path = lua_gettop(L);
+            lua_pushfstring(L,"QMAKE_POST_LINK += $$QMAKE_COPY $$quote(%s) ..\n\n", lua_tostring(L,path));
+            fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
+            lua_pop(L,2);
+        }
 #endif
     }
 
