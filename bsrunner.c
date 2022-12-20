@@ -1702,6 +1702,97 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
     assert( top == bottom );
 }
 
+static void runuic(lua_State* L,int inst, int cls, int builtins)
+{
+    const int top = lua_gettop(L);
+
+    lua_createtable(L,0,0);
+    const int outlist = lua_gettop(L);
+    lua_pushinteger(L,BS_SourceFiles);
+    lua_setfield(L,outlist,"#kind");
+    lua_pushvalue(L,outlist);
+    lua_setfield(L,inst,"#out");
+
+    bs_getModuleVar(L,inst,"#dir");
+    const int absDir = lua_gettop(L);
+
+    lua_getfield(L,builtins,"#inst");
+    const int binst = lua_gettop(L);
+
+    lua_getfield(L,binst,"root_build_dir");
+    bs_getModuleVar(L,inst,"#rdir");
+    addPath(L,-2,-1);
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
+
+    lua_getfield(L,inst,"tool_dir");
+    const int app = lua_gettop(L);
+    if( lua_isnil(L,app) || strcmp(".",lua_tostring(L,app)) == 0 )
+    {
+        lua_getfield(L,binst,"uic_path");
+        lua_replace(L,app);
+    }
+    if( lua_isnil(L,app) || strcmp(".",lua_tostring(L,app)) == 0 )
+    {
+        lua_pushstring(L,"uic");
+        lua_replace(L,app);
+    }else if( *lua_tostring(L,app) != '/' )
+        luaL_error(L,"uic_path cannot be relative: %s", lua_tostring(L,app));
+    else
+    {
+        lua_pushfstring(L,"%s/uic", lua_tostring(L,app));
+        lua_replace(L,app);
+    }
+
+    size_t i;
+    lua_getfield(L,inst,"sources");
+    const int sources = lua_gettop(L);
+    for( i = 1; i <= lua_objlen(L,sources); i++ )
+    {
+        lua_rawgeti(L,sources,i);
+        const int source = lua_gettop(L);
+        if( *lua_tostring(L,source) != '/' )
+        {
+            addPath(L,absDir,source);
+            lua_replace(L,source);
+        }
+
+        int len = 0;
+        const char* name = bs_path_part(lua_tostring(L,source),BS_baseName, &len);
+        lua_pushlstring(L,name,len);
+        lua_pushfstring(L,"%s/ui_%s.h",lua_tostring(L,outDir), lua_tostring(L,-1));
+        lua_replace(L,-2);
+        const int outFile = lua_gettop(L);
+
+        lua_pushfstring(L, "%s %s -o %s", bs_denormalize_path(lua_tostring(L,app) ),
+                        bs_denormalize_path(lua_tostring(L,source) ),
+                        bs_denormalize_path(lua_tostring(L,outFile)));
+        const int cmd = lua_gettop(L);
+
+        const time_t srcExists = bs_exists(lua_tostring(L,source));
+        const time_t outExists = bs_exists(lua_tostring(L,outFile));
+
+        if( !outExists || outExists < srcExists )
+        {
+            fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+            fflush(stdout);
+            // only call if outfile is older than source
+            if( bs_exec(lua_tostring(L,cmd)) != 0 )
+            {
+                // stderr was already written to the console
+                lua_pushnil(L);
+                lua_error(L);
+            }
+        }
+        lua_pop(L,3); // cmd, source, outFile
+    }
+
+    lua_pop(L,6); // outlist absDir binst outDir app sources
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+}
+
 static void copy(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
@@ -1983,6 +2074,8 @@ int bs_run(lua_State* L) // args: productinst, returns: inst
         runmoc(L,inst,cls,builtins);
     else if( isa( L, builtins, cls, "Rcc") )
         runrcc(L,inst,cls,builtins);
+    else if( isa( L, builtins, cls, "Uic") )
+        runuic(L,inst,cls,builtins);
     else
         luaL_error(L,"don't know how to build instances of class '%s'", name);
 

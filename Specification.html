@@ -20,7 +20,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">1.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">1.2.1</a></span>
-2022-12-16</div>
+2022-12-20</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">1.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">1.3.1</a></span>
@@ -128,7 +128,7 @@ A lot of text is derived from the Oberon+ language specification, <a href="https
 <div style="margin-left:99px"><span class="label"><a name="12641">1.5.2.2.3.4</a></span>
 <a href="#12635">3.2.5.4 Rcc</a></div>
 <div style="margin-left:99px"><span class="label"><a name="12303">1.5.2.2.3.5</a></span>
-<a href="#11893">3.2.5.5 Copy</a></div>
+<a href="#11893">3.2.5.6 Copy</a></div>
 <div style="margin-left:45px"><span class="label"><a name="12305">1.5.3</a></span>
 <a href="#11697">4 Predeclared  Field Reference</a></div>
 <div style="margin-left:45px"><span class="label"><a name="12343">1.5.4</a></span>
@@ -796,19 +796,25 @@ Note that usually Q_OBJECT marked classes are in header files; if instead a .cp
 <b>Main</b>: <a href="#11885">sources</a>, <a href="#12819">tool_dir</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12637">3.2.5.4.2</a></span>
 Calls the Qt <b>rcc</b> executable from <a href="#12819">tool_dir</a> or - if <a href="#12819">tool_dir</a> is '.' - from the directory given by the rcc_path variable and generates the corresponding cpp file. Use it as a dependency of SourceSet, Library or Executable so the resulting cpp files are automatically compiled and linked (see <a href="https://doc.qt.io/qt-5/rcc.html"><u>the original Qt rcc documentation</u></a> for more information).</div>
-<h4 style="margin-left:63px"><span class="label"><a name="11893">3.2.5.5</a></span>
+<h4 style="margin-left:63px"><span class="label"><a name="12940">3.2.5.5</a></span>
+Uic</h4>
+<div style="margin-left:81px"><span class="label"><a name="12941">3.2.5.5.1</a></span>
+<b>Main</b>: <a href="#11885">sources</a>, <a href="#12819">tool_dir</a></div>
+<div style="margin-left:81px"><span class="label"><a name="12942">3.2.5.5.2</a></span>
+Calls the Qt <b>uic</b> executable from <a href="#12819">tool_dir</a> or - if <a href="#12819">tool_dir</a> is '.' - from the directory given by the uic_path variable and generates a header file corresponding to the user interface specification (see <a href="https://doc.qt.io/qt-5/uic.html"><u>the original Qt uic documentation</u></a> for more information). Usually build_dir() has to be added to the include_dirs of the product using the interface (i.e. which includes the generated header).</div>
+<h4 style="margin-left:63px"><span class="label"><a name="11893">3.2.5.6</a></span>
 <b>Copy</b></h4>
-<div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.5.1</a></span>
+<div style="margin-left:81px"><span class="label"><a name="11904">3.2.5.6.1</a></span>
 <b>Main</b>: <a href="#11885">sources</a>, <a href="#11907">outputs</a>, <a href="#12679">use_deps</a></div>
-<div style="margin-left:81px"><span class="label"><a name="12682">3.2.5.5.2</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12682">3.2.5.6.2</a></span>
 Copy the files explicitly listed in <a href="#11885">sources</a> or received from <a href="#11831">deps</a> (subject to the file types in <a href="#12679">use_deps</a>) to the places listed in <a href="#11907">outputs</a>. </div>
-<div style="margin-left:81px"><span class="label"><a name="12683">3.2.5.5.3</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12683">3.2.5.6.3</a></span>
 <a href="#11907">outputs</a> makes use of <a href="#12603">Source Expansion</a>; the place-holders <a href="#12610">{{source_file_part}}</a>, <a href="#12612">{{source_name_part}}</a> and <a href="#12621">{{source_ext}}</a> are available.</div>
-<div style="margin-left:81px"><span class="label"><a name="12684">3.2.5.5.4</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12684">3.2.5.6.4</a></span>
 <a href="#11885">sources</a> and <a href="#11907">outputs</a> can include as many files as you want; each entry in <a href="#11885">sources</a> is copied to all places in <a href="#11907">outputs</a>.</div>
-<div style="margin-left:81px"><span class="label"><a name="12842">3.2.5.5.5</a></span>
+<div style="margin-left:81px"><span class="label"><a name="12842">3.2.5.6.5</a></span>
 The file system directories on the paths referenced by <a href="#11907">outputs</a> are recursively created if they don't exist yet.  </div>
-<div style="margin-left:81px"><span class="label"><a name="12685">3.2.5.5.6</a></span><span class="ident">NOTE</span>
+<div style="margin-left:81px"><span class="label"><a name="12685">3.2.5.6.6</a></span><span class="ident">NOTE</span>
 If the output file exists it is overwritten without warning.</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11697">4</a></span>
 <b>Predeclared Field Reference</b></h4>
@@ -917,7 +923,7 @@ The results of <a href="#11633">Executable</a>, <a href="#11662">Library</a>, <a
 <div style="margin-left:63px"><span class="label"><a name="12677">4.10.4.8</a></span>
 <a href="#11893">Copy</a> includes the file types listed in <a href="#12679">use_deps</a> from its dependencies in its source list, but doesn't pass anything up the dependency tree.</div>
 <div style="margin-left:63px"><span class="label"><a name="12675">4.10.4.9</a></span>
-<a href="#12590">Message</a> doesn't consume or pass through anything from their dependencies.</div>
+<a href="#12590">Message</a> and <a href="#12940">Uic</a> don't consume or pass through anything from their dependencies.</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11825">4.11</a></span>
 frameworks</h4>
 <div style="margin-left:45px"><span class="label"><a name="11826">4.11.1</a></span>
@@ -1067,9 +1073,9 @@ The sources are the set of files that the script will be executed over. The scri
 <div style="margin-left:81px"><span class="label"><a name="11898">4.22.4.2.1</a></span>
 The source are the source files to copy.</div>
 <div style="margin-left:63px"><span class="label"><a name="12628">4.22.4.3</a></span>
-<a href="#12625">Moc</a> and <a href="#12635">Rcc</a></div>
+<a href="#12625">Moc</a>, <a href="#12635">Rcc</a> and <a href="#12940">Uic</a></div>
 <div style="margin-left:81px"><span class="label"><a name="12629">4.22.4.3.1</a></span>
-The sources are the files which have to be processed by moc or rcc.</div>
+The sources are the files which have to be processed by moc, rcc or uic.</div>
 <h4 style="margin-left:45px"><span class="label"><a name="12603">4.22.5</a></span>
 Source Expansion</h4>
 <div style="margin-left:63px"><span class="label"><a name="12605">4.22.5.1</a></span>
@@ -1192,29 +1198,33 @@ The absolute file system directory path where the moc executable is supposed to 
 <b>var rcc_path: path</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12653">6.11.1</a></span>
 The absolute file system directory path where the rcc executable is supposed to be. If the path is '.' then the tool is assumed to be on the operating system search path and called with no directory prefix.</div>
-<div style="margin-left:27px"><span class="label"><a name="11927">6.12</a></span>
+<div style="margin-left:27px"><span class="label"><a name="12943">6.12</a></span>
+<b>var uic_path: path</b></div>
+<div style="margin-left:45px"><span class="label"><a name="12944">6.12.1</a></span>
+The absolute file system directory path where the uic executable is supposed to be. If the path is '.' then the tool is assumed to be on the operating system search path and called with no directory prefix.</div>
+<div style="margin-left:27px"><span class="label"><a name="11927">6.13</a></span>
 <b>var target_cpu: CpuType</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12646">6.12.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12646">6.13.1</a></span>
 initialized with host_cpu</div>
-<div style="margin-left:27px"><span class="label"><a name="11928">6.13</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11928">6.14</a></span>
 <b>var target_cpu_ver: int</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12647">6.13.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12647">6.14.1</a></span>
 initialized with host_cpu_ver</div>
-<div style="margin-left:27px"><span class="label"><a name="11929">6.14</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11929">6.15</a></span>
 <b>var target_wordsize: WordSize</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12648">6.14.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12648">6.15.1</a></span>
 initialized with host_wordsize</div>
-<div style="margin-left:27px"><span class="label"><a name="11930">6.15</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11930">6.16</a></span>
 <b>var target_os: OsType</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12649">6.15.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12649">6.16.1</a></span>
 initialized with host_os</div>
-<div style="margin-left:27px"><span class="label"><a name="11931">6.16</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11931">6.17</a></span>
 <b>var target_toolchain: CompilerType</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12650">6.16.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12650">6.17.1</a></span>
 initialized with host_toolchain_ver</div>
-<div style="margin-left:27px"><span class="label"><a name="11932">6.17</a></span>
+<div style="margin-left:27px"><span class="label"><a name="11932">6.18</a></span>
 <b>var target_toolchain_ver: int</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12651">6.17.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12651">6.18.1</a></span>
 initialized with host_toolchain_ver; future versions will support cross-compilation where host and target toolchain usually differ.</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11996">7</a></span>
 <b>Predeclared Procedure Reference</b></h4>

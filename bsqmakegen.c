@@ -544,7 +544,7 @@ static void groupDep(lua_State* L, int inst)
 typedef enum BS_Class { BS_NoClass, BS_LibraryClass, BS_ExecutableClass, BS_SourceSetClass,
                         BS_GroupClass, BS_ConfigClass,
                         BS_LuaScriptClass, BS_LuaScriptForEachClass, BS_CopyClass, BS_MessageClass,
-                        BS_MocClass, BS_RccClass } BS_Class;
+                        BS_MocClass, BS_RccClass, BS_UicClass } BS_Class;
 static const char* getClassName(int cls)
 {
     switch( cls )
@@ -571,6 +571,8 @@ static const char* getClassName(int cls)
         return "Moc";
     case BS_RccClass:
         return "Rcc";
+    case BS_UicClass:
+        return "Uic";
     default:
         return "<unknown>";
     }
@@ -603,6 +605,8 @@ static int getClass(lua_State* L, int prodinst, int builtins)
         res = BS_MocClass;
     else if( isa( L, builtins, cls, "Rcc") )
         res = BS_RccClass;
+    else if( isa( L, builtins, cls, "Uic") )
+        res = BS_UicClass;
     lua_pop(L,1); // cls
     return res;
 }
@@ -657,6 +661,7 @@ static int calcDep(lua_State* L) // param: inst
     case BS_LuaScriptForEachClass:
     case BS_CopyClass:
     case BS_MessageClass:
+    case BS_UicClass:
         break; // NOP
     case BS_LuaScriptClass:
         assureOut(L,inst);
@@ -970,6 +975,7 @@ static int findModulePath(lua_State* L, int inst, int builtins, const char* path
                 lua_getfield(L,decl,"#type");
                 const int cls = lua_gettop(L);
                 isMoc = isa( L, builtins, cls, "Moc")
+                        || isa( L, builtins, cls, "Uic")
                         || isa( L, builtins, cls, "LuaScript")
                         || isa( L, builtins, cls, "LuaScriptForeach");
                 lua_pop(L,1); // cls
@@ -1998,6 +2004,49 @@ static void genRcc(lua_State* L, int inst, int builtins, FILE* out )
     fwrite(text4,1,strlen(text4),out);
 }
 
+static void genUic(lua_State* L, int inst, int builtins, FILE* out )
+{
+    const char* text =
+            "QT -= core gui\n"
+            "TEMPLATE = aux\n"
+            "CONFIG -= qt\n"
+            "CONFIG -= debug_and_release debug_and_release_target\n";
+    fwrite(text,1,strlen(text),out);
+
+    const char* text7 = "UIC_SOURCES +=";
+    fwrite(text7,1,strlen(text7),out);
+    addSources(L, inst, out,0);
+    fwrite("\n\n",1,2,out);
+
+#if 1
+    lua_getfield(L,inst,"tool_dir");
+    const int tool_dir = lua_gettop(L);
+    if( !lua_isnil(L,tool_dir) && strcmp(".",lua_tostring(L,tool_dir)) != 0 )
+    {
+        remapPath(L,builtins,tool_dir);
+        lua_pushfstring(L,"uic_path = \\\"%s/uic\\\"\n", bs_denormalize_path(lua_tostring(L,tool_dir)));
+        fwrite(lua_tostring(L,-1),1,lua_objlen(L,-1),out);
+        lua_pop(L,1); // string
+    }
+    lua_pop(L,1); // tool_dir
+#endif
+
+    const char* text3 = "compiler.commands = $$uic_path "
+            "\\\"${QMAKE_FILE_IN}\\\" "
+            "-o \\\"$$shadowed($$PWD)/ui_${QMAKE_FILE_BASE}.h\\\"";
+    fwrite(text3,1,strlen(text3),out);
+    fwrite("\n",1,1,out);
+
+    const char* text5 = "compiler.input = UIC_SOURCES\n";
+    fwrite(text5,1,strlen(text5),out);
+
+    const char* text6 = "compiler.output = $$shadowed($$PWD)/ui_${QMAKE_FILE_BASE}.h\n";
+    fwrite(text6,1,strlen(text6),out);
+
+    const char* text4 = "QMAKE_EXTRA_COMPILERS += compiler\n";
+    fwrite(text4,1,strlen(text4),out);
+}
+
 static int genproduct(lua_State* L) // arg: prodinst
 {
     // Here we now do without the original module structure and instead linearize all modules depth-first
@@ -2050,6 +2099,9 @@ static int genproduct(lua_State* L) // arg: prodinst
         break;
     case BS_RccClass:
         genRcc(L,prodinst, builtins, out);
+        break;
+    case BS_UicClass:
+        genUic(L,prodinst, builtins, out);
         break;
     case BS_LuaScriptClass:
         genScript(L,prodinst, out);
@@ -2370,7 +2422,7 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
 
         const int cls = getClass(L,prodinst,builtins);
         if( cls == BS_LibraryClass || cls == BS_ExecutableClass || cls == BS_SourceSetClass ||
-                cls == BS_MocClass || cls == BS_RccClass || cls == BS_LuaScriptClass
+                cls == BS_MocClass || cls == BS_RccClass || cls == BS_UicClass || cls == BS_LuaScriptClass
         #ifdef BS_QMAKE_HAVE_COPY
                 || cls == BS_CopyClass
         #endif

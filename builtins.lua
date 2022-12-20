@@ -225,6 +225,10 @@ class("Rcc", globals.Action)
 	field("sources", listOf(globals.path))
 	field("tool_dir", globals.path)
 
+class("Uic", globals.Action)
+	field("sources", listOf(globals.path))
+	field("tool_dir", globals.path)
+
 ---- predeclared procs
 
 local function proc(name,id)
@@ -273,6 +277,7 @@ variable("target_toolchain", globals.CompilerType, false)
 variable("target_toolchain_ver", globals.int, false)
 variable("moc_path", globals.path, false)
 variable("rcc_path", globals.path, false)
+variable("uic_path", globals.path, false)
 
 B = require("BUSY")
 -- preset global variables; inst is the instance of the globals declaration
@@ -287,6 +292,7 @@ inst.host_toolchain, inst.host_toolchain_ver = B.compiler()
 inst.target_toolchain, inst.target_toolchain_ver = inst.host_toolchain, inst.host_toolchain_ver
 inst.moc_path = "."
 inst.rcc_path = "."
+inst.uic_path = "."
 inst["#ctdefaults"] = {} -- a table with optional entries CompilerType->Config
 inst["#ctdefaults"]["gcc"] = { ["cflags"] = { "-O2" } }
 inst["#ctdefaults"]["clang"] = inst["#ctdefaults"]["gcc"]
