@@ -600,7 +600,7 @@ static void addall2(lua_State* L,int inst,int ldflags, int lib_dirs, int lib_nam
     assert( top == bottom );
 }
 
-static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int ismsvc)
+static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int toolchain, int resKind)
 {
     // BS_ObjectFiles: list of file names
     // BS_StaticLib, BS_DynamicLib, BS_Executable: one file name
@@ -621,7 +621,7 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
             lua_rawgeti(L,list,i);
             const int sublist = lua_gettop(L);
             assert( lua_istable(L,sublist) );
-            const time_t exists = renderobjectfiles(L,sublist,out, buf, ismsvc);
+            const time_t exists = renderobjectfiles(L,sublist,out, buf, toolchain, resKind);
             if( exists > srcExists )
                 srcExists = exists;
             lua_pop(L,1); // sublist
@@ -648,11 +648,12 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
         break;
     case BS_StaticLib:
     case BS_DynamicLib:
+        if( resKind != BS_StaticLib || k == BS_StaticLib )
         {
             lua_rawgeti(L,list,1); // there is only one item, which has index 1
             const int path = lua_gettop(L);
 
-            if(ismsvc && k == BS_DynamicLib)
+            if( toolchain == BS_msvc && k == BS_DynamicLib)
             {
                 // add .lib because msvc requires an import library to use the dll
                 lua_pushstring(L,".lib");
@@ -681,9 +682,9 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
     return srcExists;
 }
 
-static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
+static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
 {
-    assert( kind == BS_Executable || kind == BS_DynamicLib || kind == BS_StaticLib );
+    assert( resKind == BS_Executable || resKind == BS_DynamicLib || resKind == BS_StaticLib );
 
     const int top = lua_gettop(L);
 
@@ -722,7 +723,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     lua_pushvalue(L,-1);
     lua_pushstring(L,"/");
 
-    if( !win32 && ( kind == BS_DynamicLib || kind == BS_StaticLib ) )
+    if( !win32 && ( resKind == BS_DynamicLib || resKind == BS_StaticLib ) )
         lua_pushstring(L,"lib"); // if not on Windows prefix the lib name with "lib"
     else
         lua_pushstring(L,"");
@@ -739,7 +740,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
     const int outbase = lua_gettop(L);
 
     lua_pushvalue(L,outbase);
-    switch(kind)
+    switch(resKind)
     {
     case BS_DynamicLib:
         if( win32 )
@@ -780,7 +781,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
         // TODO: since we always use gcc (not g++ and the like) additional flags and libs might be needed
         // see https://stackoverflow.com/questions/172587/what-is-the-difference-between-g-and-gcc
         // g++ on link time is equivalent to gcc -lstdc++ -shared-libgcc
-        switch(kind)
+        switch(resKind)
         {
         case BS_Executable:
             lua_pushfstring(L,"gcc @\"%s\" -o \"%s\"",
@@ -807,7 +808,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
         }
         break;
     case BS_clang:
-        switch(kind)
+        switch(resKind)
         {
         case BS_Executable:
             lua_pushfstring(L,"clang @\"%s\" -o \"%s\"",
@@ -837,7 +838,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
         }
         break;
     case BS_msvc:
-        switch(kind)
+        switch(resKind)
         {
         case BS_Executable:
             lua_pushfstring(L,"link /nologo @\"%s\" /out:\"%s\"",
@@ -863,7 +864,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
 
     lua_createtable(L,0,0);
     const int outlist = lua_gettop(L);
-    lua_pushinteger(L,kind);
+    lua_pushinteger(L,resKind);
     lua_setfield(L,outlist,"#kind");
     lua_pushvalue(L,out);
     lua_rawseti(L,outlist,1);
@@ -879,19 +880,22 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int kind)
         if( f == NULL )
             luaL_error(L, "cannot open rsp file for writing: %s", lua_tostring(L,rsp));
 
-        srcExists = renderobjectfiles(L,inlist,f,0, toolchain == BS_msvc);
+        srcExists = renderobjectfiles(L,inlist,f,0, toolchain, resKind);
 
-        fwrite(lua_tostring(L,ldflags),1,lua_objlen(L,ldflags),f);
-        fwrite(lua_tostring(L,lib_dirs),1,lua_objlen(L,lib_dirs),f);
-        fwrite(lua_tostring(L,lib_names),1,lua_objlen(L,lib_names),f);
-        fwrite(lua_tostring(L,lib_files),1,lua_objlen(L,lib_files),f);
-        fwrite(lua_tostring(L,frameworks),1,lua_objlen(L,frameworks),f);
+        if( resKind != BS_StaticLib )
+        {
+            fwrite(lua_tostring(L,ldflags),1,lua_objlen(L,ldflags),f);
+            fwrite(lua_tostring(L,lib_dirs),1,lua_objlen(L,lib_dirs),f);
+            fwrite(lua_tostring(L,lib_names),1,lua_objlen(L,lib_names),f);
+            fwrite(lua_tostring(L,lib_files),1,lua_objlen(L,lib_files),f);
+            fwrite(lua_tostring(L,frameworks),1,lua_objlen(L,frameworks),f);
+        }
 
         fclose(f);
     }else
     {
         // luaL_Buffer doesn't work; luaL_pushresult produces "attempt to concatenate a table value"
-        srcExists = renderobjectfiles(L,inlist,0,cmd, toolchain == BS_msvc);
+        srcExists = renderobjectfiles(L,inlist,0,cmd, toolchain, resKind);
         // TODO lib_files
     }
 

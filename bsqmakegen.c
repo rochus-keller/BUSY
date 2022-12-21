@@ -2333,20 +2333,9 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
         luaL_error(L,"moc_path cannot be relative: %s", lua_tostring(L,mocPath));
     else
     {
-#if 0
-        lua_pushfstring(L,"%s/moc", bs_denormalize_path(lua_tostring(L,mocPath)));
-        const char* cmd = lua_tostring(L,-1);
-        if( !tryrun(L,builtins,cmd) )
-        {
-            lua_pop(L,1);
-            lua_pushstring(L,defaultPath);
-        }
-        lua_replace(L,mocPath);
-#else
         remapPath(L,builtins,mocPath);
         lua_pushfstring(L,"%s/moc", bs_denormalize_path(lua_tostring(L,mocPath)));
         lua_replace(L,mocPath);
-#endif
     }
     fwrite(lua_tostring(L,mocPath),1,lua_objlen(L,mocPath),out);
     fwrite("\"\n",1,2,out);
@@ -2365,22 +2354,32 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
         luaL_error(L,"rcc_path cannot be relative: %s", lua_tostring(L,rccPath));
     else
     {
-#if 0
-        lua_pushfstring(L,"%s/rcc", bs_denormalize_path(lua_tostring(L,rccPath)));
-        const char* cmd = lua_tostring(L,-1);
-        if( !tryrun(L,builtins,cmd) )
-        {
-            lua_pop(L,1);
-            lua_pushstring(L,defaultRccPath);
-        }
-        lua_replace(L,rccPath);
-#else
         remapPath(L,builtins,rccPath);
         lua_pushfstring(L,"%s/rcc", bs_denormalize_path(lua_tostring(L,rccPath)));
         lua_replace(L,rccPath);
-#endif
     }
     fwrite(lua_tostring(L,rccPath),1,lua_objlen(L,rccPath),out);
+    fwrite("\"\n",1,2,out);
+
+    const char* text16 = "uic_path = \"";
+    fwrite(text16,1,strlen(text16),out);
+
+    lua_getfield(L,binst,"uic_path");
+    const int uicPath = lua_gettop(L);
+    const char* defaultUicPath = "$$root_build_dir/uic";
+    if( lua_isnil(L,uicPath) || strcmp(".",lua_tostring(L,uicPath)) == 0 )
+    {
+        lua_pushstring(L,defaultUicPath);
+        lua_replace(L,uicPath);
+    }else if( *lua_tostring(L,uicPath) != '/' )
+        luaL_error(L,"uic_path cannot be relative: %s", lua_tostring(L,uicPath));
+    else
+    {
+        remapPath(L,builtins,uicPath);
+        lua_pushfstring(L,"%s/uic", bs_denormalize_path(lua_tostring(L,uicPath)));
+        lua_replace(L,uicPath);
+    }
+    fwrite(lua_tostring(L,uicPath),1,lua_objlen(L,uicPath),out);
     fwrite("\"\n",1,2,out);
 
     fclose(out);
@@ -2475,7 +2474,7 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     fwrite(text9,1,strlen(text9),out);
     fclose(out);
 
-    lua_pop(L,11); // order builtins, binst, buildDir, confPath, sourceDir, mocPath, rccPath, proPath, dummyPath
+    lua_pop(L,12); // order builtins, binst, buildDir, confPath, sourceDir, mocPath, rccPath, uicPath, proPath, dummyPath
     assert( top == lua_gettop(L) );
     return 0;
 }
