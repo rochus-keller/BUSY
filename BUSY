@@ -1,0 +1,23 @@
+# Copyright (C) 2022 Rochus Keller (me@rochus-keller.ch) for LeanCreator
+# licensed under GPL/LGPL
+
+
+let run_rcc * : Rcc {
+	.sources += ./busy.qrc
+}
+
+let lib * : Library {
+	.sources += [
+		./bshost.c      ./bsunicode.c  ./ldebug.c  ./liolib.c    ./lopcodes.c  ./ltable.c   ./lzio.c
+		./bslex.c       ./lapi.c       ./ldo.c     ./llex.c      ./loslib.c    ./ltablib.c  ./print.c
+		./bslib.c       ./lauxlib.c    ./ldump.c   ./lmathlib.c  ./lparser.c   ./ltm.c
+		./bsparser.c    ./lbaselib.c   ./lfunc.c   ./lmem.c      ./lstate.c    
+		./bsqmakegen.c  ./lcode.c      ./lgc.c     ./loadlib.c   ./lstring.c   ./lundump.c
+		./bsrunner.c    ./ldblib.c     ./linit.c   ./lobject.c   ./lstrlib.c   ./lvm.c
+	]
+}
+
+let exe ! : Executable {
+	.sources += ./lua.c
+	.deps += lib
+}

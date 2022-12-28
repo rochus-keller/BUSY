@@ -18,7 +18,7 @@
 QT       -= core
 QT       -= gui
 
-TARGET = Lua
+TARGET = lua
 CONFIG   += console
 CONFIG   -= app_bundle
 

@@ -267,6 +267,62 @@ static void addToScope(BSParserContext* ctx, BSScope* scope, BSIdentDef* id, int
 
 static int expression(BSParserContext* ctx, BSScope* scope, int lhsType);
 static void parampath(BSParserContext* ctx, const char* name, int len);
+
+static int /*BSPathStatus*/ caclFsDir(BSParserContext* ctx, const char* path, int pathlen)
+{
+    BS_BEGIN_LUA_FUNC(ctx,1);
+
+    lua_pushvalue(ctx->L, ctx->module.table);
+    const int root = lua_gettop(ctx->L);
+    lua_getfield(ctx->L,root,"^");
+    while( !lua_isnil(ctx->L,-1) )
+    {
+        lua_replace(ctx->L,root);
+        lua_getfield(ctx->L,root,"^");
+    }
+    lua_pop(ctx->L,1);
+    lua_getfield(ctx->L,root,"#dir");
+    lua_replace(ctx->L,root);
+
+    if( *path != '/' )
+    {
+        // this is a relative path, either normalized or not
+
+        // first calc the absolute path of the new subdir (to avoide ../ exhaution)
+        lua_getfield(ctx->L,ctx->module.table,"#dir");
+        if( *path != '.' )
+        {
+            // not yet normalized
+            lua_pushstring(ctx->L,"./");
+            lua_pushlstring(ctx->L,path,pathlen);
+            lua_concat(ctx->L,2);
+        }else
+            lua_pushlstring(ctx->L,path,pathlen);
+        // stack: root, #dir, relpath
+        int res = bs_add_path(ctx->L, -2, -1);
+        if( res != BS_OK )
+        {
+            lua_pop(ctx->L,3);
+            return res;
+        }
+        // stack: root, #dir, relpath, abspath
+        lua_replace(ctx->L,-3);
+        lua_pop(ctx->L,1);
+    }else
+        lua_pushlstring(ctx->L,path,pathlen);
+
+    // stack: root, abs submod fspath
+
+    // now calc the relative path
+    int res = bs_makeRelative(lua_tostring(ctx->L,-2),lua_tostring(ctx->L,-1));
+    lua_pop(ctx->L,2);
+    if( res == BS_OK )
+        lua_pushstring(ctx->L, bs_global_buffer() );
+
+    BS_END_LUA_FUNC(ctx);
+    return res;
+}
+
 static void submodule(BSParserContext* ctx, int subdir)
 {
     BS_BEGIN_LUA_FUNC(ctx,0);
@@ -455,7 +511,7 @@ static void submodule(BSParserContext* ctx, int subdir)
             lua_getfield(ctx->L,ctx->module.table,"#dir");
             lua_pushlstring(ctx->L,altpath,altpathlen);
             if( bs_add_path(ctx->L, -2, -1) != 0 )
-                error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path" );
+                error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path (1)" );
             lua_replace(ctx->L,-3);
             lua_pop(ctx->L,1);
         }else
@@ -481,53 +537,29 @@ static void submodule(BSParserContext* ctx, int subdir)
         pathlen -= 2;
     }
 
+    if( caclFsDir(ctx, path, pathlen) != BS_OK )
+    {
+        error(ctx, pt.loc.row, pt.loc.col,"error creating relative file system path" );
+    } // else
+    lua_setfield(ctx->L,module,"#fsrdir");
+
     if( *path == '/' )
     {
-        lua_getfield(ctx->L,ctx->module.table,"#dir");
-        lua_pushlstring(ctx->L,path,pathlen);
-        const int res = bs_makeRelative(lua_tostring(ctx->L,-2),lua_tostring(ctx->L,-1));
-        lua_pop(ctx->L,2);
-        if( res != BS_OK )
-            error(ctx, pt.loc.row, pt.loc.col,"cannot make this path relative" );
-        lua_getfield(ctx->L,ctx->module.table,"#fsrdir");
-        lua_pushstring(ctx->L, bs_global_buffer() );
-        const char* str = bs_global_buffer();
-        if( bs_add_path(ctx->L, -2, -1) != 0 )
-            error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path" );
-        lua_replace(ctx->L,-3);
-        lua_pop(ctx->L,1);
-        str = lua_tostring(ctx->L,-1);
-        lua_setfield(ctx->L,module,"#fsrdir");
-
         lua_pushlstring(ctx->L,path,pathlen); // this is already an absolute path
-
     }else
     {
+        // submod name = relpath
         if( *path == '.' )
         {
-            // already normalized
-            lua_getfield(ctx->L,ctx->module.table,"#fsrdir");
-            lua_pushlstring(ctx->L,path,pathlen);
-            if( bs_add_path(ctx->L, -2, -1) != 0 )
-                error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path" );
-            lua_replace(ctx->L,-3);
-            lua_pop(ctx->L,1);
-            lua_setfield(ctx->L,module,"#fsrdir");
-
+            // already normalized, either ./ or ../
             lua_getfield(ctx->L,ctx->module.table,"#dir");
             lua_pushlstring(ctx->L,path,pathlen);
             if( bs_add_path(ctx->L, -2, -1) != 0 )
-                error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path" );
+                error(ctx, pt.loc.row, pt.loc.col,"cannot convert this path (4)" );
             lua_replace(ctx->L,-3);
             lua_pop(ctx->L,1);
         }else
         {
-            lua_getfield(ctx->L,ctx->module.table,"#fsrdir");
-            lua_pushstring(ctx->L,"/");
-            lua_pushlstring(ctx->L,path,pathlen);
-            lua_concat(ctx->L,3);
-            lua_setfield(ctx->L,module,"#fsrdir");
-
             lua_pushstring(ctx->L,ctx->dirpath);
             lua_pushstring(ctx->L,"/");
             lua_pushlstring(ctx->L,path,pathlen);
@@ -1406,7 +1438,7 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
             {
                 lua_getfield(ctx->L,ctx->module.table,"#dir");
                 if( bs_add_path(ctx->L,-1,-3) != 0 )
-                    error(ctx, row, col,"cannot convert this path" );
+                    error(ctx, row, col,"cannot convert this path (5)" );
             }
             lua_replace(ctx->L,-2);
         }
@@ -1432,7 +1464,7 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
             lua_replace(ctx->L,-2);
             // v1, t1, v2, t2, dir
             if( bs_add_path(ctx->L,-1,-3) != 0 )
-                error(ctx, row, col,"cannot convert this path" );
+                error(ctx, row, col,"cannot convert this path (6)" );
             // v1, t1, v2, t2, dir, path
             lua_replace(ctx->L,-2);
             // v1, t1, v2, t2, path
@@ -1460,7 +1492,7 @@ static void readstring(BSParserContext* ctx, int n, int row, int col)
     {
         lua_getfield(ctx->L,ctx->module.table,"#dir");
         if( bs_add_path(ctx->L,-1,-3) != 0 )
-            error(ctx, row, col,"cannot convert this path" );
+            error(ctx, row, col,"cannot convert this path (7)" );
         // stack: rel, type, field, abs
         lua_replace(ctx->L,-4);
         lua_pop(ctx->L,1);
@@ -2829,7 +2861,10 @@ int bs_add_path(lua_State* L, int lhs, int rhs)
                     break;
             }
             if( llen < 1 )
+            {
+                // rhs exhausts lhs
                 return 2; // right side cannot be appended to given left side
+            }
         }
         lua_pushlstring(L,lstr,llen);
     }else if( strncmp(rstr,".",1) == 0 )
@@ -4205,9 +4240,9 @@ int bs_parse(lua_State* L)
         lua_setfield(L,module,"#kind");
         lua_replace(L,BS_NewModule);
         lua_pushstring(L,"."); // start rdir from '.'
-        lua_setfield(L,BS_NewModule,"#rdir"); // relative virtual directory
+        lua_setfield(L,BS_NewModule,"#rdir"); // virtual directory relative to source root
         lua_pushstring(L,"."); // start rdir from '.'
-        lua_setfield(L,BS_NewModule,"#fsrdir"); // relative file system directory
+        lua_setfield(L,BS_NewModule,"#fsrdir"); // file system directory relative to source root
     }
 
     lua_getglobal(L, "require");

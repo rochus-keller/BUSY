@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/busy">
+        <file>builtins.lua</file>
+    </qresource>
+</RCC>

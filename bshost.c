@@ -767,7 +767,7 @@ BSPathStatus bs_makeRelative(const char* normalizedRefDir, const char* normalize
         return BS_NotSupported; // no relative path if on different drives
 
     size_t head = 0;
-    while(1)
+    while( normalizedRefDir[head] && normalizedTarget[head] )
     {
         if( normalizedRefDir[head] == normalizedTarget[head] )
             head++;
@@ -775,22 +775,66 @@ BSPathStatus bs_makeRelative(const char* normalizedRefDir, const char* normalize
             break;
     }
     // head is now on the first char which is different in normalizedSource and normalizedTarget
+    // this can be in a name segment, such as e.g. Modules/LeanCreator and Modules/LeanQt, which is equal including 'Lean'
+
     if( head < 2 )
         return BS_NotSupported;
 
-    size_t level = 1;
-    size_t i = strlen(normalizedRefDir) - 1;
-    if( i == head-1 )
-        level = 0;
-    else
-        while( i >= head )
+    // Case A:
+    // R Modules/LeanCreator
+    // T Modules/LeanCreator/app
+    //                head: ^
+
+    // Case B:
+    // R Modules/LeanCreator/app
+    // T Modules/LeanCreator
+    //                head: ^
+
+    // Case C:
+    // R Modules/LeanCreator
+    // T Modules/LeanCreator
+    //                head: ^
+
+    // Case D:
+    // R Modules/LeanCreator
+    // T Modules/LeanQt/core
+    //         head: ^
+
+    // Case E:
+    // R Modules/LeanCreator
+    // T Modules/BUSY
+    //     head: ^
+
+    size_t level = 0;
+
+    if( normalizedRefDir[head] == 0 )
+    {
+        // cases A or C
+        // level is 0
+    }else
+    {
+        // cases B, D or E
+        if( normalizedTarget[head] != 0 )
+        {
+            // cases D or E
+            while( head > 0 && normalizedRefDir[head] != '/' )
+                head--;
+        }
+        assert( normalizedRefDir[head] == '/' );
+
+        level = 1;
+        size_t i = strlen(normalizedRefDir) - 1;
+        while( i > head )
         {
             if( normalizedRefDir[i] == '/' )
                 level++;
             i--;
         }
+    }
+
     if( level == 0 )
     {
+        // cases A or C
         strcpy(s_buf, "./" );
         if( head == 2 )
             strcpy(s_buf + 2, normalizedTarget + head); // root directory
@@ -798,9 +842,11 @@ BSPathStatus bs_makeRelative(const char* normalizedRefDir, const char* normalize
             strcpy(s_buf + 2, normalizedTarget + head + 1);
     }else
     {
+        // cases B, D or E
+        size_t i;
         for( i = 0; i < level; i++ )
             strcpy(s_buf + i*3, "../" );
-        strcpy(s_buf + level * 3, normalizedTarget + head);
+        strcpy(s_buf + level * 3, normalizedTarget + head + 1);
     }
 
     return BS_OK;
