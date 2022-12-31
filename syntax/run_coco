@@ -1,0 +1,2 @@
+../../Coco/Coco ./BUSY.atg -o . -namespace busy > ./coco_out.txt
+

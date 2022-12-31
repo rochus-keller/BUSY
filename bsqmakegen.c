@@ -1548,7 +1548,7 @@ static void genLibrary(lua_State* L, int inst, int builtins, FILE* out, int isSo
         fwrite("\n\n",1,2,out);
 
 #if 1 // ifndef BS_QMAKE_HAVE_COPY
-        if( BS_DynamicLib )
+        if( lib_type == BS_DynamicLib )
         {
             pushLibraryPath(L,inst,builtins,isSourceSet,1,0);
             const int path = lua_gettop(L);

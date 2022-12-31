@@ -21,3 +21,5 @@ let exe ! : Executable {
 	.sources += ./lua.c
 	.deps += lib
 }
+
+let include_dir * = abspath()
