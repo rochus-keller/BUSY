@@ -44,6 +44,8 @@ typedef struct BSLexer
     BSTokenQueue* last;
     uchar n; // number of bytes read for cur ch
     uchar ownsStr;
+    uchar muted;
+    uchar alltokens; // dont aggregate strings and deliver comment delimiters
 } BSLexer;
 
 static void readchar(BSLexer* l)
@@ -63,10 +65,25 @@ static void readchar(BSLexer* l)
         l->ch = unicode_decode_utf8(l->pos, &l->n);
         if( l->n == 0 || l->n > (l->end - l->pos) )
         {
-            fprintf(stderr, "file has invalid utf-8 format: %s\n", l->source);
-            exit(1);
+            if( !l->muted )
+            {
+                fprintf(stderr, "file has invalid utf-8 format: %s\n", l->source);
+                exit(1);
+            }else
+            {
+                l->ch = 0;
+                l->pos = l->end;
+            }
         }
     }
+}
+
+static char peekchar(BSLexer* l)
+{
+    if( l->pos + 1 < l->end )
+        return l->pos[1];
+    else
+        return 0;
 }
 
 BSLexer* bslex_open(const char* filepath, const char* sourceName)
@@ -191,6 +208,8 @@ static void skipWhiteSpace(BSLexer* l)
 
 static void error(BSLexer* l, const char* format, ...)
 {
+    if( l->muted )
+        return;
     fprintf(stderr,"%s:%d:%d: ", l->source, l->loc.row, l->loc.col );
     va_list args;
     va_start(args, format);
@@ -353,8 +372,6 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
 
 static BSToken ident(BSLexer* l, BSToken t)
 {
-    t.val = (const char*)l->pos;
-    t.loc = l->loc;
     do
     {
         readchar(l);
@@ -378,8 +395,6 @@ static BSToken ident(BSLexer* l, BSToken t)
 
 static BSToken symbol(BSLexer* l, BSToken t)
 {
-    t.val = (const char*)l->pos;
-    t.loc = l->loc;
     do
     {
         readchar(l);
@@ -398,9 +413,6 @@ static int ishexdigit(int ch)
 
 static BSToken number(BSLexer* l,BSToken t)
 {
-    t.val = (const char*)l->pos;
-    t.loc = l->loc;
-
     // integer ::= // digit {digit}
     // hex ::= '0x' hexDigit {hexDigit}
     // real ::= // digit {digit} '.' {digit} [ScaleFactor]
@@ -454,11 +466,44 @@ static BSToken number(BSLexer* l,BSToken t)
     }
 }
 
+static void queueToken(BSLexer* l, BSToken t)
+{
+    BSTokenQueue* tmp = l->first;
+    int i = 0;
+    // walk through the queue starting from first until first invalid or eof
+    while( tmp && tmp->tok.tok != Tok_Invalid  )
+    {
+        tmp = tmp->next;
+        i++;
+    }
+    // here we have either a tmp == 0 or an invalid tmp
+
+    if( tmp == 0 )
+    {
+        tmp = (BSTokenQueue*)malloc(sizeof(BSTokenQueue));
+        if( tmp == 0 )
+        {
+            fprintf(stderr, "not enough memory to read file %s\n", l->source);
+            exit(1);
+        }
+        tmp->tok = t;
+        tmp->next = 0;
+        if( l->first == 0 )
+        {
+            l->first = l->last = tmp;
+        }else
+        {
+            l->last->next = tmp;
+            l->last = tmp;
+        }
+    }else if( tmp->tok.tok == Tok_Invalid )
+    {
+        tmp->tok = t;
+    }
+}
+
 static BSToken string(BSLexer* l,BSToken t)
 {
-    t.val = (const char*)l->pos;
-    t.loc = l->loc;
-
     while( l->pos < l->end )
     {
         readchar(l);
@@ -473,26 +518,49 @@ static BSToken string(BSLexer* l,BSToken t)
         }else if( l->ch == '"' )
             break;
     }
-    if( l->ch != '"' )
+    if( l->ch != '"' && !l->muted )
     {
         error(l,"non-terminated string\n" );
         t.tok = Tok_Invalid;
         return t;
-    }else
-        readchar(l);
+    }// else
+
+    readchar(l);
+
     t.tok = Tok_string;
     t.len = (const char*)l->pos - t.val;
     return t;
 }
 
-static void comment(BSLexer* l)
+static BSToken comment(BSLexer* l,BSToken t)
 {
     // '/*' already read
-
     int level = 1;
     while( l->pos < l->end )
     {
         readchar(l);
+        switch( l->ch )
+        {
+        case '*':
+            if( peekchar(l) == '/' )
+            {
+                readchar(l);
+                level--;
+            }
+            break;
+        case '/':
+            if( peekchar(l) == '*' )
+            {
+                readchar(l);
+                level++;
+            }
+            break;
+        case '\n':
+            l->loc.row++;
+            l->loc.col = 0;
+            break;
+        }
+#if 0
         if( l->ch == '*' )
         {
             readchar(l);
@@ -509,12 +577,22 @@ static void comment(BSLexer* l)
             l->loc.row++;
             l->loc.col = 0;
         }
+#endif
         if( level == 0 )
             break;
     }
+
     readchar(l);
-    if( level != 0 )
+    if( level != 0 && !l->muted )
+    {
         error(l,"non-terminated comment\n" );
+        t.tok = Tok_Invalid;
+        return t;
+    }
+
+    t.tok = Tok_Lcmt;
+    t.len = (const char*)l->pos - t.val;
+    return t;
 }
 
 static BSToken next(BSLexer* l)
@@ -580,10 +658,10 @@ static BSToken next(BSLexer* l)
             t = path(l, t, 0 );
         }else if( l->ch == '*')
         {
-            readchar(l);
-            comment(l);
-            t = next(l);
-       }else
+            t = comment(l, t);
+            if( !l->alltokens )
+                t = next(l);
+        }else
         {
             t.tok = Tok_Slash;
             t.len = 1;
@@ -592,7 +670,12 @@ static BSToken next(BSLexer* l)
     case '#': // line comment, read until end of line
         while(l->pos < l->end && l->ch != '\n')
             readchar(l);
-        t = next(l);
+        if( l->alltokens )
+        {
+            t.tok = Tok_Hash;
+            t.len = (const char*)l->pos - t.val;
+        }else
+            t = next(l);
         break;
     case '"':
         return string(l,t);
@@ -618,7 +701,6 @@ static BSToken next(BSLexer* l)
         }
         break;
     }
-
     return t;
 }
 
@@ -628,6 +710,7 @@ BSToken bslex_next(BSLexer* l)
     {
         BSToken res = l->first->tok;
         l->first->tok.tok = Tok_Invalid;
+        // move the read queue slot to the end of the queue
         if( l->first != l->last )
         {
             BSTokenQueue* tmp = l->first;
@@ -647,15 +730,18 @@ BSToken bslex_peek(BSLexer* l, int off )
     off--;
     BSTokenQueue* tmp = l->first;
     int i = 0;
+    // walk through the queue starting from first until off reached or first invalid or eof
     while( tmp && tmp->tok.tok != Tok_Invalid && i != off )
     {
         tmp = tmp->next;
         i++;
     }
+    // in case no result for off yet continue through the queue bei either reusing invalid slots or adding new slots to the end
     while( i != off || tmp == 0 || tmp->tok.tok == Tok_Invalid )
     {
         if( tmp == 0 )
         {
+            // passed last slot, add another one and set it to next() token
             tmp = (BSTokenQueue*)malloc(sizeof(BSTokenQueue));
             if( tmp == 0 )
             {
@@ -674,6 +760,7 @@ BSToken bslex_peek(BSLexer* l, int off )
             }
         }else if( tmp->tok.tok == Tok_Invalid )
         {
+            // hit invalid slot; set it to next() token and continue
             tmp->tok = next(l);
             if( tmp->tok.tok == Tok_Invalid )
                 return tmp->tok;
@@ -1067,6 +1154,7 @@ const char*bslex_tostring(int tok)
     case Tok_Invalid: return "<invalid>";
     case Tok_Bang: return "!";
     case Tok_BangEq: return "!=";
+    case Tok_Quote: return "\"";
     case Tok_Hash: return "#";
     case Tok_2Hash: return "##";
     case Tok_Dlr: return "$";
@@ -1147,6 +1235,9 @@ static BSTokType tokenTypeFromString( const char* str, int* pos )
         } else {
             res = Tok_Bang; i += 1;
         }
+        break;
+    case '"':
+        res = Tok_Quote; i += 1;
         break;
     case '#':
         if( at(str,i+1) == '#' ){
@@ -1471,4 +1562,31 @@ char*bslex_allocstr(BSHiLex* l, int len)
     mem->next = l->mem;
     l->mem = mem;
     return mem->str;
+}
+
+int bslex_numOfUnichar(const char* str, int len)
+{
+    int n = 0;
+    const char* to = str + len;
+    while( str < to )
+    {
+        uchar ulen = 0;
+        unicode_decode_utf8((const uchar*)str,&ulen);
+        if( ulen == 0 )
+            break;
+        str += ulen;
+        n++;
+    }
+    return n;
+}
+
+void bslex_mute(BSLexer* l)
+{
+    l->muted = 1;
+}
+
+
+void bslex_alltokens(BSLexer* l)
+{
+    l->alltokens = 1;
 }

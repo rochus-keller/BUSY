@@ -35,6 +35,7 @@ typedef enum BSTokType {
     TT_Literals,
     Tok_Bang,
     Tok_BangEq,
+    Tok_Quote,
     Tok_Hash,
     Tok_2Hash,
     Tok_Dlr,
@@ -125,11 +126,14 @@ typedef struct BSTokChain {
 extern BSLexer* bslex_open(const char* filepath, const char* sourceName); // filepath is utf-8 and denormalized
 extern BSLexer* bslex_openFromString(const char* str, int len, const char* sourceName);
 extern void bslex_free(BSLexer*);
+extern void bslex_mute(BSLexer*);
+extern void bslex_alltokens(BSLexer*);
 extern BSToken bslex_next(BSLexer*);
 extern BSToken bslex_peek(BSLexer*, int off); // off = 1..
 extern const char* bslex_filepath(BSLexer*);
 extern void bslex_dump(const BSToken*);
 extern const char* bslex_tostring(int tok);
+extern int bslex_numOfUnichar(const char*, int len);
 
 typedef struct BSHiLex BSHiLex; // hierarchic lexer
 

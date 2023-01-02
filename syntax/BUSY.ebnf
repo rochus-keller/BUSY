@@ -147,9 +147,6 @@ symbol ::= // an ident prefixed with '`', or maybe '$'
 tokens- ::= '$' '#' '`' '/*' '*/' include import '##' '&' '"'
 // line comments start with #, block comments framed with /* */
 
-// Helper Tokens
-
-
 
 // Pragmas
 %module ::= 'busy'
