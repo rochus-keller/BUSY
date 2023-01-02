@@ -648,7 +648,8 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
         break;
     case BS_StaticLib:
     case BS_DynamicLib:
-        if( resKind != BS_StaticLib || k == BS_StaticLib )
+        if( resKind != BS_StaticLib ) // only link libs from inlist if a dynamic lib or exe is created;
+                                      // otherwise they are passed on; ar doesn't seem to create a suiable .a with .a as input
         {
             lua_rawgeti(L,list,1); // there is only one item, which has index 1
             const int path = lua_gettop(L);
@@ -680,6 +681,57 @@ static time_t renderobjectfiles(lua_State* L, int list, FILE* out, int buf, int 
         break;
     }
     return srcExists;
+}
+
+static int makeCopyOfLibs(lua_State* L, int inlist)
+{
+    const int top = lua_gettop(L);
+    lua_getfield(L,inlist,"#kind");
+    const int k = lua_tointeger(L,-1);
+    lua_pop(L,1); // kind
+
+    if( k != BS_Mixed )
+        return 0;
+
+    size_t i, len = 0;
+    len = lua_objlen(L,inlist);
+    int hasLibs = 0;
+    for( i = 1; i <= len; i++ )
+    {
+        lua_rawgeti(L,inlist,i);
+        const int sublist = lua_gettop(L);
+        lua_getfield(L,sublist,"#kind");
+        const int k = lua_tointeger(L,-1);
+        lua_pop(L,2); // kind, sublist
+        assert( k != BS_Mixed );
+        if( k == BS_StaticLib || k == BS_DynamicLib )
+        {
+            hasLibs = 1;
+            break;
+        }
+    }
+    if( hasLibs )
+    {
+        lua_createtable(L,0,0);
+        lua_pushinteger(L,BS_Mixed);
+        lua_setfield(L,-2,"#kind");
+        const int outlist = lua_gettop(L);
+        int n = 0;
+        for( i = 1; i <= len; i++ )
+        {
+            lua_rawgeti(L,inlist,i);
+            const int sublist = lua_gettop(L);
+            lua_getfield(L,sublist,"#kind");
+            const int k = lua_tointeger(L,-1);
+            lua_pop(L,1); // kind
+            if( k == BS_StaticLib || k == BS_DynamicLib )
+                lua_rawseti(L,outlist,++n);
+            else
+                lua_pop(L,1); // sublist
+        }
+    }
+    assert( top + ( hasLibs ? 1: 0 ) == lua_gettop(L) );
+    return hasLibs;
 }
 
 static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
@@ -764,9 +816,9 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
         break;
     }
     lua_concat(L,2);
-    const int out = lua_gettop(L);
+    const int outfile = lua_gettop(L);
 
-    const time_t outExists = bs_exists(lua_tostring(L,out));
+    const time_t outExists = bs_exists(lua_tostring(L,outfile));
 
     lua_pushvalue(L,outbase);
     lua_pushstring(L,".rsp");
@@ -786,23 +838,23 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
         case BS_Executable:
             lua_pushfstring(L,"gcc @\"%s\" -o \"%s\"",
                             bs_denormalize_path(lua_tostring(L,rsp)),
-                            bs_denormalize_path(lua_tostring(L,out)) );
+                            bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_DynamicLib:
             lua_pushfstring(L,"gcc %s @\"%s\" -o \"%s\"",
                             (mac ? "-dynamiclib " : "-shared "),
                             bs_denormalize_path(lua_tostring(L,rsp)),
-                            bs_denormalize_path(lua_tostring(L,out)) );
+                            bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_StaticLib:
             if( !mac )
                 lua_pushfstring(L,"ar r \"%s\" @\"%s\"",
-                            bs_denormalize_path(lua_tostring(L,out)),
+                            bs_denormalize_path(lua_tostring(L,outfile)),
                             bs_denormalize_path(lua_tostring(L,rsp)) );
             else
             {
                 useRsp = 0; // on macs only a few years old ar and gcc version 4 is installed which doesn't support @file
-                lua_pushfstring(L,"ar r \"%s\" ", bs_denormalize_path(lua_tostring(L,out)) );
+                lua_pushfstring(L,"ar r \"%s\" ", bs_denormalize_path(lua_tostring(L,outfile)) );
             }
             break;
         }
@@ -813,26 +865,26 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
         case BS_Executable:
             lua_pushfstring(L,"clang @\"%s\" -o \"%s\"",
                             bs_denormalize_path(lua_tostring(L,rsp)),
-                            bs_denormalize_path(lua_tostring(L,out)) );
+                            bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_DynamicLib:
             lua_pushfstring(L,"clang %s @\"%s\" -o \"%s\"",
                             (mac ? "-dynamiclib " : "-shared "),
                             bs_denormalize_path(lua_tostring(L,rsp)),
-                            bs_denormalize_path(lua_tostring(L,out)) );
+                            bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_StaticLib:
             if( win32 )
                 lua_pushfstring(L,"llvm-lib /nologo /out:\"%s\" @\"%s\"",
-                            bs_denormalize_path(lua_tostring(L,out)),
+                            bs_denormalize_path(lua_tostring(L,outfile)),
                             bs_denormalize_path(lua_tostring(L,rsp)) );
             else if( mac )
             {
                 useRsp = 0; // dito, see above
-                lua_pushfstring(L,"ar r \"%s\" ", bs_denormalize_path(lua_tostring(L,out)) );
+                lua_pushfstring(L,"ar r \"%s\" ", bs_denormalize_path(lua_tostring(L,outfile)) );
             }else
                 lua_pushfstring(L,"ar r \"%s\" @\"%s\"",
-                                bs_denormalize_path(lua_tostring(L,out)),
+                                bs_denormalize_path(lua_tostring(L,outfile)),
                                 bs_denormalize_path(lua_tostring(L,rsp)) );
             break;
         }
@@ -843,18 +895,18 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
         case BS_Executable:
             lua_pushfstring(L,"link /nologo @\"%s\" /out:\"%s\"",
                             bs_denormalize_path(lua_tostring(L,rsp)),
-                            bs_denormalize_path(lua_tostring(L,out)) );
+                            bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_DynamicLib:
             // TODO: should we use -rpath=path ?
             lua_pushfstring(L,"link /nologo /dll @\"%s\" /out:\"%s\" /implib:\"%s.lib\"",
                             bs_denormalize_path(lua_tostring(L,rsp)),
-                            bs_denormalize_path(lua_tostring(L,out)),
-                            bs_denormalize_path(lua_tostring(L,out)) ); // the importlib is called xyz.dll.lib
+                            bs_denormalize_path(lua_tostring(L,outfile)),
+                            bs_denormalize_path(lua_tostring(L,outfile)) ); // the importlib is called xyz.dll.lib
             break;
         case BS_StaticLib:
             lua_pushfstring(L,"lib /nologo /out:\"%s\" @\"%s\"",
-                            bs_denormalize_path(lua_tostring(L,out)),
+                            bs_denormalize_path(lua_tostring(L,outfile)),
                             bs_denormalize_path(lua_tostring(L,rsp)) );
             break;
         }
@@ -866,10 +918,21 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     const int outlist = lua_gettop(L);
     lua_pushinteger(L,resKind);
     lua_setfield(L,outlist,"#kind");
-    lua_pushvalue(L,out);
+    lua_pushvalue(L,outfile);
     lua_rawseti(L,outlist,1);
-    lua_pushvalue(L,outlist);
-    lua_setfield(L,inst,"#out");
+
+    if( resKind == BS_StaticLib && makeCopyOfLibs(L,inlist) )
+    {
+        const int newOut = lua_gettop(L);
+        lua_pushvalue(L,outlist);
+        lua_rawseti(L,newOut,lua_objlen(L,newOut)+1);
+        lua_setfield(L,inst,"#out");
+    }else
+    {
+        lua_pushvalue(L,outlist);
+        lua_setfield(L,inst,"#out");
+    }
+
     lua_pop(L,1); // outlist
 
     time_t srcExists = 0;
@@ -985,56 +1048,6 @@ static void builddeps(lua_State* L, int inst)
     assert( top == bottom );
 }
 
-static int makeCopyOfLibs(lua_State* L, int inlist)
-{
-    const int top = lua_gettop(L);
-    lua_getfield(L,inlist,"#kind");
-    const int k = lua_tointeger(L,-1);
-    lua_pop(L,1); // kind
-
-    assert( k == BS_Mixed );
-
-    size_t i, len = 0;
-    len = lua_objlen(L,inlist);
-    int hasLibs = 0;
-    for( i = 1; i <= len; i++ )
-    {
-        lua_rawgeti(L,inlist,i);
-        const int sublist = lua_gettop(L);
-        lua_getfield(L,sublist,"#kind");
-        const int k = lua_tointeger(L,-1);
-        lua_pop(L,2); // kind, sublist
-        assert( k != BS_Mixed );
-        if( k == BS_StaticLib || k == BS_DynamicLib )
-        {
-            hasLibs = 1;
-            break;
-        }
-    }
-    if( hasLibs )
-    {
-        lua_createtable(L,0,0);
-        lua_pushinteger(L,BS_Mixed);
-        lua_setfield(L,-2,"#kind");
-        const int outlist = lua_gettop(L);
-        int n = 0;
-        for( i = 1; i <= len; i++ )
-        {
-            lua_rawgeti(L,inlist,i);
-            const int sublist = lua_gettop(L);
-            lua_getfield(L,sublist,"#kind");
-            const int k = lua_tointeger(L,-1);
-            lua_pop(L,1); // kind
-            if( k == BS_StaticLib || k == BS_DynamicLib )
-                lua_rawseti(L,outlist,++n);
-            else
-                lua_pop(L,1); // sublist
-        }
-    }
-    assert( top + ( hasLibs ? 1: 0 ) == lua_gettop(L) );
-    return hasLibs;
-}
-
 static void library(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
@@ -1043,27 +1056,38 @@ static void library(lua_State* L,int inst, int cls, int builtins)
     assert( lua_istable(L,inlist) );
     compilesources(L,inst,builtins, inlist);
 
+    lua_getfield(L,inst,"lib_type");
+    const int lib_type = ( strcmp(lua_tostring(L,-1),"shared") == 0 ? BS_DynamicLib : BS_StaticLib );
+    lua_pop(L,1); // libtype
+
     lua_getfield(L,inst,"#out");
+    // compilerOut includes the object files from inlist and the ones generated by compilesources
+    const int compilerOut = lua_gettop(L);
     if( makeCopyOfLibs(L,inlist) )
     {
-        // inlist included libs, so top of stack is new BS_Mixed which includes these libs (and only those)
+        // top of stack is a new BS_Mixed created by makeCopyOfLibs which includes the libs from inlist (and only those)
+        // store the result of makeCopyOfLibs to the inlist slot
         lua_replace(L,inlist);
+        // now consume compilerOut and add it to inlist
         lua_rawseti(L,inlist,lua_objlen(L,inlist)+1);
         // now the new BS_Mixed also includes the BS_ObjectFiles from compile output
     }else
-        lua_replace(L,inlist); // make BS_ObjectFiles from compile output the new inlist
+    {
+        // make BS_ObjectFiles from compile output the new inlist
+        // now consume compilerOut and make it the new inlist
+        lua_replace(L,inlist);
+    }
 
-    lua_getfield(L,inst,"lib_type");
+    // inlist here includes the object files generated by compilesources and inherited from the initial inlist
+    // in case a dynamic lib is to be generated by link(), inlist also includes the libs inherited from the initial inlist
+
     // link sets out to a new table of kind BS_DynamicLib or BS_StaticLib; inlist is not passed out
-    if( strcmp(lua_tostring(L,-1),"shared") == 0 )
-        link(L,inst,builtins,inlist,BS_DynamicLib);
-    else
-        link(L,inst,builtins,inlist,BS_StaticLib);
+    link(L,inst,builtins,inlist,lib_type);
 
-    lua_pop(L,2); // out, lib_type
+    lua_pop(L,1); // inlist
     assert( top == lua_gettop(L) );
 
-    // passes on one lib (either BS_DynamicLib or BS_StaticLib)
+    // passes on one lib (either BS_DynamicLib or BS_StaticLib), or a BS_Mixed of libs
 }
 
 static void executable(lua_State* L,int inst, int cls, int builtins)

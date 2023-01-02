@@ -17,6 +17,10 @@ let lib * : Library {
 	]
 }
 
+let src * : SourceSet {
+	.sources += lib.sources
+}
+
 let exe ! : Executable {
 	.sources += ./lua.c
 	.deps += lib
