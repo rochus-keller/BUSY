@@ -104,7 +104,7 @@ factor ::= integer | real | string | symbol | path | true | false
 	| ('+' | '-' |'!') factor
 	| list 
 
-list ::= '[' [ expression { \LL:2\ ',' expression } [ ',' ] ] ']'
+list ::= '[' [ expression { [','] expression } [ ',' ] ] ']'
 
 initializer ::= constructor // block is for objects and immediately executed in the statement flow
 	| ( '=' | ':=' ) expression // expression is for base types and lists and is immediately executed

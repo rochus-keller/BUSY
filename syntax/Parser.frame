@@ -54,22 +54,20 @@ private:
 	bool StartOf(int s);
 	void ExpectWeak(int n, int follow);
 	bool WeakSeparator(int n, int syFol, int repFol);
-    void SynErr(const QString& sourcePath, int line, int col, int n, const char* ctx, const QString& = QString() );
+    void SynErr(int line, int col, int n, const char* ctx, const QString& = QString() );
 
 public:
 	Lexer *scanner;
 	struct Error
 	{
-		QString sourcePath;
 		QString msg;
 		int row, col;
 	};
 	QList<Error> errors;
 	
-	void error(const QString& sourcePath, int row, int col, const QString& msg)
+	void error(int row, int col, const QString& msg)
 	{
 		Error e;
-		e.sourcePath = sourcePath;
 		e.row = row;
 		e.col = col;
 		e.msg = msg;
@@ -146,14 +144,14 @@ void Parser::RunParser()
 void Parser::SynErr(int n, const char* ctx) {
     if (errDist >= minErrDist)
     {
-       SynErr(d_next.d_sourcePath,d_next.d_lineNr, d_next.d_colNr, n, ctx);
+       SynErr(d_next.d_lineNr, d_next.d_colNr, n, ctx);
     }
 	errDist = 0;
 }
 
 void Parser::SemErr(const char* msg) {
 	if (errDist >= minErrDist)
-		error(d_cur.d_sourcePath,d_cur.d_lineNr, d_cur.d_colNr, msg);
+		error(d_cur.d_lineNr, d_cur.d_colNr, msg);
 	errDist = 0;
 }
 
@@ -319,7 +317,7 @@ Parser::~Parser() {
 	ParserDestroyCaller<Parser>::CallDestroy(this);
 }
 
-void Parser::SynErr(const QString& sourcePath, int line, int col, int n, const char* ctx, const QString& str ) {
+void Parser::SynErr(int line, int col, int n, const char* ctx, const QString& str ) {
 	QString s;
 	QString ctxStr;
 	if( ctx )
@@ -341,7 +339,7 @@ void Parser::SynErr(const QString& sourcePath, int line, int col, int n, const c
 	}
     if( !str.isEmpty() )
         s = QString("%1 %2").arg(s).arg(str);
-	error(sourcePath, line, col, s);
+	error(line, col, s);
 	//count++;
 }
 

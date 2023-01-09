@@ -1151,75 +1151,75 @@ const char*bslex_tostring(int tok)
     const int r = tok;
     // generated with EbnfStudio from busy.ebnf
     switch(r) {
-    case Tok_Invalid: return "<invalid>";
-    case Tok_Bang: return "!";
-    case Tok_BangEq: return "!=";
-    case Tok_Quote: return "\"";
-    case Tok_Hash: return "#";
-    case Tok_2Hash: return "##";
-    case Tok_Dlr: return "$";
-    case Tok_Percent: return "%";
-    case Tok_Amp: return "&";
-    case Tok_2Amp: return "&&";
-    case Tok_Lpar: return "(";
-    case Tok_Rpar: return ")";
-    case Tok_Star: return "*";
-    case Tok_Rcmt: return "*/";
-    case Tok_StarEq: return "*=";
-    case Tok_Plus: return "+";
-    case Tok_PlusEq: return "+=";
-    case Tok_Comma: return ",";
-    case Tok_Minus: return "-";
-    case Tok_MinusEq: return "-=";
-    case Tok_Dot: return ".";
-    case Tok_Slash: return "/";
-    case Tok_Lcmt: return "/*";
-    case Tok_Colon: return ":";
-    case Tok_ColonEq: return ":=";
-    case Tok_Semi: return ";";
-    case Tok_Lt: return "<";
-    case Tok_Leq: return "<=";
-    case Tok_Eq: return "=";
-    case Tok_2Eq: return "==";
-    case Tok_Gt: return ">";
-    case Tok_Geq: return ">=";
-    case Tok_Qmark: return "?";
-    case Tok_Lbrack: return "[";
-    case Tok_LbrackRbrack: return "[]";
-    case Tok_Rbrack: return "]";
-    case Tok_Hat: return "^";
-    case Tok_60: return "`";
-    case Tok_Lbrace: return "{";
-    case Tok_2Bar: return "||";
-    case Tok_Rbrace: return "}";
-    case Tok_begin: return "begin";
-    case Tok_class: return "class";
-    case Tok_define: return "define";
-    case Tok_else: return "else";
-    case Tok_elsif: return "elsif";
-    case Tok_end: return "end";
-    case Tok_false: return "false";
-    case Tok_if: return "if";
-    case Tok_import: return "import";
-    case Tok_in: return "in";
-    case Tok_include: return "include";
-    case Tok_let: return "let";
-    case Tok_param: return "param";
-    case Tok_subdir: return "subdir";
-    case Tok_submod: return "submod";
-    case Tok_submodule: return "submodule";
-    case Tok_then: return "then";
-    case Tok_true: return "true";
-    case Tok_type: return "type";
-    case Tok_var: return "var";
-    case Tok_ident: return "ident";
-    case Tok_string: return "string";
-    case Tok_integer: return "integer";
-    case Tok_real: return "real";
-    case Tok_path: return "path";
-    case Tok_symbol: return "symbol";
-    case Tok_Eof: return "<eof>";
-    default: return "";
+			case Tok_Invalid: return "<invalid>";
+			case Tok_Bang: return "!";
+			case Tok_BangEq: return "!=";
+			case Tok_Quote: return "\"";
+			case Tok_Hash: return "#";
+			case Tok_2Hash: return "##";
+			case Tok_Dlr: return "$";
+			case Tok_Percent: return "%";
+			case Tok_Amp: return "&";
+			case Tok_2Amp: return "&&";
+			case Tok_Lpar: return "(";
+			case Tok_Rpar: return ")";
+			case Tok_Star: return "*";
+			case Tok_Rcmt: return "*/";
+			case Tok_StarEq: return "*=";
+			case Tok_Plus: return "+";
+			case Tok_PlusEq: return "+=";
+			case Tok_Comma: return ",";
+			case Tok_Minus: return "-";
+			case Tok_MinusEq: return "-=";
+			case Tok_Dot: return ".";
+			case Tok_Slash: return "/";
+			case Tok_Lcmt: return "/*";
+			case Tok_Colon: return ":";
+			case Tok_ColonEq: return ":=";
+			case Tok_Semi: return ";";
+			case Tok_Lt: return "<";
+			case Tok_Leq: return "<=";
+			case Tok_Eq: return "=";
+			case Tok_2Eq: return "==";
+			case Tok_Gt: return ">";
+			case Tok_Geq: return ">=";
+			case Tok_Qmark: return "?";
+			case Tok_Lbrack: return "[";
+			case Tok_LbrackRbrack: return "[]";
+			case Tok_Rbrack: return "]";
+			case Tok_Hat: return "^";
+			case Tok_60: return "`";
+			case Tok_Lbrace: return "{";
+			case Tok_2Bar: return "||";
+			case Tok_Rbrace: return "}";
+			case Tok_begin: return "begin";
+			case Tok_class: return "class";
+			case Tok_define: return "define";
+			case Tok_else: return "else";
+			case Tok_elsif: return "elsif";
+			case Tok_end: return "end";
+			case Tok_false: return "false";
+			case Tok_if: return "if";
+			case Tok_import: return "import";
+			case Tok_in: return "in";
+			case Tok_include: return "include";
+			case Tok_let: return "let";
+			case Tok_param: return "param";
+			case Tok_subdir: return "subdir";
+			case Tok_submod: return "submod";
+			case Tok_submodule: return "submodule";
+			case Tok_then: return "then";
+			case Tok_true: return "true";
+			case Tok_type: return "type";
+			case Tok_var: return "var";
+			case Tok_ident: return "ident";
+			case Tok_string: return "string";
+			case Tok_integer: return "integer";
+			case Tok_real: return "real";
+			case Tok_path: return "path";
+			case Tok_symbol: return "symbol";
+			case Tok_Eof: return "<eof>";
+			default: return "";
     }
 }
 
@@ -1228,327 +1228,327 @@ static BSTokType tokenTypeFromString( const char* str, int* pos )
     // generated with EbnfStudio from busy.ebnf
     int i = ( pos != 0 ? *pos: 0 );
     BSTokType res = Tok_Invalid;
-    switch( at(str,i) ){
-    case '!':
-        if( at(str,i+1) == '=' ){
-            res = Tok_BangEq; i += 2;
-        } else {
-            res = Tok_Bang; i += 1;
-        }
-        break;
-    case '"':
-        res = Tok_Quote; i += 1;
-        break;
-    case '#':
-        if( at(str,i+1) == '#' ){
-            res = Tok_2Hash; i += 2;
-        } else {
-            res = Tok_Hash; i += 1;
-        }
-        break;
-    case '$':
-        res = Tok_Dlr; i += 1;
-        break;
-    case '%':
-        res = Tok_Percent; i += 1;
-        break;
-    case '&':
-        if( at(str,i+1) == '&' ){
-            res = Tok_2Amp; i += 2;
-        } else {
-            res = Tok_Amp; i += 1;
-        }
-        break;
-    case '(':
-        res = Tok_Lpar; i += 1;
-        break;
-    case ')':
-        res = Tok_Rpar; i += 1;
-        break;
-    case '*':
-        switch( at(str,i+1) ){
-        case '/':
-            res = Tok_Rcmt; i += 2;
-            break;
-        case '=':
-            res = Tok_StarEq; i += 2;
-            break;
-        default:
-            res = Tok_Star; i += 1;
-            break;
-        }
-        break;
-    case '+':
-        if( at(str,i+1) == '=' ){
-            res = Tok_PlusEq; i += 2;
-        } else {
-            res = Tok_Plus; i += 1;
-        }
-        break;
-    case ',':
-        res = Tok_Comma; i += 1;
-        break;
-    case '-':
-        if( at(str,i+1) == '=' ){
-            res = Tok_MinusEq; i += 2;
-        } else {
-            res = Tok_Minus; i += 1;
-        }
-        break;
-    case '.':
-        res = Tok_Dot; i += 1;
-        break;
-    case '/':
-        if( at(str,i+1) == '*' ){
-            res = Tok_Lcmt; i += 2;
-        } else {
-            res = Tok_Slash; i += 1;
-        }
-        break;
-    case ':':
-        if( at(str,i+1) == '=' ){
-            res = Tok_ColonEq; i += 2;
-        } else {
-            res = Tok_Colon; i += 1;
-        }
-        break;
-    case ';':
-        res = Tok_Semi; i += 1;
-        break;
-    case '<':
-        if( at(str,i+1) == '=' ){
-            res = Tok_Leq; i += 2;
-        } else {
-            res = Tok_Lt; i += 1;
-        }
-        break;
-    case '=':
-        if( at(str,i+1) == '=' ){
-            res = Tok_2Eq; i += 2;
-        } else {
-            res = Tok_Eq; i += 1;
-        }
-        break;
-    case '>':
-        if( at(str,i+1) == '=' ){
-            res = Tok_Geq; i += 2;
-        } else {
-            res = Tok_Gt; i += 1;
-        }
-        break;
-    case '?':
-        res = Tok_Qmark; i += 1;
-        break;
-    case '[':
-        if( at(str,i+1) == ']' ){
-            res = Tok_LbrackRbrack; i += 2;
-        } else {
-            res = Tok_Lbrack; i += 1;
-        }
-        break;
-    case ']':
-        res = Tok_Rbrack; i += 1;
-        break;
-    case '^':
-        res = Tok_Hat; i += 1;
-        break;
-    case '`':
-        res = Tok_60; i += 1;
-        break;
-    case 'b':
-        if( at(str,i+1) == 'e' ){
-            if( at(str,i+2) == 'g' ){
-                if( at(str,i+3) == 'i' ){
-                    if( at(str,i+4) == 'n' ){
-                        res = Tok_begin; i += 5;
-                    }
-                }
-            }
-        }
-        break;
-    case 'c':
-        if( at(str,i+1) == 'l' ){
-            if( at(str,i+2) == 'a' ){
-                if( at(str,i+3) == 's' ){
-                    if( at(str,i+4) == 's' ){
-                        res = Tok_class; i += 5;
-                    }
-                }
-            }
-        }
-        break;
-    case 'd':
-        if( at(str,i+1) == 'e' ){
-            if( at(str,i+2) == 'f' ){
-                if( at(str,i+3) == 'i' ){
-                    if( at(str,i+4) == 'n' ){
-                        if( at(str,i+5) == 'e' ){
-                            res = Tok_define; i += 6;
-                        }
-                    }
-                }
-            }
-        }
-        break;
-    case 'e':
-        switch( at(str,i+1) ){
-        case 'l':
-            if( at(str,i+2) == 's' ){
-                switch( at(str,i+3) ){
-                case 'e':
-                    res = Tok_else; i += 4;
-                    break;
-                case 'i':
-                    if( at(str,i+4) == 'f' ){
-                        res = Tok_elsif; i += 5;
-                    }
-                    break;
-                }
-            }
-            break;
-        case 'n':
-            if( at(str,i+2) == 'd' ){
-                res = Tok_end; i += 3;
-            }
-            break;
-        }
-        break;
-    case 'f':
-        if( at(str,i+1) == 'a' ){
-            if( at(str,i+2) == 'l' ){
-                if( at(str,i+3) == 's' ){
-                    if( at(str,i+4) == 'e' ){
-                        res = Tok_false; i += 5;
-                    }
-                }
-            }
-        }
-        break;
-    case 'i':
-        switch( at(str,i+1) ){
-        case 'f':
-            res = Tok_if; i += 2;
-            break;
-        case 'm':
-            if( at(str,i+2) == 'p' ){
-                if( at(str,i+3) == 'o' ){
-                    if( at(str,i+4) == 'r' ){
-                        if( at(str,i+5) == 't' ){
-                            res = Tok_import; i += 6;
-                        }
-                    }
-                }
-            }
-            break;
-        case 'n':
-            if( at(str,i+2) == 'c' ){
-                if( at(str,i+3) == 'l' ){
-                    if( at(str,i+4) == 'u' ){
-                        if( at(str,i+5) == 'd' ){
-                            if( at(str,i+6) == 'e' ){
-                                res = Tok_include; i += 7;
-                            }
-                        }
-                    }
-                }
-            } else {
-                res = Tok_in; i += 2;
-            }
-            break;
-        }
-        break;
-    case 'l':
-        if( at(str,i+1) == 'e' ){
-            if( at(str,i+2) == 't' ){
-                res = Tok_let; i += 3;
-            }
-        }
-        break;
-    case 'p':
-        if( at(str,i+1) == 'a' ){
-            if( at(str,i+2) == 'r' ){
-                if( at(str,i+3) == 'a' ){
-                    if( at(str,i+4) == 'm' ){
-                        res = Tok_param; i += 5;
-                    }
-                }
-            }
-        }
-        break;
-    case 's':
-        if( at(str,i+1) == 'u' ){
-            if( at(str,i+2) == 'b' ){
-                switch( at(str,i+3) ){
-                case 'd':
-                    if( at(str,i+4) == 'i' ){
-                        if( at(str,i+5) == 'r' ){
-                            res = Tok_subdir; i += 6;
-                        }
-                    }
-                    break;
-                case 'm':
-                    if( at(str,i+4) == 'o' ){
-                        if( at(str,i+5) == 'd' ){
-                            if( at(str,i+6) == 'u' ){
-                                if( at(str,i+7) == 'l' ){
-                                    if( at(str,i+8) == 'e' ){
-                                        res = Tok_submodule; i += 9;
-                                    }
-                                }
-                            } else {
-                                res = Tok_submod; i += 6;
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-        break;
-    case 't':
-        switch( at(str,i+1) ){
-        case 'h':
-            if( at(str,i+2) == 'e' ){
-                if( at(str,i+3) == 'n' ){
-                    res = Tok_then; i += 4;
-                }
-            }
-            break;
-        case 'r':
-            if( at(str,i+2) == 'u' ){
-                if( at(str,i+3) == 'e' ){
-                    res = Tok_true; i += 4;
-                }
-            }
-            break;
-        case 'y':
-            if( at(str,i+2) == 'p' ){
-                if( at(str,i+3) == 'e' ){
-                    res = Tok_type; i += 4;
-                }
-            }
-            break;
-        }
-        break;
-    case 'v':
-        if( at(str,i+1) == 'a' ){
-            if( at(str,i+2) == 'r' ){
-                res = Tok_var; i += 3;
-            }
-        }
-        break;
-    case '{':
-        res = Tok_Lbrace; i += 1;
-        break;
-    case '|':
-        if( at(str,i+1) == '|' ){
-            res = Tok_2Bar; i += 2;
-        }
-        break;
-    case '}':
-        res = Tok_Rbrace; i += 1;
-        break;
-    }
+		switch( at(str,i) ){
+		case '!':
+			if( at(str,i+1) == '=' ){
+				res = Tok_BangEq; i += 2;
+			} else {
+				res = Tok_Bang; i += 1;
+			}
+			break;
+		case '"':
+			res = Tok_Quote; i += 1;
+			break;
+		case '#':
+			if( at(str,i+1) == '#' ){
+				res = Tok_2Hash; i += 2;
+			} else {
+				res = Tok_Hash; i += 1;
+			}
+			break;
+		case '$':
+			res = Tok_Dlr; i += 1;
+			break;
+		case '%':
+			res = Tok_Percent; i += 1;
+			break;
+		case '&':
+			if( at(str,i+1) == '&' ){
+				res = Tok_2Amp; i += 2;
+			} else {
+				res = Tok_Amp; i += 1;
+			}
+			break;
+		case '(':
+			res = Tok_Lpar; i += 1;
+			break;
+		case ')':
+			res = Tok_Rpar; i += 1;
+			break;
+		case '*':
+			switch( at(str,i+1) ){
+			case '/':
+				res = Tok_Rcmt; i += 2;
+				break;
+			case '=':
+				res = Tok_StarEq; i += 2;
+				break;
+			default:
+				res = Tok_Star; i += 1;
+				break;
+			}
+			break;
+		case '+':
+			if( at(str,i+1) == '=' ){
+				res = Tok_PlusEq; i += 2;
+			} else {
+				res = Tok_Plus; i += 1;
+			}
+			break;
+		case ',':
+			res = Tok_Comma; i += 1;
+			break;
+		case '-':
+			if( at(str,i+1) == '=' ){
+				res = Tok_MinusEq; i += 2;
+			} else {
+				res = Tok_Minus; i += 1;
+			}
+			break;
+		case '.':
+			res = Tok_Dot; i += 1;
+			break;
+		case '/':
+			if( at(str,i+1) == '*' ){
+				res = Tok_Lcmt; i += 2;
+			} else {
+				res = Tok_Slash; i += 1;
+			}
+			break;
+		case ':':
+			if( at(str,i+1) == '=' ){
+				res = Tok_ColonEq; i += 2;
+			} else {
+				res = Tok_Colon; i += 1;
+			}
+			break;
+		case ';':
+			res = Tok_Semi; i += 1;
+			break;
+		case '<':
+			if( at(str,i+1) == '=' ){
+				res = Tok_Leq; i += 2;
+			} else {
+				res = Tok_Lt; i += 1;
+			}
+			break;
+		case '=':
+			if( at(str,i+1) == '=' ){
+				res = Tok_2Eq; i += 2;
+			} else {
+				res = Tok_Eq; i += 1;
+			}
+			break;
+		case '>':
+			if( at(str,i+1) == '=' ){
+				res = Tok_Geq; i += 2;
+			} else {
+				res = Tok_Gt; i += 1;
+			}
+			break;
+		case '?':
+			res = Tok_Qmark; i += 1;
+			break;
+		case '[':
+			if( at(str,i+1) == ']' ){
+				res = Tok_LbrackRbrack; i += 2;
+			} else {
+				res = Tok_Lbrack; i += 1;
+			}
+			break;
+		case ']':
+			res = Tok_Rbrack; i += 1;
+			break;
+		case '^':
+			res = Tok_Hat; i += 1;
+			break;
+		case '`':
+			res = Tok_60; i += 1;
+			break;
+		case 'b':
+			if( at(str,i+1) == 'e' ){
+				if( at(str,i+2) == 'g' ){
+					if( at(str,i+3) == 'i' ){
+						if( at(str,i+4) == 'n' ){
+							res = Tok_begin; i += 5;
+						}
+					}
+				}
+			}
+			break;
+		case 'c':
+			if( at(str,i+1) == 'l' ){
+				if( at(str,i+2) == 'a' ){
+					if( at(str,i+3) == 's' ){
+						if( at(str,i+4) == 's' ){
+							res = Tok_class; i += 5;
+						}
+					}
+				}
+			}
+			break;
+		case 'd':
+			if( at(str,i+1) == 'e' ){
+				if( at(str,i+2) == 'f' ){
+					if( at(str,i+3) == 'i' ){
+						if( at(str,i+4) == 'n' ){
+							if( at(str,i+5) == 'e' ){
+								res = Tok_define; i += 6;
+							}
+						}
+					}
+				}
+			}
+			break;
+		case 'e':
+			switch( at(str,i+1) ){
+			case 'l':
+				if( at(str,i+2) == 's' ){
+					switch( at(str,i+3) ){
+					case 'e':
+						res = Tok_else; i += 4;
+						break;
+					case 'i':
+						if( at(str,i+4) == 'f' ){
+							res = Tok_elsif; i += 5;
+						}
+						break;
+					}
+				}
+				break;
+			case 'n':
+				if( at(str,i+2) == 'd' ){
+					res = Tok_end; i += 3;
+				}
+				break;
+			}
+			break;
+		case 'f':
+			if( at(str,i+1) == 'a' ){
+				if( at(str,i+2) == 'l' ){
+					if( at(str,i+3) == 's' ){
+						if( at(str,i+4) == 'e' ){
+							res = Tok_false; i += 5;
+						}
+					}
+				}
+			}
+			break;
+		case 'i':
+			switch( at(str,i+1) ){
+			case 'f':
+				res = Tok_if; i += 2;
+				break;
+			case 'm':
+				if( at(str,i+2) == 'p' ){
+					if( at(str,i+3) == 'o' ){
+						if( at(str,i+4) == 'r' ){
+							if( at(str,i+5) == 't' ){
+								res = Tok_import; i += 6;
+							}
+						}
+					}
+				}
+				break;
+			case 'n':
+				if( at(str,i+2) == 'c' ){
+					if( at(str,i+3) == 'l' ){
+						if( at(str,i+4) == 'u' ){
+							if( at(str,i+5) == 'd' ){
+								if( at(str,i+6) == 'e' ){
+									res = Tok_include; i += 7;
+								}
+							}
+						}
+					}
+				} else {
+					res = Tok_in; i += 2;
+				}
+				break;
+			}
+			break;
+		case 'l':
+			if( at(str,i+1) == 'e' ){
+				if( at(str,i+2) == 't' ){
+					res = Tok_let; i += 3;
+				}
+			}
+			break;
+		case 'p':
+			if( at(str,i+1) == 'a' ){
+				if( at(str,i+2) == 'r' ){
+					if( at(str,i+3) == 'a' ){
+						if( at(str,i+4) == 'm' ){
+							res = Tok_param; i += 5;
+						}
+					}
+				}
+			}
+			break;
+		case 's':
+			if( at(str,i+1) == 'u' ){
+				if( at(str,i+2) == 'b' ){
+					switch( at(str,i+3) ){
+					case 'd':
+						if( at(str,i+4) == 'i' ){
+							if( at(str,i+5) == 'r' ){
+								res = Tok_subdir; i += 6;
+							}
+						}
+						break;
+					case 'm':
+						if( at(str,i+4) == 'o' ){
+							if( at(str,i+5) == 'd' ){
+								if( at(str,i+6) == 'u' ){
+									if( at(str,i+7) == 'l' ){
+										if( at(str,i+8) == 'e' ){
+											res = Tok_submodule; i += 9;
+										}
+									}
+								} else {
+									res = Tok_submod; i += 6;
+								}
+							}
+						}
+						break;
+					}
+				}
+			}
+			break;
+		case 't':
+			switch( at(str,i+1) ){
+			case 'h':
+				if( at(str,i+2) == 'e' ){
+					if( at(str,i+3) == 'n' ){
+						res = Tok_then; i += 4;
+					}
+				}
+				break;
+			case 'r':
+				if( at(str,i+2) == 'u' ){
+					if( at(str,i+3) == 'e' ){
+						res = Tok_true; i += 4;
+					}
+				}
+				break;
+			case 'y':
+				if( at(str,i+2) == 'p' ){
+					if( at(str,i+3) == 'e' ){
+						res = Tok_type; i += 4;
+					}
+				}
+				break;
+			}
+			break;
+		case 'v':
+			if( at(str,i+1) == 'a' ){
+				if( at(str,i+2) == 'r' ){
+					res = Tok_var; i += 3;
+				}
+			}
+			break;
+		case '{':
+			res = Tok_Lbrace; i += 1;
+			break;
+		case '|':
+			if( at(str,i+1) == '|' ){
+				res = Tok_2Bar; i += 2;
+			}
+			break;
+		case '}':
+			res = Tok_Rbrace; i += 1;
+			break;
+		}
     if(pos) *pos = i;
     return res;
 }
