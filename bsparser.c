@@ -46,6 +46,8 @@ typedef struct BSParserContext {
     const char* filepath; // normalized absolute path to BUSY in current dir
     unsigned builtins : 8;
     unsigned skipMode : 1; // when on, read over tokens without executing
+    unsigned locInfo : 1;  // when on, add #row, #col and #file to AST elements
+    unsigned fullAst : 1;  // when on, also add AST statement and expression elements
     lua_State* L;
 } BSParserContext;
 
@@ -207,6 +209,19 @@ static void checkUnique(BSParserContext* ctx, BSScope* scope, BSIdentDef* id )
     lua_pop(ctx->L,1);
     if( !isnil )
         error(ctx,id->loc.row, id->loc.col,"name is not unique in scope: '%s'", name );
+}
+
+static void addLocInfo(BSParserContext* ctx, BSRowCol loc, int table)
+{
+    if( ctx->locInfo )
+    {
+        lua_pushinteger(ctx->L, loc.row );
+        lua_setfield(ctx->L, table, "#row");
+        lua_pushinteger(ctx->L, loc.col );
+        lua_setfield(ctx->L, table, "#col");
+        lua_getfield(ctx->L, ctx->module.table,"#file");
+        lua_setfield(ctx->L,table,"#file");
+    }
 }
 
 static BSIdentDef identdef(BSParserContext* ctx, BSScope* scope)
@@ -611,6 +626,7 @@ static void macrodef(BSParserContext* ctx)
     lua_pushstring(ctx->L,ctx->label);
     lua_setfield(ctx->L,decl,"#source");
     addToScope(ctx, &ctx->module, &id, decl );
+    addLocInfo(ctx,id.loc,decl);
 
     BSToken t = nextToken(ctx);
     if( t.tok == Tok_Lpar )
@@ -655,9 +671,9 @@ static void macrodef(BSParserContext* ctx)
         error(ctx, t.loc.row, t.loc.col,"expecting '{'" );
     BSToken lbrace = t;
     lua_pushinteger(ctx->L,lbrace.loc.row);
-    lua_setfield(ctx->L,decl,"#row");
+    lua_setfield(ctx->L,decl,"#brow");
     lua_pushinteger(ctx->L,lbrace.loc.col);
-    lua_setfield(ctx->L,decl,"#col");
+    lua_setfield(ctx->L,decl,"#bcol");
     int n = 0;
     while(1)
     {
@@ -984,6 +1000,7 @@ static void enumdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
     lua_pushinteger(ctx->L,BS_EnumDecl);
     lua_setfield(ctx->L,decl,"#kind");
     addToScope(ctx, scope, id, decl );
+    addLocInfo(ctx,id->loc,decl);
     t = nextToken(ctx);
     int n = 0;
     while( t.tok != Tok_Rpar )
@@ -1074,6 +1091,7 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
     const int clsDecl = lua_gettop(ctx->L);
     lua_pushinteger(ctx->L,BS_ClassDecl);
     lua_setfield(ctx->L,clsDecl,"#kind");
+    addLocInfo(ctx,id->loc,clsDecl);
     t = peekToken(ctx,1);
     int n = 0;
     if( t.tok == Tok_Lpar )
@@ -1140,6 +1158,7 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
         // the following does the same as addToScope, but for the class
         lua_pushinteger(ctx->L,BS_FieldDecl);
         lua_setfield(ctx->L,field,"#kind");
+        addLocInfo(ctx,t.loc,field);
 
         lua_pushvalue(ctx->L,name);
         lua_setfield(ctx->L,field,"#name");
@@ -2093,8 +2112,8 @@ static void evalInst(BSParserContext* ctx, BSScope* scope)
     lua_getfield(ctx->L,templ,"#code");
     const int code = lua_gettop(ctx->L);
 
-    lua_getfield(ctx->L,templ,"#row");
-    lua_getfield(ctx->L,templ,"#col");
+    lua_getfield(ctx->L,templ,"#brow");
+    lua_getfield(ctx->L,templ,"#bcol");
     const BSRowCol orig = { lua_tointeger(ctx->L,-2), lua_tointeger(ctx->L,-1) };
     lua_pop(ctx->L,2);
     lua_getfield(ctx->L,templ,"#source");
@@ -3251,6 +3270,7 @@ static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken
     const int blockdecl = lua_gettop(ctx->L);
     lua_pushinteger(ctx->L,BS_BlockDef);
     lua_setfield(ctx->L,blockdecl,"#kind");
+    addLocInfo(ctx,lbrace->loc,blockdecl); // TODO: do we also need end of block loc?
     // point to surrounding scope
     lua_pushvalue(ctx->L,scope->table);
     lua_setfield(ctx->L,blockdecl,"#up");
@@ -3335,6 +3355,7 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
     const int var = lua_gettop(ctx->L);
     lua_pushinteger(ctx->L,BS_VarDecl);
     lua_setfield(ctx->L,var,"#kind");
+    addLocInfo(ctx,id.loc,var);
     switch( kind )
     {
     case Tok_let:
@@ -4267,6 +4288,12 @@ int bs_parse(lua_State* L)
         moduleerror(L,BS_NewModule,"expecting absolute, normalized directory path: %s", ctx.dirpath );
     ctx.builtins = builtins;
     ctx.label = calcLabel(ctx.dirpath,calcLevel(L,BS_NewModule)+1);
+    lua_getglobal(L,"#haveLocInfo");
+    ctx.locInfo = !lua_isnil(L,-1);
+    lua_pop(L,1);
+    lua_getglobal(L,"#haveFullAst");
+    ctx.fullAst = !lua_isnil(L,-1);
+    lua_pop(L,1);
     lua_pushstring(L,ctx.label);
     lua_setfield(L,BS_NewModule, "#label");
     // BS_BEGIN_LUA_FUNC(&ctx,1); cannot use this here because module was created above already
