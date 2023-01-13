@@ -4,7 +4,7 @@ BUSY (for *BU*ild *SY*stem) is a lean, cross-platform build system for the GCC, 
 
 Compared to other build systems like CMake, QMake, Meson or GN, BUSY is characterized by a **statically typed** build specification language, and by the possibility to build a project directly from scratch without any further requirements to the host system; BUSY is so lean that it is even suited to be directly integrated with the source tree of a project. 
 
-Here is an **example project** using BUSY: https://github.com/rochus-keller/nappgui/tree/BUSY2. NAppGUI is an extensive cross-platform GUI library written in C89 (with parts in C++99 and Objective-C) by Francisco García. See the README on how to build the project and check the BUSY files in the root and the src directory (and subdirectories). See below and in the syntax directory for more information about the specification language. Those who know GN will recognize various concepts in BUSY.
+Here is an **example project** using BUSY: https://github.com/rochus-keller/nappgui/. NAppGUI is an extensive cross-platform GUI library written in C89 (with parts in C++99 and Objective-C) by Francisco García. See the README on how to build the project and check the BUSY files in the root and the src directory (and subdirectories). See below and in the syntax directory for more information about the specification language. Those who know GN will recognize various concepts in BUSY.
 
 Here are a few excerpts for convenience:
 

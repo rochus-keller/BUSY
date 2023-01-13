@@ -190,6 +190,16 @@ static int bs_compile (lua_State *L)
     lua_setfield(L,-2,"root_source_dir");
     lua_pop(L,2);
 
+    lua_createtable(L,0,0);
+    lua_setglobal(L,"#xref"); // overwrite an existing #xref if present
+
+    lua_createtable(L,0,0);
+    lua_createtable(L,0,0);
+    lua_pushstring(L, "v");
+    lua_setfield(L, -2, "__mode");
+    lua_setmetatable(L, -2);
+    lua_setglobal(L,"#refs"); // overwrite an existing #refs if present
+
     lua_pushcfunction(L, bs_parse);
 
     push_normalized(L,1);

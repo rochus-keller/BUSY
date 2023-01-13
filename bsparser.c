@@ -48,6 +48,8 @@ typedef struct BSParserContext {
     unsigned skipMode : 1; // when on, read over tokens without executing
     unsigned locInfo : 1;  // when on, add #row, #col and #file to AST elements
     unsigned fullAst : 1;  // when on, also add AST statement and expression elements
+    unsigned numRefs : 8;  // optional index a weak #refs table pointing to all objects with identdef
+    unsigned xref : 8;     // optional index to xref table or 0; if a table is present, build bi-dir xref
     lua_State* L;
 } BSParserContext;
 
@@ -222,6 +224,91 @@ static void addLocInfo(BSParserContext* ctx, BSRowCol loc, int table)
         lua_getfield(ctx->L, ctx->module.table,"#file");
         lua_setfield(ctx->L,table,"#file");
     }
+}
+
+enum { ROW_BIT_LEN = 19, COL_BIT_LEN = 32 - ROW_BIT_LEN };
+unsigned int bs_torowcol(int row, int col)
+{
+    return ( row << COL_BIT_LEN ) | ( col & ( ( 1 << COL_BIT_LEN ) -1 ));
+}
+
+static void addXref(BSParserContext* ctx, BSRowCol loc, int decl)
+{
+    if( !ctx->xref )
+        return;
+
+    const int top = lua_gettop(ctx->L);
+
+    // #xref table: filepath -> list_of_idents
+    // list_of_idents: rowcol -> set_of_decls
+
+    // decl.#xref table: filepath -> set of rowcol
+
+    lua_getfield(ctx->L, ctx->module.table, "#file");
+    lua_rawget(ctx->L,ctx->xref);
+    assert( lua_istable(ctx->L,-1) );
+    const int list_of_idents = lua_gettop(ctx->L);
+
+    const unsigned int rowCol = bs_torowcol(loc.row, loc.col);
+
+    lua_pushinteger(ctx->L,rowCol);
+    lua_rawget(ctx->L,list_of_idents);
+    if( !lua_istable(ctx->L,-1) )
+    {
+        lua_pop(ctx->L,1); // nil
+        lua_createtable(ctx->L,0,0);
+        lua_pushinteger(ctx->L,rowCol);
+        lua_pushvalue(ctx->L,-2);
+        lua_rawset(ctx->L,list_of_idents);
+    }
+    const int set_of_decls = lua_gettop(ctx->L);
+    assert( lua_istable(ctx->L,-1) );
+
+    lua_pushvalue(ctx->L,decl);
+    lua_pushboolean(ctx->L,1);
+    lua_rawset(ctx->L,set_of_decls);
+
+    lua_pop(ctx->L,2); // list_of_idents, set_of_decls
+
+    lua_getfield(ctx->L, decl, "#xref");
+    if( !lua_istable(ctx->L,-1) )
+    {
+        lua_pop(ctx->L,1); // nil
+        lua_createtable(ctx->L,0,0);
+        lua_pushvalue(ctx->L,-1);
+        lua_setfield(ctx->L,decl, "#xref");
+    }
+    const int decl_xref = lua_gettop(ctx->L);
+
+    lua_getfield(ctx->L, ctx->module.table, "#file");
+    lua_rawget(ctx->L,decl_xref);
+    if( !lua_istable(ctx->L,-1) )
+    {
+        lua_pop(ctx->L,1); // nil
+        lua_createtable(ctx->L,0,0);
+        lua_getfield(ctx->L, ctx->module.table, "#file");
+        lua_pushvalue(ctx->L,-2);
+        lua_rawset(ctx->L,decl_xref);
+    }
+    const int set_of_rowcol = lua_gettop(ctx->L);
+
+    lua_pushinteger(ctx->L,rowCol);
+    lua_pushboolean(ctx->L,1);
+    lua_rawset(ctx->L, set_of_rowcol);
+
+    lua_pop(ctx->L,2); // decl_xref, set_of_rowcol
+    assert( top == lua_gettop(ctx->L));
+}
+
+static void addNumRef(BSParserContext* ctx, int obj)
+{
+    if( !ctx->numRefs )
+        return;
+    const int id = lua_objlen(ctx->L,ctx->numRefs) + 1;
+    lua_pushvalue(ctx->L,obj);
+    lua_rawseti(ctx->L,ctx->numRefs,id);
+    lua_pushinteger(ctx->L,id);
+    lua_setfield(ctx->L,obj,"#ref");
 }
 
 static BSIdentDef identdef(BSParserContext* ctx, BSScope* scope)
@@ -503,6 +590,8 @@ static void submodule(BSParserContext* ctx, int subdir)
     lua_pushvalue(ctx->L,ctx->module.table);
     lua_setfield(ctx->L,-2,"^"); // set reference to outer scope
     addToScope(ctx, &ctx->module, &id, module ); // the outer module directly references this module, no adapter
+    addXref(ctx, id.loc, module);
+    addNumRef(ctx,module);
 
     lua_getfield(ctx->L,ctx->module.table,"#rdir");
     lua_pushstring(ctx->L,"/");
@@ -627,6 +716,8 @@ static void macrodef(BSParserContext* ctx)
     lua_setfield(ctx->L,decl,"#source");
     addToScope(ctx, &ctx->module, &id, decl );
     addLocInfo(ctx,id.loc,decl);
+    addXref(ctx, id.loc, decl);
+    addNumRef(ctx,decl);
 
     BSToken t = nextToken(ctx);
     if( t.tok == Tok_Lpar )
@@ -799,6 +890,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
                     // stack: module def, decl, inst
                     lua_replace(ctx->L,-3); // replace the module def by its instance
                     // result stack: module inst, decl
+                    addXref(ctx, t.loc, -1);
                     break;
                 }
             }else
@@ -823,6 +915,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         {
             // we have a hit
             // stack: container instance, derefed decl
+            addXref(ctx, t.loc, -1);
         }else if( method != Field )
         {
             // continue search to surrounding (local) scope (if present)
@@ -860,7 +953,8 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
                 {
                     // we have a hit
                     // stack: container instance (not builtins table!), derefed builtin decl
-                }
+                    addXref(ctx, t.loc, -1);
+               }
             }
         }
     }
@@ -955,6 +1049,7 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
 
         lua_replace(ctx->L, -3);
         // stack: new instance, derefed decl
+        addXref(ctx, t.loc, -1);
 
         lua_getfield(ctx->L,-1,"#kind");
         kind = lua_tointeger(ctx->L,-1);
@@ -1001,6 +1096,9 @@ static void enumdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
     lua_setfield(ctx->L,decl,"#kind");
     addToScope(ctx, scope, id, decl );
     addLocInfo(ctx,id->loc,decl);
+    addXref(ctx, id->loc, decl);
+    addNumRef(ctx,decl);
+
     t = nextToken(ctx);
     int n = 0;
     while( t.tok != Tok_Rpar )
@@ -1092,6 +1190,9 @@ static void classdecl(BSParserContext* ctx, BSScope* scope, BSIdentDef* id)
     lua_pushinteger(ctx->L,BS_ClassDecl);
     lua_setfield(ctx->L,clsDecl,"#kind");
     addLocInfo(ctx,id->loc,clsDecl);
+    addXref(ctx, id->loc, clsDecl);
+    addNumRef(ctx,clsDecl);
+
     t = peekToken(ctx,1);
     int n = 0;
     if( t.tok == Tok_Lpar )
@@ -2156,6 +2257,10 @@ static void evalInst(BSParserContext* ctx, BSScope* scope)
                     break;
                 case Tok_if:
                     condition(ctx, scope);
+                    if( ctx->fullAst )
+                        lua_rawseti(ctx->L,scope->table,++scope->n);
+                    else
+                        lua_pop(ctx->L,1);
                     break;
                 case Tok_Hat:
                 case Tok_Dot:
@@ -3265,7 +3370,7 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
 
 static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken* lbrace, int pascal )
 {
-    BS_BEGIN_LUA_FUNC(ctx,0);
+    BS_BEGIN_LUA_FUNC(ctx,1);
     lua_createtable(ctx->L,0,0); // create a temporary block definition for the local declarations
     const int blockdecl = lua_gettop(ctx->L);
     lua_pushinteger(ctx->L,BS_BlockDef);
@@ -3274,6 +3379,7 @@ static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken
     // point to surrounding scope
     lua_pushvalue(ctx->L,scope->table);
     lua_setfield(ctx->L,blockdecl,"#up");
+
     // the block is associated with the class instance it initializes, so syntax like ".varname" works
     if( _this > 0 )
     {
@@ -3293,7 +3399,7 @@ static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken
     nested.table = blockdecl;
     block(ctx, &nested, lbrace, pascal);
 
-    lua_pop(ctx->L,2); // blockdecl, blockinst
+    lua_pop(ctx->L,1); // blockinst
     BS_END_LUA_FUNC(ctx);
 }
 
@@ -3356,6 +3462,9 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
     lua_pushinteger(ctx->L,BS_VarDecl);
     lua_setfield(ctx->L,var,"#kind");
     addLocInfo(ctx,id.loc,var);
+    addXref(ctx, id.loc, var);
+    addNumRef(ctx,var);
+
     switch( kind )
     {
     case Tok_let:
@@ -3493,7 +3602,14 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
             lua_pop(ctx->L,2); // decl, name
         }
 
-        nestedblock(ctx,scope,classInst, &t, pascal);
+        nestedblock(ctx,scope, classInst, &t, pascal); // returns block on stack
+        if( ctx->fullAst )
+        {
+            lua_pushvalue(ctx->L,var);
+            lua_setfield(ctx->L,-2,"#owner"); // set block.#owner to var
+            lua_setfield(ctx->L,var,"#ctr"); // set var.#ctr to block, consuming the stack
+        }else
+            lua_pop(ctx->L,1);
 
         if( pascal )
         {
@@ -4001,8 +4117,18 @@ static void assignment(BSParserContext* ctx, BSScope* scope, int lro)
 
 static void condition(BSParserContext* ctx, BSScope* scope)
 {
-    BS_BEGIN_LUA_FUNC(ctx,0);
+    BS_BEGIN_LUA_FUNC(ctx,1);
     BSToken t = nextToken(ctx); // eat if
+    const int ast = lua_gettop(ctx->L)+1;
+    int n = 0;
+    if( ctx->fullAst )
+    {
+        lua_createtable(ctx->L,0,0);
+        lua_pushinteger(ctx->L,BS_CondStat);
+        lua_setfield(ctx->L,ast,"#kind");
+        addLocInfo(ctx,t.loc,ast);
+    }else
+        lua_pushnil(ctx->L);
     t = peekToken(ctx,1);
     expression(ctx,scope,0);
     lua_getfield(ctx->L,-1,"#type");
@@ -4019,6 +4145,13 @@ static void condition(BSParserContext* ctx, BSScope* scope)
     if( t.tok == Tok_then )
     {
         nestedblock(ctx,scope,0,&t,1);
+        if( ctx->fullAst )
+        {
+            lua_pushvalue(ctx->L,ast);
+            lua_setfield(ctx->L,-2,"#owner"); // set block.#owner to cond
+            lua_rawseti(ctx->L,ast,++n); // add block to cond, consuming the stack
+        }else
+            lua_pop(ctx->L,1);
         if( !skipping )
             ctx->skipMode = 0;
         t = nextToken(ctx);
@@ -4039,6 +4172,13 @@ static void condition(BSParserContext* ctx, BSScope* scope)
             if( !skipping )
                 ctx->skipMode = !( cond && !done );
             nestedblock(ctx,scope,0,&t,1);
+            if( ctx->fullAst )
+            {
+                lua_pushvalue(ctx->L,ast);
+                lua_setfield(ctx->L,-2,"#owner"); // set block.#owner to cond
+                lua_rawseti(ctx->L,ast,++n); // add block to cond, consuming the stack
+            }else
+                lua_pop(ctx->L,1);
             if( !skipping )
                 ctx->skipMode = 0;
             t = nextToken(ctx);
@@ -4050,6 +4190,13 @@ static void condition(BSParserContext* ctx, BSScope* scope)
             if( !skipping )
                 ctx->skipMode = done;
             nestedblock(ctx,scope,0,&t,1);
+            if( ctx->fullAst )
+            {
+                lua_pushvalue(ctx->L,ast);
+                lua_setfield(ctx->L,-2,"#owner"); // set block.#owner to cond
+                lua_rawseti(ctx->L,ast,++n); // add block to cond, consuming the stack
+            }else
+                lua_pop(ctx->L,1);
             if( !skipping )
                 ctx->skipMode = 0;
             t = nextToken(ctx);
@@ -4061,6 +4208,13 @@ static void condition(BSParserContext* ctx, BSScope* scope)
         if( t.tok != Tok_Lbrace )
             error(ctx, t.loc.row, t.loc.col,"expecting '{'" );
         nestedblock(ctx,scope,0,&t,0);
+        if( ctx->fullAst )
+        {
+            lua_pushvalue(ctx->L,ast);
+            lua_setfield(ctx->L,-2,"#owner"); // set block.#owner to cond
+            lua_rawseti(ctx->L,ast,++n); // add block to cond, consuming the stack
+        }else
+            lua_pop(ctx->L,1);
         if( !skipping )
             ctx->skipMode = 0;
         t = peekToken(ctx,1);
@@ -4074,10 +4228,21 @@ static void condition(BSParserContext* ctx, BSScope* scope)
             {
             case Tok_if:
                 condition(ctx,scope);
+                if( ctx->fullAst )
+                    lua_setfield(ctx->L,ast,"#else");
+                else
+                    lua_pop(ctx->L,1);
                 break;
             case Tok_Lbrace:
                 nextToken(ctx); // eat lbrace
                 nestedblock(ctx,scope,0,&t,0);
+                if( ctx->fullAst )
+                {
+                    lua_pushvalue(ctx->L,ast);
+                    lua_setfield(ctx->L,-2,"#owner"); // set block.#owner to cond
+                    lua_rawseti(ctx->L,ast,++n); // add block to cond, consuming the stack
+                }else
+                    lua_pop(ctx->L,1);
                 break;
             default:
                 error(ctx, t.loc.row, t.loc.col,"expecting 'if' or '{'" );
@@ -4157,6 +4322,10 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
                 break;
             case Tok_if:
                 condition(ctx, scope);
+                if( ctx->fullAst )
+                    lua_rawseti(ctx->L,scope->table,++scope->n);
+                else
+                    lua_pop(ctx->L,1);
                 break;
             case Tok_Hat:
             case Tok_Dot:
@@ -4271,6 +4440,27 @@ int bs_parse(lua_State* L)
     lua_call(L,1,1);
     const int builtins = lua_gettop(L);
 
+    lua_getglobal(L,"#haveXref");
+    const int haveXref = !lua_isnil(L,-1);
+    lua_pop(L,1);
+
+    if( haveXref )
+        lua_getglobal(L,"#xref");
+    else
+        lua_pushnil(L);
+    const int xref = lua_gettop(L);
+
+    lua_getglobal(L,"#haveNumRefs");
+    const int haveNumRefs = !lua_isnil(L,-1);
+    lua_pop(L,1);
+
+    if( haveNumRefs )
+        lua_getglobal(L,"#refs");
+    else
+        lua_pushnil(L);
+    const int numRefs = lua_gettop(L);
+
+
     lua_createtable(L,0,0); // module instance
     lua_pushvalue(L,-1);
     lua_setfield(L,BS_NewModule,"#inst");
@@ -4294,6 +4484,12 @@ int bs_parse(lua_State* L)
     lua_getglobal(L,"#haveFullAst");
     ctx.fullAst = !lua_isnil(L,-1);
     lua_pop(L,1);
+
+    if( haveXref )
+        ctx.xref = xref;
+    if( haveNumRefs )
+        ctx.numRefs = numRefs;
+
     lua_pushstring(L,ctx.label);
     lua_setfield(L,BS_NewModule, "#label");
     // BS_BEGIN_LUA_FUNC(&ctx,1); cannot use this here because module was created above already
@@ -4321,6 +4517,22 @@ int bs_parse(lua_State* L)
     }else
         fprintf(stdout,"# analyzing %s\n", lua_tostring(L,-1));
     ctx.filepath = lua_tostring(L,-1);
+
+    if( haveXref )
+    {
+        const int filePath = lua_gettop(L);
+        lua_pushvalue(L,filePath);
+        lua_rawget(L,ctx.xref);
+        if( !lua_istable(L,-1) )
+        {
+            lua_pop(L,1); // nil
+            lua_pushvalue(L,filePath);
+            lua_createtable(L,0,0);
+            lua_rawset(L,ctx.xref);
+        }else
+            lua_pop(L,1); // list
+    }
+
     lua_setfield(L,BS_NewModule,"#file");
     fflush(stdout);
     ctx.lex = bslex_createhilex(bs_denormalize_path(ctx.filepath), ctx.label);
