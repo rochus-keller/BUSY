@@ -110,6 +110,11 @@ enumtype("FileType")
 	enumitem("shared_lib")
 	enumitem("executable")
 
+enumtype("BuildMode")
+	enumitem("optimized")
+	enumitem("nonoptimized")
+	enumitem("debug")
+
 
 -- standard classes
 local curClass
@@ -278,6 +283,7 @@ variable("target_toolchain_ver", globals.int, false)
 variable("moc_path", globals.path, false)
 variable("rcc_path", globals.path, false)
 variable("uic_path", globals.path, false)
+variable("build_mode", globals.BuildMode, true)
 
 B = require("BUSY")
 -- preset global variables; inst is the instance of the globals declaration
@@ -294,9 +300,29 @@ inst.moc_path = "."
 inst.rcc_path = "."
 inst.uic_path = "."
 inst["#ctdefaults"] = {} -- a table with optional entries CompilerType->Config
-inst["#ctdefaults"]["gcc"] = { ["cflags"] = { "-O2" } }
-inst["#ctdefaults"]["clang"] = inst["#ctdefaults"]["gcc"]
-inst["#ctdefaults"]["msvc"] = { ["cflags"] = { "/O2", "/MD" } }
+local optimized = {}
+optimized["gcc"] = { ["cflags"] = { "-O2" } }
+optimized["clang"] = optimized["gcc"]
+optimized["msvc"] = { ["cflags"] = { "/O2", "/MD" } }
+local debug = {}
+debug["gcc"] = { ["cflags"] = { "-g" } }
+debug["clang"] = debug["gcc"]
+debug["msvc"] = { ["cflags"] = { "/Zi", "-MDd", "-Fddebug" } } -- creates debug.mdb in the current directory
+if _G["#build_mode"] ~= nil then
+	inst.build_mode = _G["#build_mode"]
+	if inst.build_mode == "optimized" then
+		inst["#ctdefaults"] = optimized
+	elseif inst.build_mode == "nonoptimized" then
+		-- NOP
+	elseif inst.build_mode == "debug" then
+		inst["#ctdefaults"] = debug
+	else
+		error("invalid symbol in #build_mode")
+	end
+else
+	inst.build_mode = "optimized"
+	inst["#ctdefaults"] = optimized
+end
 
 
 return globals

@@ -44,6 +44,7 @@ local function parseParam(str)
 	end
 end
 
+_G["#build_mode"] = nil
 local i = 1
 while i <= #arg do
 	if arg[i] == "-B" then
@@ -74,6 +75,21 @@ while i <= #arg do
 		generate = arg[i]
 	elseif arg[i] == "-c" then 
 		checkOnly = true
+	elseif arg[i] == "-M" then
+		i = i + 1
+		if arg[i] ~= "debug" and arg[i] ~= "nonoptimized" and arg[i] ~= "optimized" then 
+			error("expecting debug, nonoptimized or optimized after -M") 
+		end
+		_G["#build_mode"] = arg[i]
+	elseif arg[i] == "-nopt" then
+		if _G["#build_mode"] ~= nil then error("build mode already set on command line") end
+		_G["#build_mode"] = "nonoptimized"
+	elseif arg[i] == "-dbg" then
+		if _G["#build_mode"] ~= nil then error("build mode already set on command line") end
+		_G["#build_mode"] = "debug"
+	elseif arg[i] == "-opt" then
+		if _G["#build_mode"] ~= nil then error("build mode already set on command line") end
+		_G["#build_mode"] = "optimized"
 	elseif arg[i]:sub(1,1) == "-" then
 		error("unknown option "..arg[i])
 	else
