@@ -66,14 +66,9 @@ static void readchar(BSLexer* l)
         if( l->n == 0 || l->n > (l->end - l->pos) )
         {
             if( !l->muted )
-            {
                 fprintf(stderr, "file has invalid utf-8 format: %s\n", l->source);
-                exit(1);
-            }else
-            {
-                l->ch = 0;
-                l->pos = l->end;
-            }
+            l->ch = 0;
+            l->pos = l->end;
         }
     }
 }
@@ -951,7 +946,11 @@ static BSToken hnext(BSHiLex* l)
                 // the first is just to transport loc and source if tok == 0
                 char* str = chainToStr(l,a->what->tok.tok == 0 ? a->what->next : a->what);
                 // TODO: support directly lexing token streams instead of strings
-                bslex_hopen(l,str, strlen(str), a->what->tok.source, a->what->tok.loc);
+                if( bslex_hopen(l,str, strlen(str), a->what->tok.source, a->what->tok.loc) != 0 )
+                {
+                    t.tok = Tok_Invalid;
+                    return t;
+                }
                 lev = &l->lex[l->level];
                 t = bslex_next(lev->lex);
                 break;
@@ -1106,15 +1105,14 @@ int bslex_hopen(BSHiLex* l, const char* str, int len, const char* sourceName, BS
     {
         fprintf(stderr, "%s:%d:%d:ERR lexer stack: maximum levels reached (%d levels)\n", sourceName,
                 orig.row, orig.col, BS_MAX_LEVEL);
-        exit(1);
-        return 0;
+        return -1;
     }
     if( l->lex[l->level].ref.tok == Tok_Invalid )
         l->lex[l->level].ref = l->cur;
     l->level++;
     l->lex[l->level].lex = bslex_openFromString(str, len, sourceName);
     l->lex[l->level].orig = orig;
-    return 1;
+    return 0;
 }
 
 const char*bslex_hfilepath(BSHiLex* l)

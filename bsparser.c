@@ -591,7 +591,6 @@ static void submodule(BSParserContext* ctx, int subdir)
     lua_setfield(ctx->L,-2,"^"); // set reference to outer scope
     addToScope(ctx, &ctx->module, &id, module ); // the outer module directly references this module, no adapter
     addXref(ctx, id.loc, module);
-    addNumRef(ctx,module);
 
     lua_getfield(ctx->L,ctx->module.table,"#rdir");
     lua_pushstring(ctx->L,"/");
@@ -2222,7 +2221,9 @@ static void evalInst(BSParserContext* ctx, BSScope* scope)
 
     if( !ctx->skipMode )
     {
-        bslex_hopen(ctx->lex,lua_tostring(ctx->L,code), lua_objlen(ctx->L,code), lua_tostring(ctx->L,source), orig);
+        if( bslex_hopen(ctx->lex,lua_tostring(ctx->L,code), lua_objlen(ctx->L,code),
+                        lua_tostring(ctx->L,source), orig) != 0 )
+            return;
         t = nextToken(ctx);
         if( t.tok != Tok_Lbrace )
             error(ctx, t.loc.row, t.loc.col,"internal error" );
@@ -3520,6 +3521,10 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         lua_pushvalue(ctx->L,var);
         lua_setfield(ctx->L,classInst,"#decl");
 
+        // also make instance accessible by the var decl
+        lua_pushvalue(ctx->L,classInst);
+        lua_setfield(ctx->L,var,"#inst");
+
         // set the value of the variable in the scope instance
         lua_pushvalue(ctx->L,scope->table); // +1 scope def
         lua_getfield(ctx->L,-1,"#inst"); // +1 scope inst
@@ -4422,18 +4427,7 @@ int bs_parse(lua_State* L)
         lua_createtable(L,0,0);
         lua_replace(L,BS_Params);
     }
-    if( lua_isnil(L,BS_NewModule) )
-    {
-        lua_createtable(L,0,0); // module definition
-        const int module = lua_gettop(L);
-        lua_pushinteger(L, BS_ModuleDef);
-        lua_setfield(L,module,"#kind");
-        lua_replace(L,BS_NewModule);
-        lua_pushstring(L,"."); // start rdir from '.'
-        lua_setfield(L,BS_NewModule,"#rdir"); // virtual directory relative to source root
-        lua_pushstring(L,"."); // start rdir from '.'
-        lua_setfield(L,BS_NewModule,"#fsrdir"); // file system directory relative to source root
-    }
+    assert( lua_istable(L,BS_NewModule) );
 
     lua_getglobal(L, "require");
     lua_pushstring(L, "builtins");
@@ -4534,7 +4528,11 @@ int bs_parse(lua_State* L)
     }
 
     lua_setfield(L,BS_NewModule,"#file");
+
     fflush(stdout);
+
+    addNumRef(&ctx,BS_NewModule);
+
     ctx.lex = bslex_createhilex(bs_denormalize_path(ctx.filepath), ctx.label);
     if( ctx.lex == 0 )
     {

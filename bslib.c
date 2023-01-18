@@ -149,12 +149,13 @@ static void push_normalized(lua_State *L, int path)
 // NOTE: if BUSY is built information about the OS and toolchain is melted into the executable and doesn't have
 //   to be explicitly set when BUSY is used.
 // returns: root module
-static int bs_compile (lua_State *L)
+int bs_compile (lua_State *L)
 {
+    enum { SOURCE_DIR = 1, BUILD_DIR, PARAMS };
     int i;
     for( i = lua_gettop(L); i < 3; i++ )
         lua_pushnil(L);
-    if( lua_isnil(L,1) )
+    if( lua_isnil(L,SOURCE_DIR) )
     {
         lua_pushstring(L, "..");
         lua_replace(L,1);
@@ -182,9 +183,9 @@ static int bs_compile (lua_State *L)
     lua_pushstring(L, "builtins");
     lua_call(L,1,1);
     lua_getfield(L,-1,"#inst");
-    push_normalized(L,2);
+    push_normalized(L,BUILD_DIR);
     lua_setfield(L,-2,"root_build_dir");
-    push_normalized(L,1);
+    push_normalized(L,SOURCE_DIR);
     fprintf(stdout,"# running parser\n# root source directory is %s\n",lua_tostring(L,-1));
     fflush(stdout);
     lua_setfield(L,-2,"root_source_dir");
@@ -202,16 +203,24 @@ static int bs_compile (lua_State *L)
 
     lua_pushcfunction(L, bs_parse);
 
-    push_normalized(L,1);
+    push_normalized(L,SOURCE_DIR);
 
-    lua_pushnil(L);
+    lua_createtable(L,0,0); // module definition
+    const int module = lua_gettop(L);
+    lua_pushinteger(L, BS_ModuleDef);
+    lua_setfield(L,module,"#kind");
+    lua_pushstring(L,"."); // start rdir from '.'
+    lua_setfield(L,module,"#rdir"); // virtual directory relative to source root
+    lua_pushstring(L,"."); // start rdir from '.'
+    lua_setfield(L,module,"#fsrdir"); // file system directory relative to source root
 
-    lua_pushvalue(L,3);
+    lua_pushvalue(L,module);
+    lua_setglobal(L, "#root");
+
+    lua_pushvalue(L,PARAMS);
 
     lua_call(L,3,1);
     // module is on the stack
-    lua_pushvalue(L,-1);
-    lua_setglobal(L, "#root");
 
     lua_pushnil(L);
     while (lua_next(L, 3) != 0)
