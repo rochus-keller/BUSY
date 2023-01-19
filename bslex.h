@@ -20,13 +20,9 @@
 * http://www.gnu.org/copyleft/gpl.html.
 */
 
-typedef struct BSLexer BSLexer;
+#include "bslogger.h"
 
-typedef struct BSRowCol
-{
-    unsigned int row: 20;
-    unsigned int col: 12;
-} BSRowCol;
+typedef struct BSLexer BSLexer;
 
 typedef enum BSTokType {
     // generated with EbnfStudio from busy.ebnf
@@ -134,6 +130,8 @@ extern const char* bslex_filepath(BSLexer*);
 extern void bslex_dump(const BSToken*);
 extern const char* bslex_tostring(int tok);
 extern int bslex_numOfUnichar(const char*, int len);
+extern void bslex_setlogger(BSLexer*,BSLogger,void*);
+extern void bs_defaultLogger(BSLogLevel l, void* data,const char* file, BSRowCol loc, const char* format, va_list args);
 
 typedef struct BSHiLex BSHiLex; // hierarchic lexer
 
@@ -148,6 +146,7 @@ extern const char* bslex_hfilepath(BSHiLex*);
 extern int bslex_hlevelcount(BSHiLex*);
 extern BSToken bslex_hlevel(BSHiLex*, unsigned int level);
 extern char* bslex_allocstr(BSHiLex*,int len);
+extern void bslex_hsetlogger(BSHiLex*,BSLogger,void*);
 
 
 #endif // BSLEX_H

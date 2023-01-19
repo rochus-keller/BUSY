@@ -46,7 +46,72 @@ typedef struct BSLexer
     uchar ownsStr;
     uchar muted;
     uchar alltokens; // dont aggregate strings and deliver comment delimiters
+    BSLogger logger;
+    void* loggerData;
 } BSLexer;
+
+void bs_defaultLogger(BSLogLevel l, void* data,const char* file, BSRowCol loc, const char* format, va_list args)
+{
+    FILE* out;
+
+    if( l == BS_Info || l == BS_Debug )
+        out = stdout;
+    else
+        out = stderr;
+
+    const char* tag = "";
+    switch( l )
+    {
+    case BS_Debug:
+        tag = "DGB:";
+        break;
+    case BS_Warning:
+        tag = "WRN:";
+        break;
+    case BS_Error:
+        tag = "ERR:";
+        break;
+    case BS_Critical:
+        tag = "PANIC:";
+        break;
+    }
+
+    if( file && loc.row )
+        fprintf(out,"%s:%d:%d:%s ", file, loc.row, loc.col, tag);
+    else if( file )
+        fprintf(out,"%s:%s ", file, tag);
+    else if( *tag != 0 )
+        fprintf(out,"%s ", tag);
+
+    vfprintf(out, format, args);
+    fprintf(out,"\n");
+    fflush(out);
+
+}
+
+static void error1( BSLexer* l, const char* format, ...)
+{
+    if( l->muted )
+        return;
+    va_list args;
+    va_start(args, format);
+    l->logger(BS_Error, l->loggerData,l->source, l->loc, format, args);
+    va_end(args);
+
+}
+
+static void error2( BSLexer* l, const char* format, ...)
+{
+    if( l->muted )
+        return;
+    BSRowCol loc;
+    loc.row = 0;
+    va_list args;
+    va_start(args, format);
+    l->logger(BS_Error, l->loggerData, 0, loc, format, args);
+    va_end(args);
+
+}
 
 static void readchar(BSLexer* l)
 {
@@ -66,7 +131,7 @@ static void readchar(BSLexer* l)
         if( l->n == 0 || l->n > (l->end - l->pos) )
         {
             if( !l->muted )
-                fprintf(stderr, "file has invalid utf-8 format: %s\n", l->source);
+                error2(l, "file has invalid utf-8 format: %s\n", l->source);
             l->ch = 0;
             l->pos = l->end;
         }
@@ -120,6 +185,7 @@ BSLexer* bslex_open(const char* filepath, const char* sourceName)
         fprintf(stderr, "not enough memory to process file %s\n", filepath);
         return 0;
     }
+    l->logger = bs_defaultLogger;
 
     if( sourceName == 0 )
         l->source = filepath;
@@ -156,6 +222,7 @@ BSLexer* bslex_openFromString(const char* str, int len, const char* sourceName)
     l->loc.row = 1;
     l->loc.col = 0;
     l->ownsStr = 0;
+    l->logger = bs_defaultLogger;
 
     if( sz >= 3 && l->str[0] == 0xEF && l->str[1] == 0xBB && l->str[2] == 0xBF)
         l->pos += 3; // remove BOM
@@ -201,17 +268,6 @@ static void skipWhiteSpace(BSLexer* l)
     }
 }
 
-static void error(BSLexer* l, const char* format, ...)
-{
-    if( l->muted )
-        return;
-    fprintf(stderr,"%s:%d:%d: ", l->source, l->loc.row, l->loc.col );
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-}
-
 static BSToken path(BSLexer* l, BSToken t, int quoted )
 {
     // path ::= [ '../' { '../' } | './' | '//' ] fsname { '/' fsname } | '..' | '.'
@@ -236,13 +292,13 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
                 readchar(l);
                 if( l->ch != '/' && l->ch != '\'' )
                 {
-                    error(l, "expecting '..' or '../path'\n" );
+                    error1(l, "expecting '..' or '../path'\n" );
                     t.tok = Tok_Invalid;
                     return t;
                 }
             }else if( l->ch != '/' && l->ch != '\'' )
             {
-                error(l, "expecting '.' or './path'\n" );
+                error1(l, "expecting '.' or './path'\n" );
                 t.tok = Tok_Invalid;
                 return t;
             }
@@ -251,13 +307,13 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
             readchar(l);
             if( l->ch != '/' )
             {
-                error(l, "expecting '//' in the root of an absolute path\n" );
+                error1(l, "expecting '//' in the root of an absolute path\n" );
                 t.tok = Tok_Invalid;
                 return t;
             }
         }else if( l->ch == '\'' )
         {
-            error(l, "empty paths not allowed\n" );
+            error1(l, "empty paths not allowed\n" );
             t.tok = Tok_Invalid;
             return t;
         }
@@ -284,7 +340,7 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
             readchar(l);
         else if( bs_forbidden_fschar(l->ch) )
         {
-            error( l, "cannot use '%c' in a path\n", l->ch );
+            error1( l, "cannot use '%c' in a path\n", l->ch );
             t.tok = Tok_Invalid;
             return t;
         }else if( l->ch == ':' )
@@ -297,7 +353,7 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
                     && isalpha(start[2])
                     && ( l->pos[1] == '/' || isspace(l->pos[1]) || ( quoted && l->pos[1] == '\'' ) ) ) )
             {
-                error( l, "':' can only be used in the root of an absolute path like //c:\n" );
+                error1( l, "':' can only be used in the root of an absolute path like //c:\n" );
                 t.tok = Tok_Invalid;
                 return t;
             }
@@ -309,13 +365,13 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
                 switch(diff)
                 {
                 case 1:
-                    error(l, "'//' only allowed at the beginning of an absolute path\n");
+                    error1(l, "'//' only allowed at the beginning of an absolute path\n");
                     t.tok = Tok_Invalid;
                     return t;
                 case 2:
                     if( strncmp(lastSlash,"/./",3) == 0 )
                     {
-                        error(l, "'/./' not allowed in a path\n" );
+                        error1(l, "'/./' not allowed in a path\n" );
                         t.tok = Tok_Invalid;
                         return t;
                     }
@@ -325,7 +381,7 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
                     {
                         if( !dotdotStart )
                         {
-                            error(l, "'/../' not allowed in a path\n" );
+                            error1(l, "'/../' not allowed in a path\n" );
                             t.tok = Tok_Invalid;
                             return t;
                         }
@@ -338,7 +394,7 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
         {
             if( !dotdotStart && lastDot && ((const char*)l->pos - lastDot) == 1 )
             {
-                error(l, "pairs of '..' not allowed in a path\n" );
+                error1(l, "pairs of '..' not allowed in a path\n" );
                 t.tok = Tok_Invalid;
                 return t;
             }
@@ -357,7 +413,7 @@ static BSToken path(BSLexer* l, BSToken t, int quoted )
     if( lastSlash && (const char*)l->pos - lastSlash == ( quoted ? 2 : 1 ) &&
            (const char*)l->pos - t.val > ( quoted ? 3 : 2 ) )
     {
-        error(l, "trailing '/' not allowed\n" );
+        error1(l, "trailing '/' not allowed\n" );
         t.tok = Tok_Invalid;
         return t;
     }
@@ -435,7 +491,7 @@ static BSToken number(BSLexer* l,BSToken t)
         {
             readchar(l);
             if( !unicode_isdigit(l->ch) )
-                error(l, "expecting a digit after '.'\n" );
+                error1(l, "expecting a digit after '.'\n" );
             while( unicode_isdigit(l->ch) )
                 readchar(l);
         }
@@ -445,7 +501,7 @@ static BSToken number(BSLexer* l,BSToken t)
             if( l->ch == '+' || l->ch == '-' )
                 readchar(l);
             if( !unicode_isdigit(l->ch) )
-                error(l, "expecting a digit after exponent\n" );
+                error1(l, "expecting a digit after exponent\n" );
             while( unicode_isdigit(l->ch) )
                 readchar(l);
 
@@ -478,7 +534,7 @@ static void queueToken(BSLexer* l, BSToken t)
         tmp = (BSTokenQueue*)malloc(sizeof(BSTokenQueue));
         if( tmp == 0 )
         {
-            fprintf(stderr, "not enough memory to read file %s\n", l->source);
+            error2(l, "not enough memory to read file %s\n", l->source);
             exit(1);
         }
         tmp->tok = t;
@@ -515,7 +571,7 @@ static BSToken string(BSLexer* l,BSToken t)
     }
     if( l->ch != '"' && !l->muted )
     {
-        error(l,"non-terminated string\n" );
+        error1(l,"non-terminated string\n" );
         t.tok = Tok_Invalid;
         return t;
     }// else
@@ -580,7 +636,7 @@ static BSToken comment(BSLexer* l,BSToken t)
     readchar(l);
     if( level != 0 && !l->muted )
     {
-        error(l,"non-terminated comment\n" );
+        error1(l,"non-terminated comment\n" );
         t.tok = Tok_Invalid;
         return t;
     }
@@ -631,7 +687,7 @@ static BSToken next(BSLexer* l)
                 t.len = 2;
             }else
             {
-                error(l, "expecting '/' after '..'\n" );
+                error1(l, "expecting '/' after '..'\n" );
                 t.tok = Tok_Invalid;
             }
             break;
@@ -686,9 +742,9 @@ static BSToken next(BSLexer* l)
                 assert( pos == 0 );
                 pos++;
                 if( t.val )
-                    error(l, "unexpected symbol: %c\n", *t.val );
+                    error1(l, "unexpected symbol: %c\n", *t.val );
                 else
-                    error(l, "unexpected symbol\n" );
+                    error1(l, "unexpected symbol\n" );
             }
             t.len = pos;
             while( pos-- > 0 )
@@ -740,7 +796,7 @@ BSToken bslex_peek(BSLexer* l, int off )
             tmp = (BSTokenQueue*)malloc(sizeof(BSTokenQueue));
             if( tmp == 0 )
             {
-                fprintf(stderr, "not enough memory to read file %s\n", l->source);
+                error2(l, "not enough memory to read file %s\n", l->source);
                 exit(1);
             }
             tmp->tok = next(l);
@@ -814,7 +870,7 @@ typedef struct BSHiLexMemSlot
 
 typedef struct BSHiLex
 {
-#define BS_MAX_LEVEL  20
+    #define BS_MAX_LEVEL  20
     BSHiLexLevel lex[BS_MAX_LEVEL];
     unsigned level : 5;
     BSTokenQueue* first;
@@ -900,7 +956,7 @@ static char* chainToStr(BSHiLex* l, BSTokChain* ts)
     char* res = bslex_allocstr(l,len+1);
     if( res == 0 )
     {
-        fprintf(stderr,"%s:%d:%d:ERR: not enough memory to make string of token chain\n",
+        error2(l->lex[0].lex,"%s:%d:%d: not enough memory to make string of token chain\n",
                 ts->tok.source, ts->tok.loc.row, ts->tok.loc.col );
         exit(1);
     }
@@ -1003,7 +1059,7 @@ static BSTokenQueue* reserveSlots(BSHiLex* l, BSTokenQueue* firstInvalid, int n 
             tmp = (BSTokenQueue*)calloc(1,sizeof(BSTokenQueue));
             if( tmp == 0 )
             {
-                fprintf(stderr, "not enough memory to allocate token queue for %s\n", l->lex[0].lex->source);
+                error2(l->lex[0].lex, "not enough memory to allocate token queue for %s\n", l->lex[0].lex->source);
                 exit(1);
             }
             if( firstInvalid == 0 )
@@ -1062,7 +1118,7 @@ BSToken bslex_hpeek(BSHiLex* l, int off)
                     char* str = bslex_allocstr(l,tmp->tok.len + b.len);
                     if( str == 0 )
                     {
-                        fprintf(stderr,"%s:%d:%d:ERR: not enough memory to copy identifier\n",
+                        error2(l->lex[0].lex,"%s:%d:%d: not enough memory to copy identifier",
                                 a.source, a.loc.row, a.loc.col );
                         exit(1);
                     }
@@ -1072,7 +1128,7 @@ BSToken bslex_hpeek(BSHiLex* l, int off)
                     tmp->tok.len += b.len;
                 }else
                 {
-                    fprintf(stderr, "%s:%d:%d:ERR: operator '&' requires an identifier on left and right side\n",
+                    error2(l->lex[0].lex, "%s:%d:%d: operator '&' requires an identifier on left and right side",
                             a.source,a.loc.row, a.loc.col);
                     res->tok.tok = Tok_Invalid;
                     return res->tok;
@@ -1103,7 +1159,7 @@ int bslex_hopen(BSHiLex* l, const char* str, int len, const char* sourceName, BS
 {
     if( l->level+1 >= BS_MAX_LEVEL )
     {
-        fprintf(stderr, "%s:%d:%d:ERR lexer stack: maximum levels reached (%d levels)\n", sourceName,
+        error2(l->lex[0].lex, "%s:%d:%d lexer stack maximum level reached (%d levels)\n", sourceName,
                 orig.row, orig.col, BS_MAX_LEVEL);
         return -1;
     }
@@ -1112,6 +1168,8 @@ int bslex_hopen(BSHiLex* l, const char* str, int len, const char* sourceName, BS
     l->level++;
     l->lex[l->level].lex = bslex_openFromString(str, len, sourceName);
     l->lex[l->level].orig = orig;
+    l->lex[l->level].lex->logger = l->lex[0].lex->logger;
+    l->lex[l->level].lex->loggerData = l->lex[0].lex->loggerData;
     return 0;
 }
 
@@ -1587,4 +1645,24 @@ void bslex_mute(BSLexer* l)
 void bslex_alltokens(BSLexer* l)
 {
     l->alltokens = 1;
+}
+
+void bslex_setlogger(BSLexer* l, BSLogger log, void* data)
+{
+    if( log == 0 )
+    {
+        l->logger = bs_defaultLogger;
+        l->loggerData = 0;
+    }else
+    {
+        l->logger = log;
+        l->loggerData = data;
+    }
+}
+
+void bslex_hsetlogger(BSHiLex* l, BSLogger log, void* data)
+{
+    int i;
+    for( i = 0; i < l->level; i++ )
+        bslex_setlogger(l->lex[i].lex, log, data);
 }

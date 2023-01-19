@@ -57,7 +57,8 @@ HEADERS += \
     bsrunner.h \
     bshost.h \
     bsdetect.h \
-    bsqmakegen.h
+    bsqmakegen.h \
+    bslogger.h
 
 SOURCES += \
     lapi.c \

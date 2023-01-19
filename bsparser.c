@@ -51,6 +51,8 @@ typedef struct BSParserContext {
     unsigned numRefs : 8;  // optional index a weak #refs table pointing to all objects with identdef
     unsigned xref : 8;     // optional index to xref table or 0; if a table is present, build bi-dir xref
     lua_State* L;
+    BSLogger logger;
+    void* loggerData;
 } BSParserContext;
 
 static BSToken nextToken(BSParserContext* ctx)
@@ -76,35 +78,61 @@ static void printLexerStack(BSParserContext* ctx)
     while(i >= 0)
     {
         BSToken level = bslex_hlevel(ctx->lex,i);
-        fprintf(stderr,"    instantiated from: %s:%d:%d\n", level.source, level.loc.row, level.loc.col );
+        BSRowCol loc;
+        loc.row = level.loc.row;
+        loc.col = level.loc.col;
+        va_list args;
+        va_end(args);
+        ctx->logger(BS_Error, ctx->loggerData,level.source,loc, "    instantiated from here", args );
         i--;
     }
 }
 
 static void error(BSParserContext* ctx, int row, int col, const char* format, ... )
 {
-    fprintf(stderr,"%s:%d:%d:ERR: ", bslex_hfilepath(ctx->lex), row, col);
+    BSRowCol loc;
+    loc.row = row;
+    loc.col = col;
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    ctx->logger(BS_Error, ctx->loggerData,bslex_hfilepath(ctx->lex),loc, format, args );
     va_end(args);
-    fprintf(stderr,"\n");
     printLexerStack(ctx);
-    fflush(stderr);
     lua_pushnil(ctx->L);
     lua_error(ctx->L);
 }
 
 static void warning(BSParserContext* ctx, int row, int col, const char* format, ... )
 {
-    fprintf(stderr,"%s:%d:%d:WRN: ", bslex_hfilepath(ctx->lex), row, col);
+    BSRowCol loc;
+    loc.row = row;
+    loc.col = col;
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    ctx->logger(BS_Warning, ctx->loggerData,bslex_hfilepath(ctx->lex),loc, format, args );
     va_end(args);
-    fprintf(stderr,"\n");
-    printLexerStack(ctx);
-    fflush(stderr);
+}
+
+static void message(BSParserContext* ctx, const char* format, ... )
+{
+    BSRowCol loc;
+    loc.row = 0;
+    loc.col = 0;
+    va_list args;
+    va_start(args, format);
+    ctx->logger(BS_Info, ctx->loggerData,0,loc, format, args );
+    va_end(args);
+}
+
+static void debugprint(BSLogger out, void* data, const char* format, ... )
+{
+    BSRowCol loc;
+    loc.row = 0;
+    loc.col = 0;
+    va_list args;
+    va_start(args, format);
+    out(BS_Debug, data,0,loc, format, args );
+    va_end(args);
 }
 
 static void unexpectedToken(BSParserContext* ctx, BSToken* t, const char* where)
@@ -115,89 +143,73 @@ static void unexpectedToken(BSParserContext* ctx, BSToken* t, const char* where)
 #define BS_BEGIN_LUA_FUNC(ctx,diff) const int $stack = lua_gettop((ctx)->L) + diff
 #define BS_END_LUA_FUNC(ctx) int $end = lua_gettop((ctx)->L); assert($stack == $end)
 
-static void dumpimp(lua_State* L, int index, int nl)
+static void dumpimp(lua_State* L, int index, BSLogger out, void* data, const char* title)
 {
     if( index <= 0 )
         index += lua_gettop(L) + 1;
+    if( title && *title != 0 )
+        debugprint(out,data,title);
     switch( lua_type(L,index) )
     {
     case LUA_TNIL:
-        fprintf(stdout,"nil");
+        debugprint(out,data,"nil");
         break;
     case LUA_TBOOLEAN:
-        fprintf(stdout,"bool %d",lua_toboolean(L,index));
+        debugprint(out,data,"bool %d",lua_toboolean(L,index));
         break;
     case LUA_TNUMBER:
         if( ( (int)lua_tonumber(L,index) - lua_tonumber(L,index) ) == 0.0 )
-            fprintf(stdout,"int %d",lua_tointeger(L,index));
+            debugprint(out,data,"int %d",lua_tointeger(L,index));
         else
-            fprintf(stdout,"number %f",lua_tonumber(L,index));
+            debugprint(out,data,"number %f",lua_tonumber(L,index));
         break;
     case LUA_TSTRING:
-        fprintf(stdout,"string \"%s\"",lua_tostring(L,index));
+        debugprint(out,data,"string \"%s\"",lua_tostring(L,index));
         break;
     case LUA_TTABLE:
-        fprintf(stdout,"*** table: %p", lua_topointer(L,index));
+        debugprint(out,data,"*** table: %p", lua_topointer(L,index));
         if( lua_getmetatable(L,index) )
         {
-            fprintf(stdout,"\n  metatable %p", lua_topointer(L,-1));
+            debugprint(out,data,"  metatable %p", lua_topointer(L,-1));
             lua_pop(L,1);
         }
         lua_pushnil(L);  /* first key */
         while (lua_next(L, index) != 0) {
-            fprintf(stdout,"\n  ");
-            if( lua_type(L,-2) == LUA_TTABLE )
-                fprintf(stdout,"table %p", lua_topointer(L,-2));
+            const int key = lua_gettop(L)-1;
+            const int value = lua_gettop(L);
+            if( lua_type(L,key) == LUA_TTABLE )
+                lua_pushfstring(L,"table %p", lua_topointer(L,key));
             else
-                dumpimp(L,-2,0);
-            fprintf(stdout," = ");
-            if( lua_type(L,-1) == LUA_TTABLE )
-                fprintf(stdout,"table %p", lua_topointer(L,-1));
+                lua_pushvalue(L,key);
+            if( lua_type(L,value) == LUA_TTABLE )
+                lua_pushfstring(L,"table %p", lua_topointer(L,value));
             else
-                dumpimp(L,-1,0);
-            lua_pop(L, 1);
+                lua_pushvalue(L,value);
+            debugprint(out,data,"  %s = %s", lua_tostring(L,-2), lua_tostring(L,-1));
+            lua_pop(L, 3);
         }
         break;
     case LUA_TFUNCTION:
-        fprintf(stdout,"function %p",lua_topointer(L,index));
+        debugprint(out,data,"function %p",lua_topointer(L,index));
         break;
     default:
-        fprintf(stdout,"<lua value>");
+        debugprint(out,data,"<lua value>");
         break;
     }
-    if( nl )
-    {
-        fprintf(stdout,"\n");
-        fflush(stdout);
-    }
 }
 
-int bs_dump(lua_State *L)
-{
-    if( lua_isstring(L,2) )
-        fprintf(stdout,"%s: ", lua_tostring(L,2) );
-    dumpimp(L,1,1);
-    return 0;
-}
-
-void bs_dump2(lua_State *L, const char* title, int index )
-{
-    fprintf(stdout,"%s: ", title);
-    dumpimp(L,index,1);
-}
 
 static void dump(BSParserContext* ctx, int index)
 {
     BS_BEGIN_LUA_FUNC(ctx,0);
-    dumpimp(ctx->L,index,1);
+    dumpimp(ctx->L,index,ctx->logger,ctx->loggerData,0);
     BS_END_LUA_FUNC(ctx);
 }
 
 static void dump2(BSParserContext* ctx, const char* title, int index)
 {
     BS_BEGIN_LUA_FUNC(ctx,0);
-    fprintf(stdout,"%s: ", title);
-    dumpimp(ctx->L,index,1);
+    dumpimp(ctx->L,index,ctx->logger,ctx->loggerData,title);
     BS_END_LUA_FUNC(ctx);
 }
 
@@ -433,9 +445,9 @@ static void submodule(BSParserContext* ctx, int subdir)
     lua_getfield(ctx->L,ctx->module.table,"#dummy");
     if( !lua_isnil(ctx->L,-1) )
     {
-        fprintf(stderr,"%s:%d:%d:ERR: submod declarations not allowed here\n",
-                ctx->filepath, id.loc.row, id.loc.col );
-        fflush(stderr);
+        va_list args;
+        va_end(args);
+        ctx->logger(BS_Error, ctx->loggerData,ctx->filepath,id.loc, "submod declarations not allowed here", args );
         lua_pushnil(ctx->L);
         lua_error(ctx->L);
     }else
@@ -1885,6 +1897,14 @@ static void topath(BSParserContext* ctx, int n, int row, int col)
     BS_END_LUA_FUNC(ctx);
 }
 
+static inline const char* labelOrFilepath(BSParserContext* ctx)
+{
+    if( ctx->logger == bs_defaultLogger )
+        return ctx->label;
+    else
+        return bs_denormalize_path(ctx->filepath);
+}
+
 // kind = 0: message; = 1: warning; = 2: error
 static void print(BSParserContext* ctx, int n, int row, int col, int kind)
 {
@@ -1906,22 +1926,25 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
     lua_concat(ctx->L,n);
     if( !ctx->skipMode )
     {
+        BSRowCol loc;
+        loc.row = row;
+        loc.col = col;
+        va_list args;
+        va_end(args);
         switch( kind )
         {
         case 2:
-            fprintf(stderr,"%s:%d:%d:ERR: %s\n",ctx->label, row, col, lua_tostring(ctx->L,-1) );
-            fflush(stderr);
+            ctx->logger(BS_Error,ctx->loggerData,labelOrFilepath(ctx), loc, lua_tostring(ctx->L,-1), args);
             lua_pushnil(ctx->L);
             lua_error(ctx->L);
             break;
         case 1:
-            fprintf(stderr,"%s:%d:%d:WRN: %s\n",ctx->label, row, col, lua_tostring(ctx->L,-1) );
+            ctx->logger(BS_Warning,ctx->loggerData,labelOrFilepath(ctx), loc, lua_tostring(ctx->L,-1), args);
             break;
         default:
-            fprintf(stdout,"%s:%d:%d: %s\n", ctx->label, row, col, lua_tostring(ctx->L,-1) );
+            ctx->logger(BS_Info,ctx->loggerData,ctx->label, loc, lua_tostring(ctx->L,-1), args);
             break;
         }
-        fflush(stdout);
     }
 
     lua_pop(ctx->L,1);
@@ -2127,8 +2150,6 @@ static void trycompile(BSParserContext* ctx, int n, int row, int col)
         lua_pushstring(ctx->L," 2>/dev/null");
     lua_concat(ctx->L,6);
     lua_replace(ctx->L,cmd);
-
-    //fprintf(stdout,"%s\n", lua_tostring(ctx->L,cmd));fflush(stdout); // TEST
 
     int res2 = 0;
 
@@ -2364,8 +2385,7 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
             {
                 if( n == 2 )
                 {
-                    fprintf(stdout,"%s: ", lua_tostring(ctx->L,lua_gettop(ctx->L)-2+1));
-                    dump(ctx,lua_gettop(ctx->L)-4+1);
+                    dump2(ctx,lua_tostring(ctx->L,lua_gettop(ctx->L)-2+1),lua_gettop(ctx->L)-4+1);
                 }else
                     dump(ctx,lua_gettop(ctx->L)-2+1);
             }
@@ -4394,31 +4414,41 @@ static int calcLevel(lua_State* L, int module)
     return level;
 }
 
-static void moduleerror(lua_State* L, int module, const char* format, ... )
+static void moduleerror(BSParserContext* ctx, int module, const char* format, ... )
 {
-    lua_getfield(L, module, "#row");
-    const int row = lua_tointeger(L,-1);
-    lua_getfield(L, module, "#col");
-    const int col = lua_tointeger(L,-1);
-    lua_pop(L,2);
+    BSRowCol loc;
+    lua_getfield(ctx->L, module, "#row");
+    loc.row = lua_tointeger(ctx->L,-1);
+    lua_getfield(ctx->L, module, "#col");
+    loc.col = lua_tointeger(ctx->L,-1);
+    lua_pop(ctx->L,2);
 
-    lua_getfield(L,module,"^");
-    if( lua_istable(L,-1) )
+    lua_getfield(ctx->L,module,"^");
+    const char* path = 0;
+    if( lua_istable(ctx->L,-1) )
     {
-        lua_getfield(L,-1,"#rdir");
-        fprintf(stderr,"%s:%d:%d:ERR: ", lua_tostring(L,-1), row, col);
-        lua_pop(L,2);
+        lua_getfield(ctx->L,-1,"#file");
+        path = bs_denormalize_path(lua_tostring(ctx->L,-1));
+        lua_pop(ctx->L,2);
     }else
-        lua_pop(L,1);
+    {
+        lua_getfield(ctx->L,module,"#file");
+        path = bs_denormalize_path(lua_tostring(ctx->L,-1));
+        loc.row = 0;
+        lua_pop(ctx->L,2);
+    }
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    ctx->logger(BS_Error, ctx->loggerData,path,loc, format, args );
     va_end(args);
-    fprintf(stderr,"\n");
-    fflush(stderr);
-    lua_pushnil(L);
-    lua_error(L);
+    lua_pushnil(ctx->L);
+    lua_error(ctx->L);
 }
+
+typedef struct BSPresetLogger {
+    BSLogger logger;
+    void* data;
+} BSPresetLogger;
 
 int bs_parse(lua_State* L)
 {
@@ -4468,8 +4498,6 @@ int bs_parse(lua_State* L)
     ctx.module.n = 0;
     ctx.L = L;
     ctx.dirpath = lua_tostring(L,BS_PathToSourceRoot);
-    if( strncmp(ctx.dirpath,"//",2) != 0 )
-        moduleerror(L,BS_NewModule,"expecting absolute, normalized directory path: %s", ctx.dirpath );
     ctx.builtins = builtins;
     ctx.label = calcLabel(ctx.dirpath,calcLevel(L,BS_NewModule)+1);
     lua_getglobal(L,"#haveLocInfo");
@@ -4483,6 +4511,22 @@ int bs_parse(lua_State* L)
         ctx.xref = xref;
     if( haveNumRefs )
         ctx.numRefs = numRefs;
+
+    lua_getglobal(L,"#logger");
+    BSPresetLogger* psl = (BSPresetLogger*)lua_touserdata(L,-1);
+    if( psl == 0 || psl->logger == 0 )
+    {
+        ctx.logger = bs_defaultLogger;
+        ctx.loggerData = 0;
+    }else
+    {
+        ctx.logger = psl->logger;
+        ctx.loggerData = psl->data;
+    }
+    lua_pop(L,1);
+
+    if( strncmp(ctx.dirpath,"//",2) != 0 )
+        moduleerror(&ctx,BS_NewModule,"expecting absolute, normalized directory path: %s", ctx.dirpath );
 
     lua_pushstring(L,ctx.label);
     lua_setfield(L,BS_NewModule, "#label");
@@ -4501,15 +4545,15 @@ int bs_parse(lua_State* L)
         if( lua_isnil(L,-1) )
             lua_pop(L,1);
         else if( !bs_exists( lua_tostring(L,-1) ) )
-            moduleerror(L,BS_NewModule,"neither can find '%s' nor alternative path '%s'",
+            moduleerror(&ctx,BS_NewModule,"neither can find '%s' nor alternative path '%s'",
                         lua_tostring(L,-2), lua_tostring(L,-1) );
         else
             lua_replace(L,-2);
         lua_pushboolean(L,1);
         lua_setfield(L,BS_NewModule,"#dummy");
-        // fprintf(stdout,"# analyzing %s on behalf of %s\n", lua_tostring(L,-1), ctx.dirpath);
+        // message(&ctx,"# analyzing %s on behalf of %s\n", lua_tostring(L,-1), ctx.dirpath);
     }else
-        fprintf(stdout,"# analyzing %s\n", lua_tostring(L,-1));
+        message(&ctx,"# analyzing %s", lua_tostring(L,-1));
     ctx.filepath = lua_tostring(L,-1);
 
     if( haveXref )
@@ -4529,11 +4573,9 @@ int bs_parse(lua_State* L)
 
     lua_setfield(L,BS_NewModule,"#file");
 
-    fflush(stdout);
-
     addNumRef(&ctx,BS_NewModule);
 
-    ctx.lex = bslex_createhilex(bs_denormalize_path(ctx.filepath), ctx.label);
+    ctx.lex = bslex_createhilex(bs_denormalize_path(ctx.filepath), labelOrFilepath(&ctx) );
     if( ctx.lex == 0 )
     {
         lua_pop(L,1);
@@ -4549,3 +4591,42 @@ int bs_parse(lua_State* L)
     BS_END_LUA_FUNC(&ctx);
     return 1;
 }
+
+void bs_preset_logger(lua_State* L, BSLogger l, void* data)
+{
+    BSPresetLogger* ps = (BSPresetLogger*)lua_newuserdata(L,sizeof(BSPresetLogger));
+    ps->logger = l;
+    ps->data = data;
+    lua_setglobal(L,"#logger");
+}
+
+int bs_dump(lua_State *L)
+{
+    BSPresetLogger l;
+    l.data = 0;
+    l.logger = bs_defaultLogger;
+    lua_getglobal(L,"#logger");
+    BSPresetLogger* psl = (BSPresetLogger*)lua_touserdata(L,-1);
+    if( psl == 0 || psl->logger == 0 )
+        l = *psl;
+    lua_pop(L,1);
+    if( lua_isstring(L,2) )
+        dumpimp(L,1,l.logger,l.data,lua_tostring(L,2));
+    else
+        dumpimp(L,1,l.logger,l.data, 0);
+    return 0;
+}
+
+void bs_dump2(lua_State *L, const char* title, int index )
+{
+    BSPresetLogger l;
+    l.data = 0;
+    l.logger = bs_defaultLogger;
+    lua_getglobal(L,"#logger");
+    BSPresetLogger* psl = (BSPresetLogger*)lua_touserdata(L,-1);
+    if( psl == 0 || psl->logger == 0 )
+        l = *psl;
+    lua_pop(L,1);
+    dumpimp(L,index,l.logger,l.data,title);
+}
+

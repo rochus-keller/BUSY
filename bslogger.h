@@ -1,8 +1,8 @@
-#ifndef BSLIB_H
-#define BSLIB_H
+#ifndef BSLOGGER_H
+#define BSLOGGER_H
 
 /*
-* Copyright 2022 Rochus Keller <mailto:me@rochus-keller.ch>
+* Copyright 2023 Rochus Keller <mailto:me@rochus-keller.ch>
 *
 * This file is part of the BUSY build system.
 *
@@ -20,13 +20,17 @@
 * http://www.gnu.org/copyleft/gpl.html.
 */
 
-#include "lua.h"
+#include <stdarg.h>
 
-#define BS_BSLIBNAME	"BUSY"
-#define BS_BSVERSION    "2023-01-19"
+typedef struct BSRowCol
+{
+    unsigned int row: 20;
+    unsigned int col: 12;
+} BSRowCol;
 
-LUALIB_API int bs_open_busy (lua_State *L);
-LUALIB_API int bs_compile (lua_State *L);
+typedef enum { BS_Info, BS_Debug, BS_Warning, BS_Error, BS_Critical } BSLogLevel;
+typedef void (*BSLogger)(BSLogLevel, void* data, const char* file, BSRowCol loc, const char* format, va_list);
+                // file & loc.row may be 0; format doesn't require terminal \n
 
+#endif // BSLOGGER_H
 
-#endif // BSLIB_H

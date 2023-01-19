@@ -21,6 +21,7 @@
 */
 
 #include "lua.h"
+#include "bslogger.h"
 
 typedef enum BSNodeType { // #kind
     BS_Invalid,
@@ -54,6 +55,10 @@ typedef enum BSVisibility { // #visi
 typedef enum BSReadability { // #rw
     BS_var, BS_let, BS_param
 } BSReadability;
+
+
+
+extern void bs_preset_logger(lua_State *L, BSLogger, void*);
 
 
 /* Expects
