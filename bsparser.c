@@ -243,6 +243,14 @@ unsigned int bs_torowcol(int row, int col)
 {
     return ( row << COL_BIT_LEN ) | ( col & ( ( 1 << COL_BIT_LEN ) -1 ));
 }
+unsigned int bs_torow(int rowcol)
+{
+    return ( rowcol >> COL_BIT_LEN ) ;
+}
+unsigned int bs_tocol(int rowcol)
+{
+    return rowcol & ( ( 1 << COL_BIT_LEN ) -1 );
+}
 
 static void addXref(BSParserContext* ctx, BSRowCol loc, int decl)
 {
@@ -256,7 +264,7 @@ static void addXref(BSParserContext* ctx, BSRowCol loc, int decl)
 
     // decl.#xref table: filepath -> set of rowcol
 
-    lua_getfield(ctx->L, ctx->module.table, "#file");
+    lua_pushstring(ctx->L, bs_denormalize_path(ctx->filepath) );
     lua_rawget(ctx->L,ctx->xref);
     assert( lua_istable(ctx->L,-1) );
     const int list_of_idents = lua_gettop(ctx->L);
@@ -292,13 +300,13 @@ static void addXref(BSParserContext* ctx, BSRowCol loc, int decl)
     }
     const int decl_xref = lua_gettop(ctx->L);
 
-    lua_getfield(ctx->L, ctx->module.table, "#file");
+    lua_pushstring(ctx->L, bs_denormalize_path(ctx->filepath) );
     lua_rawget(ctx->L,decl_xref);
     if( !lua_istable(ctx->L,-1) )
     {
         lua_pop(ctx->L,1); // nil
         lua_createtable(ctx->L,0,0);
-        lua_getfield(ctx->L, ctx->module.table, "#file");
+        lua_pushstring(ctx->L, bs_denormalize_path(ctx->filepath) );
         lua_pushvalue(ctx->L,-2);
         lua_rawset(ctx->L,decl_xref);
     }
@@ -4555,25 +4563,31 @@ int bs_parse(lua_State* L)
     }else
         message(&ctx,"# analyzing %s", lua_tostring(L,-1));
     ctx.filepath = lua_tostring(L,-1);
+    lua_setfield(L,BS_NewModule,"#file");
 
     if( haveXref )
     {
-        const int filePath = lua_gettop(L);
-        lua_pushvalue(L,filePath);
+        lua_pushstring(ctx.L,bs_denormalize_path(ctx.filepath));
         lua_rawget(L,ctx.xref);
         if( !lua_istable(L,-1) )
         {
             lua_pop(L,1); // nil
-            lua_pushvalue(L,filePath);
+            lua_pushstring(ctx.L,bs_denormalize_path(ctx.filepath));
             lua_createtable(L,0,0);
             lua_rawset(L,ctx.xref);
         }else
             lua_pop(L,1); // list
     }
 
-    lua_setfield(L,BS_NewModule,"#file");
-
     addNumRef(&ctx,BS_NewModule);
+    if( ctx.numRefs )
+    {
+        // also add path->module to #refs for each module
+        // TODO: a path can point to more than one module
+        lua_pushstring(ctx.L,bs_denormalize_path(ctx.filepath));
+        lua_pushvalue(ctx.L,BS_NewModule);
+        lua_rawset(ctx.L,ctx.numRefs);
+    }
 
     ctx.lex = bslex_createhilex(bs_denormalize_path(ctx.filepath), labelOrFilepath(&ctx) );
     if( ctx.lex == 0 )
@@ -4629,4 +4643,6 @@ void bs_dump2(lua_State *L, const char* title, int index )
     lua_pop(L,1);
     dumpimp(L,index,l.logger,l.data,title);
 }
+
+
 

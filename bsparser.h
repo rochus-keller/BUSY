@@ -79,6 +79,8 @@ extern int bs_parse(lua_State *L);
 extern int bs_add_path(lua_State* L, int lhs, int rhs); // return 0..ok, >0..error
 extern int bs_isa( lua_State *L, int lhs, int rhs ); // returns 1 if rhs is same or subclass of lhs, 0 otherwise
 extern unsigned int bs_torowcol(int row, int col);
+extern unsigned int bs_torow(int rowcol);
+extern unsigned int bs_tocol(int rowcol);
 
 // debugging feature; expects zero or more Lua values
 extern int bs_dump(lua_State *L);
