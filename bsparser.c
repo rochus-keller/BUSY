@@ -258,6 +258,8 @@ static void addXref(BSParserContext* ctx, BSRowCol loc, int decl)
         return;
 
     const int top = lua_gettop(ctx->L);
+    if( decl <= 0 )
+        decl += top + 1;
 
     // #xref table: filepath -> list_of_idents
     // list_of_idents: rowcol -> set_of_decls
@@ -974,7 +976,8 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
                     // stack: container instance (not builtins table!), derefed builtin decl
                     addXref(ctx, t.loc, -1);
                }
-            }
+            }else
+                addXref(ctx, t.loc, -1); // we have a hit
         }
     }
     if( lua_isnil(ctx->L,-1) )
@@ -4160,6 +4163,8 @@ static void condition(BSParserContext* ctx, BSScope* scope)
         lua_pushinteger(ctx->L,BS_CondStat);
         lua_setfield(ctx->L,ast,"#kind");
         addLocInfo(ctx,t.loc,ast);
+        lua_pushvalue(ctx->L,scope->table);
+        lua_setfield(ctx->L,-2,"#owner"); // condition.#owner points to enclosing scope
     }else
         lua_pushnil(ctx->L);
     t = peekToken(ctx,1);
