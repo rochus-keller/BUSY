@@ -254,7 +254,7 @@ BSPathStatus bs_normalize_path(const char* in, char* out, int outlen)
                     return BS_InvalidFormat;
                 case 2:
                     if( strncmp(out+lastSlash,"/./",3) == 0 ||
-                            strncmp(out+lastSlash,"\\.\\",3))
+                            strncmp(out+lastSlash,"\\.\\",3) == 0)
                         return BS_InvalidFormat;
                     break;
                 case 3:
@@ -316,8 +316,10 @@ BSPathStatus bs_normalize_path2(const char* in)
 BSPathStatus bs_cwd()
 {
     char buffer[PATH_MAX];
-    getcwd(buffer, sizeof(buffer));
-    return bs_normalize_path2(buffer);
+    if( getcwd(buffer, sizeof(buffer)) )
+        return bs_normalize_path2(buffer);
+    else
+        return BS_NotSupported;
 }
 
 BSPathStatus bs_thisapp()

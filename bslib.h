@@ -23,7 +23,7 @@
 #include "lua.h"
 
 #define BS_BSLIBNAME	"BUSY"
-#define BS_BSVERSION    "2023-01-21"
+#define BS_BSVERSION    "2023-01-25"
 
 LUALIB_API int bs_open_busy (lua_State *L);
 LUALIB_API int bs_compile (lua_State *L);
