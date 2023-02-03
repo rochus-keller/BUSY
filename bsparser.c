@@ -1908,7 +1908,7 @@ static void topath(BSParserContext* ctx, int n, int row, int col)
     BS_END_LUA_FUNC(ctx);
 }
 
-static inline const char* labelOrFilepath(BSParserContext* ctx)
+static const char* labelOrFilepath(BSParserContext* ctx)
 {
     if( ctx->logger == bs_defaultLogger )
         return ctx->label;
