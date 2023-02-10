@@ -2385,7 +2385,16 @@ int bs_genQmake(lua_State* L) // args: root module def, list of productinst
     fclose(out);
 
     lua_pushvalue(L,buildDir);
-    lua_pushstring(L,"/Project.pro");
+    int len2;
+    const char* name = bs_path_part(lua_tostring(L,sourceDir),BS_fileName,&len2);
+    if( len2 )
+    {
+        lua_pushstring(L,"/");
+        lua_pushlstring(L,name,len2);
+        lua_pushstring(L,".pro");
+        lua_concat(L,3);
+    }else
+        lua_pushstring(L,"/Project.pro");
     lua_concat(L,2);
     const int proPath = lua_gettop(L);
     out = bs_fopen(bs_denormalize_path(lua_tostring(L,proPath)),"w");
