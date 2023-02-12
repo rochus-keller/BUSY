@@ -123,7 +123,7 @@ With the `-B` option you can explicitly set the path to the root of the build di
 
 With the `-T` option you can explicitly select which products should be built; e.g. `-T my_lib` would look for a public variable declaration of a `Product` subtype named "my_lib" in the root BUSY file; it is also possible to select more than one product, or a product from a BUSY file located further down the source tree; the latter must be visible from the root (i.e. the variable and submodule declarations in the designator must be public).
 
-With the `-P` option parameter values can be set; the syntax is `-P x.y=value`, where value is a valid BUSY basic type literal syntax; the syntax of strings and symbols usually has to make use of command line escapes, e.g. like `-P "string_param=\"this is a string\""`. Again it is possible to set parameters of BUSY files located further down the source tree, but only if the submodule declarations in the designator are public.
+With the `-P` option parameter values can be set; the syntax is `-P x.y=value`, where value is a valid BUSY basic type literal syntax; the syntax of strings and symbols usually has to make use of command line escapes, e.g. like `-P "string_param=\"this is a string\""`, or ``-P symbol_param=\`abc``. Again it is possible to set parameters of BUSY files located further down the source tree, but only if the submodule declarations in the designator are public.
 
 With the `-M` option one of the build modes `optimized`, `nonoptimized` or `debug`can be set; e.g. `-M debug`; the default build mode is `optimized`. BUSY also supports the abbreviated options `-opt` (for `optimized`), `-nopt` (for `nonoptimized`) or `-dgb` (for `debug`). 
 
@@ -173,6 +173,7 @@ The current BUSY version is feature complete for the use with [LeanQt](https://g
 - [ ] Make a Mono CLR source tree version using BUSY
 - [ ] Implement Ninja backend
 - [ ] Implement CMake backend
+- [ ] Support cross-compilation
 
 ### Non-Goals
 

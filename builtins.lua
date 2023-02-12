@@ -17,10 +17,11 @@
 * http://www.gnu.org/copyleft/gpl.html.
 ]]--
 
--- TODO: sync with bsparser.h BSNodeType, BSBaseType and BSVisibility
+-- TODO: sync with bsparser.h BSNodeType, BSBaseType, BSVisibility and BSReadability
 local BaseType, ListType, ModuleDef, ClassDecl, EnumDecl, VarDecl, FieldDecl, BlockDef, ProcDef = 1, 2, 3, 4, 5, 6, 7, 8, 9
 local boolean, integer, real, string, path, symbol = 1, 2, 3, 4, 5, 6
 local private, public, protected = 0, 1, 2
+local Var, Let, Param = 0, 1, 2
 
 
 local globals = {}
@@ -261,29 +262,31 @@ proc("set_defaults",18)
 
 ---- built-in vars
 local function variable(name, type, ro)
-	local c = { ["#kind"] = VarDecl, ["#name"] = name, ["#visi"] = public, ["#type"] = type, ["#ro"] = ro, ["#owner"] = globals }
+	local c = { ["#kind"] = VarDecl, ["#name"] = name, ["#visi"] = public, ["#type"] = type, ["#rw"] = ro, ["#owner"] = globals }
 	globals[name] = c
 end
 
-variable("busy_version", globals.string, true)
-variable("host_cpu", globals.CpuType, true)
-variable("host_cpu_ver", globals.int, true)
-variable("host_wordsize", globals.WordSize, true )
-variable("host_os", globals.OsType, true)
-variable("host_toolchain", globals.CompilerType, true)
-variable("host_toolchain_ver", globals.int, true)
-variable("root_build_dir", globals.path, true)
-variable("root_source_dir", globals.path, true)
-variable("target_cpu", globals.CpuType, false)
-variable("target_cpu_ver", globals.int, false)
-variable("target_wordsize", globals.WordSize, false)
-variable("target_os", globals.OsType, false)
-variable("target_toolchain", globals.CompilerType, false)
-variable("target_toolchain_ver", globals.int, false)
-variable("moc_path", globals.path, false)
-variable("rcc_path", globals.path, false)
-variable("uic_path", globals.path, false)
-variable("build_mode", globals.BuildMode, true)
+variable("busy_version", globals.string, Let)
+variable("host_cpu", globals.CpuType, Let)
+variable("host_cpu_ver", globals.int, Let)
+variable("host_wordsize", globals.WordSize, Let )
+variable("host_os", globals.OsType, Let)
+variable("host_toolchain", globals.CompilerType, Let)
+variable("host_toolchain_ver", globals.int, Let)
+variable("root_build_dir", globals.path, Let)
+variable("root_source_dir", globals.path, Let)
+variable("target_cpu", globals.CpuType, Param)
+variable("target_cpu_ver", globals.int, Param)
+variable("target_wordsize", globals.WordSize, Param)
+variable("target_os", globals.OsType, Param)
+variable("target_toolchain", globals.CompilerType, Param)
+variable("target_toolchain_ver", globals.int, Param)
+variable("target_toolchain_path", globals.path, Param)
+variable("target_toolchain_prefix", globals.string, Param)
+variable("moc_path", globals.path, Var)
+variable("rcc_path", globals.path, Var)
+variable("uic_path", globals.path, Var)
+variable("build_mode", globals.BuildMode, Var)
 
 B = require("BUSY")
 -- preset global variables; inst is the instance of the globals declaration

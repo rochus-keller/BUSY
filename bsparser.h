@@ -81,6 +81,10 @@ extern int bs_isa( lua_State *L, int lhs, int rhs ); // returns 1 if rhs is same
 extern unsigned int bs_torowcol(int row, int col);
 extern unsigned int bs_torow(int rowcol);
 extern unsigned int bs_tocol(int rowcol);
+extern int bs_isInEnum(lua_State* L, int type, int sym );
+extern int bs_sameType(lua_State* L, int left, int right );
+extern int bs_getAndCheckParam( lua_State* L, int builtins, int params, int paramName, int accessible, int refType );
+
 
 // debugging feature; expects zero or more Lua values
 extern int bs_dump(lua_State *L);

@@ -413,6 +413,7 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
         // not for development
         if( !outExists || outExists < srcExists )
         {
+            // TODO: we should record the path where these tools are located in the os at compile time
             switch(toolchain)
             {
             case BS_gcc:

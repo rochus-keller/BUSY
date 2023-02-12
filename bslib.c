@@ -140,9 +140,6 @@ static void push_normalized(lua_State *L, int path)
     }
 }
 
-// TODO: an optional way to set default config values as supported in GN with set_defaults() and the build config
-// file; see 'gn help execution'
-
 // opt param: path to source root directory (default '..')
 // opt param: path to output root dir (default ./output)
 // opt param: table with parameter values
@@ -151,6 +148,8 @@ static void push_normalized(lua_State *L, int path)
 // returns: root module
 int bs_compile (lua_State *L)
 {
+    const int top = lua_gettop(L);
+
     enum { SOURCE_DIR = 1, BUILD_DIR, PARAMS };
     int i;
     for( i = lua_gettop(L); i < 3; i++ )
@@ -160,12 +159,12 @@ int bs_compile (lua_State *L)
         lua_pushstring(L, "..");
         lua_replace(L,1);
     }
-    if( lua_isnil(L,2) )
+    if( lua_isnil(L,BUILD_DIR) )
     {
         lua_pushstring(L, "./output");
         lua_replace(L,2);
     }
-    if( lua_isnil(L,3) )
+    if( lua_isnil(L,PARAMS) )
     {
         lua_createtable(L,0,0);
         lua_replace(L,3);
@@ -182,14 +181,53 @@ int bs_compile (lua_State *L)
     lua_getglobal(L, "require");
     lua_pushstring(L, "builtins");
     lua_call(L,1,1);
+    const int builtins = lua_gettop(L);
     lua_getfield(L,-1,"#inst");
+    const int binst = lua_gettop(L);
+
     push_normalized(L,BUILD_DIR);
-    lua_setfield(L,-2,"root_build_dir");
+    lua_setfield(L,binst,"root_build_dir");
     push_normalized(L,SOURCE_DIR);
     fprintf(stdout,"# running parser\n# root source directory is %s\n",lua_tostring(L,-1));
     fflush(stdout);
-    lua_setfield(L,-2,"root_source_dir");
-    lua_pop(L,2);
+    lua_setfield(L,binst,"root_source_dir");
+
+    lua_pushnil(L);  /* first key */
+    while (lua_next(L, PARAMS) != 0) {
+        // go through all params and see if there is a global param with the same name and if so apply it
+        const int key = lua_gettop(L)-1;
+
+        lua_pushvalue(L,key);
+        lua_rawget(L,builtins);
+        if( !lua_isnil(L,-1) )
+        {
+            const int decl = lua_gettop(L);
+            lua_getfield(L,decl,"#kind");
+            const int k = lua_tointeger(L,-1);
+            lua_getfield(L,decl,"#rw");
+            const int rw = lua_tointeger(L,-1);
+            lua_pop(L, 2); // k, rw
+            lua_getfield(L,decl,"#type");
+            const int refType = lua_gettop(L);
+            if( k == BS_VarDecl && rw == BS_param )
+            {
+                lua_pushvalue(L,key);
+                if( bs_getAndCheckParam( L, builtins, PARAMS, key, 1, refType ) == 0 )
+                {
+                    if( !lua_isnil(L,-1) )
+                        // the param value is ok, assign it
+                        lua_rawset(L,binst); // eats value
+                    else
+                        lua_pop(L,1); // value
+                }else
+                    lua_error(L);
+            }
+            lua_pop(L, 1); // refType
+        }
+        lua_pop(L, 2); // value, decl
+    }
+
+    lua_pop(L,2); // builtins, binst
 
     lua_createtable(L,0,0);
     lua_setglobal(L,"#xref"); // overwrite an existing #xref if present
@@ -229,6 +267,7 @@ int bs_compile (lua_State *L)
         lua_pop(L, 1);
     }
 
+    assert( top + 1 == lua_gettop(L) );
     return 1;
 }
 

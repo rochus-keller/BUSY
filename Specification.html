@@ -22,7 +22,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">2.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">2.2.1</a></span>
-2023-01-15</div>
+2023-02-11</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">2.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">2.3.1</a></span>
@@ -33,6 +33,8 @@ me@rochus-keller.ch</div>
 The sections <a href="#11631">4 Predeclared Class Reference</a> and <a href="#11697">5 Predeclared  Field Reference</a> are derived from the help text included in GN (<a href="https://gn.googlesource.com/gn/"><u>gn.googlesource.com/.../</u></a> as of July 2019), copyright (c) 2013 by The Chromium Authors, made available under a BSD-style license.</div>
 <div style="margin-left:45px"><span class="label"><a name="12207">2.4.2</a></span>
 A lot of text is derived from the Oberon+ language specification, <a href="https://github.com/oberon-lang/specification"><u>github.com/.../specification</u></a></div>
+<div style="margin-left:45px"><span class="label"><a name="12974">2.4.3</a></span>
+This specification was written in CrossLine (see <a href="https://github.com/rochus-keller/CrossLine"><u>github.com/.../CrossLine</u></a>)</div>
 <h4 style="margin-left:27px"><span class="label"><a name="12253">2.5</a></span>
 <b>Table of Contents</b></h4>
 <div style="margin-left:45px"><span class="label"><a name="12260">2.5.1</a></span>
@@ -1211,29 +1213,37 @@ The absolute file system directory path where the rcc executable is supposed to 
 <div style="margin-left:45px"><span class="label"><a name="12944">7.13.1</a></span>
 The absolute file system directory path where the uic executable is supposed to be. If the path is '.' then the tool is assumed to be on the operating system search path and called with no directory prefix.</div>
 <div style="margin-left:27px"><span class="label"><a name="11927">7.14</a></span>
-<b>var target_cpu: CpuType</b></div>
+<b>param target_cpu: CpuType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12646">7.14.1</a></span>
 initialized with host_cpu</div>
 <div style="margin-left:27px"><span class="label"><a name="11928">7.15</a></span>
-<b>var target_cpu_ver: int</b></div>
+<b>param target_cpu_ver: int</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12647">7.15.1</a></span>
 initialized with host_cpu_ver</div>
 <div style="margin-left:27px"><span class="label"><a name="11929">7.16</a></span>
-<b>var target_wordsize: WordSize</b></div>
+<b>param target_wordsize: WordSize</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12648">7.16.1</a></span>
 initialized with host_wordsize</div>
 <div style="margin-left:27px"><span class="label"><a name="11930">7.17</a></span>
-<b>var target_os: OsType</b></div>
+<b>param target_os: OsType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12649">7.17.1</a></span>
 initialized with host_os</div>
 <div style="margin-left:27px"><span class="label"><a name="11931">7.18</a></span>
-<b>var target_toolchain: CompilerType</b></div>
+<b>param target_toolchain: CompilerType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12650">7.18.1</a></span>
 initialized with host_toolchain_ver</div>
 <div style="margin-left:27px"><span class="label"><a name="11932">7.19</a></span>
-<b>var target_toolchain_ver: int</b></div>
+<b>param target_toolchain_ver: int</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12651">7.19.1</a></span>
-initialized with host_toolchain_ver; future versions will support cross-compilation where host and target toolchain usually differ.</div>
+initialized with host_toolchain_ver</div>
+<div style="margin-left:27px"><span class="label"><a name="13024">7.20</a></span>
+<b>param target_toolchain_path: path</b></div>
+<div style="margin-left:45px"><span class="label"><a name="13025">7.20.1</a></span>
+initialized with '.'; if set to another path than '.' then the tool name is prefixed with the path (e.g. "path" + "gcc").</div>
+<div style="margin-left:27px"><span class="label"><a name="13026">7.21</a></span>
+<b>param target_toolchain_prefix: string</b></div>
+<div style="margin-left:45px"><span class="label"><a name="13027">7.21.1</a></span>
+initialized with the empty string; the tool name is prefixes with this string (e.g. "xtensa-esp32-elf-" + "gcc").</div>
 <h4 style="margin-left:9px"><span class="label"><a name="11996">8</a></span>
 <b>Predeclared Procedure Reference</b></h4>
 <h4 style="margin-left:27px"><span class="label"><a name="12007">8.1</a></span>

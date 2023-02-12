@@ -390,7 +390,7 @@ static void addToScope(BSParserContext* ctx, BSScope* scope, BSIdentDef* id, int
 }
 
 static int expression(BSParserContext* ctx, BSScope* scope, int lhsType);
-static void parampath(BSParserContext* ctx, const char* name, int len);
+static void parampath(lua_State* L, int module, const char* name, int len);
 
 static int /*BSPathStatus*/ caclFsDir(BSParserContext* ctx, const char* path, int pathlen)
 {
@@ -538,7 +538,7 @@ static void submodule(BSParserContext* ctx, int subdir)
                 error(ctx, t.loc.row, t.loc.col,"expexting an identifier" );
             nextToken(ctx); // eat ident
             BSToken pname = t;
-            parampath(ctx,id.name,id.len);
+            parampath(ctx->L,ctx->module.table, id.name,id.len);
             lua_pop(ctx->L,1);
             lua_pushstring(ctx->L,".");
             lua_pushlstring(ctx->L,pname.val,pname.len);
@@ -1349,45 +1349,50 @@ static void typedecl(BSParserContext* ctx, BSScope* scope)
     BS_END_LUA_FUNC(ctx);
 }
 
-static int isInEnum( BSParserContext* ctx, int type, int sym )
+int bs_isInEnum(lua_State* L, int type, int sym )
 {
-    const int top = lua_gettop(ctx->L);
+    const int top = lua_gettop(L);
     if( type <= 0 )
         type += top + 1;
     if( sym <= 0 )
         sym += top + 1;
-    if( !lua_istable(ctx->L,type) )
+    if( !lua_istable(L,type) )
         return 0;
-    lua_getfield(ctx->L,type,"#kind");
-    const int k = lua_tointeger(ctx->L,-1);
-    lua_pop(ctx->L,1);
+    lua_getfield(L,type,"#kind");
+    const int k = lua_tointeger(L,-1);
+    lua_pop(L,1);
     if( k != BS_EnumDecl )
         return 0;
-    lua_pushvalue(ctx->L,sym);
-    lua_rawget(ctx->L,type);
-    const int found = !lua_isnil(ctx->L,-1);
-    lua_pop(ctx->L,1);
+    lua_pushvalue(L,sym);
+    lua_rawget(L,type);
+    const int found = !lua_isnil(L,-1);
+    lua_pop(L,1);
 
     return found;
 }
 
-static int sameType( BSParserContext* ctx, int left, int right )
+static int isInEnum( BSParserContext* ctx, int type, int sym )
 {
-    const int top = lua_gettop(ctx->L);
+    return bs_isInEnum(ctx->L, type, sym );
+}
+
+int bs_sameType( lua_State* L, int left, int right )
+{
+    const int top = lua_gettop(L);
     if( left <= 0 )
         left += top + 1;
     if( right <= 0 )
         right += top + 1;
-    if( lua_equal(ctx->L,left,right) )
+    if( lua_equal(L,left,right) )
         return 1;
-    if( !lua_istable(ctx->L,left) || !lua_istable(ctx->L,right) )
+    if( !lua_istable(L,left) || !lua_istable(L,right) )
         return 0;
-    lua_getfield(ctx->L,left,"#kind");
-    const int kleft = lua_tointeger(ctx->L,-1);
-    lua_pop(ctx->L,1);
-    lua_getfield(ctx->L,right,"#kind");
-    const int kright = lua_tointeger(ctx->L,-1);
-    lua_pop(ctx->L,1);
+    lua_getfield(L,left,"#kind");
+    const int kleft = lua_tointeger(L,-1);
+    lua_pop(L,1);
+    lua_getfield(L,right,"#kind");
+    const int kright = lua_tointeger(L,-1);
+    lua_pop(L,1);
 #if 0 // doesnt work since right is a type, not a value
     if( kleft == BS_EnumDecl && kright == BS_BaseType )
         return isInEnum(ctx,left,right);
@@ -1400,23 +1405,28 @@ static int sameType( BSParserContext* ctx, int left, int right )
         return 0; // we already checked whether table a and b ar the same
     if( kleft == BS_BaseType && kright == BS_BaseType )
     {
-        lua_getfield(ctx->L,left,"#type");
-        const int tl = lua_tointeger(ctx->L,-1);
-        lua_pop(ctx->L,1);
-        lua_getfield(ctx->L,right,"#type");
-        const int tr = lua_tointeger(ctx->L,-1);
-        lua_pop(ctx->L,1);
+        lua_getfield(L,left,"#type");
+        const int tl = lua_tointeger(L,-1);
+        lua_pop(L,1);
+        lua_getfield(L,right,"#type");
+        const int tr = lua_tointeger(L,-1);
+        lua_pop(L,1);
         return tl == tr;
     }
     if( kleft == BS_ListType && kright == BS_ListType )
     {
-        lua_getfield(ctx->L,left,"#type");
-        lua_getfield(ctx->L,right,"#type");
-        const int res = sameType(ctx,-2,-1);
-        lua_pop(ctx->L,2);
+        lua_getfield(L,left,"#type");
+        lua_getfield(L,right,"#type");
+        const int res = bs_sameType(L,-2,-1);
+        lua_pop(L,2);
         return res;
     }
     return 0;
+}
+
+static int sameType( BSParserContext* ctx, int left, int right )
+{
+    return bs_sameType(ctx->L,left,right);
 }
 
 int bs_isa( lua_State *L, int lhs, int rhs )
@@ -3435,40 +3445,210 @@ static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken
     BS_END_LUA_FUNC(ctx);
 }
 
-static void parampath(BSParserContext* ctx, const char* name, int len)
+static void parampath(lua_State* L, int module, const char* name, int len)
 {
-    BS_BEGIN_LUA_FUNC(ctx,2);
-    lua_pushlstring(ctx->L,name, len);
-    const int path = lua_gettop(ctx->L);
-    lua_pushvalue(ctx->L,ctx->module.table);
-    const int curmod = lua_gettop(ctx->L);
+    const int top = lua_gettop(L);
+
+    lua_pushlstring(L,name, len);
+    const int path = lua_gettop(L);
+    lua_pushvalue(L,module);
+    const int curmod = lua_gettop(L);
     int accessible = 1;
-    while( !lua_isnil(ctx->L,curmod) )
+    while( !lua_isnil(L,curmod) )
     {
-        lua_getfield(ctx->L,curmod,"#visi");
-        const int visi = lua_tointeger(ctx->L,-1);
-        lua_pop(ctx->L,1); // visi
-        lua_getfield(ctx->L,curmod,"#name");
-        if( lua_isnil(ctx->L,-1) )
+        lua_getfield(L,curmod,"#visi");
+        const int visi = lua_tointeger(L,-1);
+        lua_pop(L,1); // visi
+        lua_getfield(L,curmod,"#name");
+        if( lua_isnil(L,-1) )
         {
-            lua_pop(ctx->L,1); // name
+            lua_pop(L,1); // name
             break;
         }
 
         if( visi != BS_Public )
             accessible = 0;
 
-        lua_pushstring(ctx->L,".");
-        lua_pushvalue(ctx->L,path);
-        lua_concat(ctx->L,3);
-        lua_replace(ctx->L,path);
+        lua_pushstring(L,".");
+        lua_pushvalue(L,path);
+        lua_concat(L,3);
+        lua_replace(L,path);
 
-        lua_getfield(ctx->L,curmod,"#owner");
-        lua_replace(ctx->L,curmod);
+        lua_getfield(L,curmod,"#owner");
+        lua_replace(L,curmod);
     }
-    lua_pop(ctx->L,1); // curmod
-    lua_pushinteger(ctx->L,accessible);
-    BS_END_LUA_FUNC(ctx);
+    lua_pop(L,1); // curmod
+    lua_pushinteger(L,accessible);
+
+    assert( top + 2 == lua_gettop(L)); // returns path + accessible
+}
+
+int bs_getAndCheckParam( lua_State* L, int builtins, int params, int paramName, int accessible, int refType )
+{
+    // returns 0 on success with the param val or nil on stack
+    // returns -1 on fail with the error message on stack
+
+    const int top = lua_gettop(L);
+
+    lua_pushvalue(L,paramName);
+    lua_rawget(L, params);
+    const int parval = lua_gettop(L);
+
+    // stack: val or nil
+    if( !lua_isnil(L,parval) )
+    {
+        if( lua_istable(L,parval) )
+        {
+            // the param value is a table which carries the value in index 1
+            // because value is boxed in a table the module knows not to do visibility check
+            lua_rawgeti(L,parval, 1);
+            lua_replace(L,parval);
+        }else if( !accessible )
+        {
+            lua_pushfstring(L,"the parameter %s cannot be set because it is not visible from the root directory",
+                   lua_tostring(L,-2));
+            return -1;
+        }
+
+        // remove the used param from the table
+        lua_pushvalue(L, paramName);
+        lua_pushnil(L);
+        lua_rawset(L,params);
+
+        // stack: val
+        const char* val = "";
+        switch(lua_type(L,parval))
+        {
+        case LUA_TNIL:
+            assert(0);
+        case LUA_TNUMBER:
+        case LUA_TSTRING:
+            val = lua_tostring(L,parval);
+            break;
+        case LUA_TBOOLEAN:
+            if( lua_toboolean(L,parval) )
+                val = "true";
+            else
+                val = "false";
+            break;
+        default:
+            break;
+        }
+        uchar len;
+        const uint ch = unicode_decode_utf8((const uchar*)val, &len );
+        if( len == 0 )
+        {
+           lua_pushfstring(L,"the value of parameter %s is invalid: %s",
+                   lua_tostring(L,paramName), lua_tostring(L,parval));
+           return -1;
+        }
+        if( unicode_isdigit(ch) || ch == '`' || ch == '$' || ch == '/' || ch == '.'
+                || ch == '\'' || ch == '"' )
+        {
+            lua_pushfstring(L, "parameter '%s': %s", lua_tostring(L,paramName),
+                            lua_tostring(L,parval) ); // create pretty name
+
+            // use lexer to check and convert the string representation of the parameter value
+            BSLexer* l = bslex_openFromString(lua_tostring(L,parval),lua_objlen(L,parval),
+                                              lua_tostring(L,-1));
+            if( l == 0 )
+                exit(0);
+            bslex_mute(l);
+            BSToken t = bslex_next(l);
+            bslex_free(l);
+            lua_pop(L,1); // pretty name
+
+            if( t.tok == Tok_Invalid )
+            {
+                lua_pushfstring(L,"the value of parameter %s does not comply with BUSY syntax: %s",
+                       lua_tostring(L,paramName), lua_tostring(L,parval));
+                return -1;
+            }
+            switch(t.tok)
+            {
+            case Tok_integer:
+                lua_getfield(L,builtins,"int");
+                lua_pushinteger(L,lua_tointeger(L,parval));
+                break;
+            case Tok_real:
+                lua_getfield(L,builtins,"real");
+                lua_pushnumber(L,lua_tonumber(L,parval));
+                break;
+            case Tok_path:
+                lua_getfield(L,builtins,"path");
+                if( *t.val == '\'')
+                    lua_pushlstring(L,t.val+1,t.len-2); // remove ''
+                else
+                    lua_pushvalue(L,parval);
+                break;
+            case Tok_symbol:
+                lua_getfield(L,builtins,"symbol");
+                lua_pushstring(L,lua_tostring(L,parval) + 1); // remove '`'
+                break;
+            case Tok_string:
+                lua_getfield(L,builtins,"string");
+                push_unescaped(L,t.val+1,t.len-2); // remove ""
+                break;
+            default:
+                lua_pushfstring(L,"unexpected parameter value type %s: %s",
+                       lua_tostring(L,paramName), lua_tostring(L,parval));
+                return -1;
+            }
+        }else
+        {
+            if( strcmp(val,"true") == 0 )
+            {
+                lua_getfield(L,builtins,"bool");
+                lua_pushboolean(L,1);
+            }else if( strcmp(val,"false") == 0 )
+            {
+                lua_getfield(L,builtins,"bool");
+                lua_pushboolean(L,0);
+            }else
+            {
+                lua_getfield(L,builtins,"string"); // assume string
+                lua_pushstring(L,val);
+            }
+        }
+        // stack: valstr, valtype, val
+        if( !bs_sameType(L,refType,-2) && !bs_isInEnum(L,refType,-1) )
+        {
+            lua_pushfstring(L,"the value passed in for parameter '%s' has an incompatible type",
+                   lua_tostring(L,paramName));
+            return -1;
+        }
+        // stack: valstr, valtype, val
+        lua_replace(L,parval);
+        lua_pop(L,1); // valtype
+    }
+
+    const int bottom = lua_gettop(L);
+    assert( top + 1 == bottom );
+    return 0;
+}
+
+static void initParam(BSParserContext* ctx, int inst, int var, BSIdentDef id)
+{
+    parampath(ctx->L,ctx->module.table, id.name,id.len);
+
+    const int accessible = lua_tointeger(ctx->L,-1);
+    lua_pop(ctx->L,1);
+    const int desig = lua_gettop(ctx->L);
+
+    lua_getfield(ctx->L,var,"#type");
+    const int type = lua_gettop(ctx->L);
+    if( bs_getAndCheckParam(ctx->L,ctx->builtins,BS_Params,desig,accessible,type) == 0 )
+    {
+        if( !lua_isnil(ctx->L,-1) )
+        {
+            // the param value is ok, assign it
+            lua_pushlstring(ctx->L,id.name, id.len);
+            lua_pushvalue(ctx->L,-2);
+            lua_rawset(ctx->L,inst);
+        }
+        lua_pop(ctx->L,3); // desig, type, value
+    }else
+        error(ctx, id.loc.row, id.loc.col, lua_tostring(ctx->L,-1));
 }
 
 static void vardecl(BSParserContext* ctx, BSScope* scope)
@@ -3695,129 +3875,9 @@ static void vardecl(BSParserContext* ctx, BSScope* scope)
         lua_pushvalue(ctx->L,type-1);
         lua_rawset(ctx->L,inst);
 
-        if( kind == Tok_param )
-        {
-            parampath(ctx,id.name,id.len);
 
-            const int accessible = lua_tointeger(ctx->L,-1);
-            lua_pop(ctx->L,1);
-            const int desig = lua_gettop(ctx->L);
-            lua_pushvalue(ctx->L,desig);
-            lua_rawget(ctx->L,BS_Params);
-            // stack: desig, val or nil
-            if( !lua_isnil(ctx->L,-1) )
-            {
-                if( lua_istable(ctx->L,-1) )
-                {
-                    lua_rawgeti(ctx->L,-1,1);
-                    lua_replace(ctx->L,-2);
-                }else if( !accessible )
-                    error(ctx, id.loc.row, id.loc.col,
-                           "the parameter %s cannot be set because it is not visible from the root directory",
-                           lua_tostring(ctx->L,desig));
-                // remove the used param from the table
-                lua_pushvalue(ctx->L,desig);
-                lua_pushnil(ctx->L);
-                lua_rawset(ctx->L,BS_Params);
-                // stack: desig, val
-                const char* val = "";
-                switch(lua_type(ctx->L,desig+1))
-                {
-                case LUA_TNIL:
-                    assert(0);
-                case LUA_TNUMBER:
-                case LUA_TSTRING:
-                    val = lua_tostring(ctx->L,desig+1);
-                    break;
-                case LUA_TBOOLEAN:
-                    if( lua_toboolean(ctx->L,desig+1) )
-                        val = "true";
-                    else
-                        val = "false";
-                    break;
-                default:
-                    break;
-                }
-                uchar len;
-                const uint ch = unicode_decode_utf8((const uchar*)val, &len );
-                if( len == 0 )
-                    error(ctx, id.loc.row, id.loc.col,"passing invalid value to parameter %s: %s",
-                           lua_tostring(ctx->L,desig), lua_tostring(ctx->L,desig+1));
-                if( unicode_isdigit(ch) || ch == '`' || ch == '$' || ch == '/' || ch == '.'
-                        || ch == '\'' || ch == '"' )
-                {
-                    lua_pushfstring(ctx->L, "parameter '%s': %s", lua_tostring(ctx->L,desig),
-                                    lua_tostring(ctx->L,desig+1) );
-                    BSLexer* l = bslex_openFromString(lua_tostring(ctx->L,desig+1),lua_objlen(ctx->L,desig+1),lua_tostring(ctx->L,-1));
-                    if( l == 0 ) exit(0);
-                    BSToken t = bslex_next(l);
-                    bslex_free(l);
-                    lua_pop(ctx->L,1); // pretty name
-                    if( t.tok == Tok_Invalid )
-                    {
-                        lua_pushnil(ctx->L);
-                        lua_error(ctx->L); // bslex_next has already reported
-                    }
-                    switch(t.tok)
-                    {
-                    case Tok_integer:
-                        lua_getfield(ctx->L,ctx->builtins,"int");
-                        lua_pushinteger(ctx->L,lua_tointeger(ctx->L,desig+1));
-                        break;
-                    case Tok_real:
-                        lua_getfield(ctx->L,ctx->builtins,"real");
-                        lua_pushnumber(ctx->L,lua_tonumber(ctx->L,desig+1));
-                        break;
-                    case Tok_path:
-                        lua_getfield(ctx->L,ctx->builtins,"path");
-                        if( *t.val == '\'')
-                            lua_pushlstring(ctx->L,t.val+1,t.len-2); // remove ''
-                        else
-                            lua_pushvalue(ctx->L,desig+1);
-                        break;
-                    case Tok_symbol:
-                        lua_getfield(ctx->L,ctx->builtins,"symbol");
-                        lua_pushstring(ctx->L,lua_tostring(ctx->L,desig+1) + 1); // remove '`'
-                        break;
-                    case Tok_string:
-                        lua_getfield(ctx->L,ctx->builtins,"string");
-                        push_unescaped(ctx->L,t.val+1,t.len-2); // remove ""
-                        break;
-                    default:
-                        error(ctx, id.loc.row, id.loc.col,"unexpected parameter value type %s: %s",
-                               lua_tostring(ctx->L,desig), lua_tostring(ctx->L,desig+1));
-                        break;
-                    }
-                }else
-                {
-                    if( strcmp(val,"true") == 0 )
-                    {
-                        lua_getfield(ctx->L,ctx->builtins,"bool");
-                        lua_pushboolean(ctx->L,1);
-                    }else if( strcmp(val,"false") == 0 )
-                    {
-                        lua_getfield(ctx->L,ctx->builtins,"bool");
-                        lua_pushboolean(ctx->L,0);
-                    }else
-                    {
-                        lua_getfield(ctx->L,ctx->builtins,"string"); // assume string
-                        lua_pushstring(ctx->L,val);
-                    }
-                }
-                // stack: desig, valstr, valtype, val
-                lua_getfield(ctx->L,var,"#type");
-                // stack: desig, valstr, valtype, val, reftype
-                if( !sameType(ctx,-1,-3) && !isInEnum(ctx,-1,-2) )
-                    error(ctx, t.loc.row, t.loc.col,"value passed in for parameter '%s' is incompatible",
-                           lua_tostring(ctx->L,desig));
-                // the param value is ok, assign it
-                lua_pushlstring(ctx->L,id.name, id.len);
-                lua_pushvalue(ctx->L,desig+3);
-                lua_rawset(ctx->L,inst);
-                lua_pop(ctx->L,5); // desig, valstr, valtype, val, reftype
-            }else
-                lua_pop(ctx->L,2); // desig, nil
-        }
+        if( kind == Tok_param )
+            initParam(ctx,inst,var, id);
 
         lua_pop(ctx->L,3); // the value and type slot returned by expression, and inst
 
@@ -4643,7 +4703,7 @@ void bs_dump2(lua_State *L, const char* title, int index )
     l.logger = bs_defaultLogger;
     lua_getglobal(L,"#logger");
     BSPresetLogger* psl = (BSPresetLogger*)lua_touserdata(L,-1);
-    if( psl == 0 || psl->logger == 0 )
+    if( psl != 0 && psl->logger != 0 )
         l = *psl;
     lua_pop(L,1);
     dumpimp(L,index,l.logger,l.data,title);
