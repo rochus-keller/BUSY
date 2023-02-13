@@ -146,6 +146,7 @@ end
 
 class("Product")
 	field("deps", listOf(globals.Product))
+	field("to_host", globals.bool)
 	--field("data_deps", listOf(globals.Product))
 	--field("public_deps", listOf(globals.Product))
 
@@ -259,6 +260,7 @@ proc("trycompile",15)
 proc("build_dir",16)
 proc("modname",17)
 proc("set_defaults",18)
+proc("cross_compiling",19)
 
 ---- built-in vars
 local function variable(name, type, ro)
@@ -302,6 +304,8 @@ inst.target_toolchain, inst.target_toolchain_ver = inst.host_toolchain, inst.hos
 inst.moc_path = "."
 inst.rcc_path = "."
 inst.uic_path = "."
+inst.target_toolchain_path = "."
+inst.target_toolchain_prefix = ""
 inst["#ctdefaults"] = {} -- a table with optional entries CompilerType->Config
 local optimized = {}
 optimized["gcc"] = { ["cflags"] = { "-O2" } }

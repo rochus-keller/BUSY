@@ -169,11 +169,20 @@ The current BUSY version is feature complete for the use with [LeanQt](https://g
 - [x] Language specification
 - [x] Make a lean Qt source tree version using BUSY (see [LeanQt](https://github.com/rochus-keller/LeanQt))
 - [x] QMake backend (tested with LeanQt on Linux, Windows and Mac with QtCreator 3 and 4)
+- [ ] Support cross-compilation (work in progress, see NOTE)
 - [ ] Tutorials
 - [ ] Make a Mono CLR source tree version using BUSY
 - [ ] Implement Ninja backend
 - [ ] Implement CMake backend
-- [ ] Support cross-compilation
+
+NOTE:
+
+Linux cross-compilation from x86 to ARM Cortex-A7 (Allwinner H3) successfully worked with this command:
+
+```
+lua build.lua ../LeanQt -P target_toolchain_path=//home/me/toolchain/bin -P HAVE_OBJECT -P target_toolchain_prefix=\"arm-linux-gnueabihf-\"
+```
+
 
 ### Non-Goals
 

@@ -237,9 +237,12 @@ static void addall(lua_State* L,int inst,int cflags, int cflags_c, int cflags_cc
 
 }
 
-int bs_getToolchain(lua_State* L, int builtinsInst)
+int bs_getToolchain(lua_State* L, int builtinsInst, int to_host)
 {
-    lua_getfield(L,builtinsInst,"target_toolchain");
+    if( to_host )
+        lua_getfield(L,builtinsInst,"host_toolchain");
+    else
+        lua_getfield(L,builtinsInst,"target_toolchain");
     int toolchain;
     if( strcmp(lua_tostring(L,-1),"msvc") == 0 )
         toolchain = BS_msvc;
@@ -295,10 +298,17 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
     lua_getfield(L,builtins,"#inst");
     const int binst = lua_gettop(L);
 
-    const int toolchain = bs_getToolchain(L,binst);
+    lua_getfield(L,inst,"to_host");
+    const int to_host = lua_toboolean(L,-1);
+    lua_pop(L,1);
+
+    const int toolchain = bs_getToolchain(L,binst,to_host);
 
     lua_getfield(L,binst,"#ctdefaults");
-    lua_getfield(L,binst,"target_toolchain");
+    if( to_host )
+        lua_getfield(L,binst,"host_toolchain");
+    else
+        lua_getfield(L,binst,"target_toolchain");
     lua_rawget(L,-2);
     lua_replace(L,-2);
     const int ctdefaults = lua_gettop(L);
@@ -413,7 +423,6 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
         // not for development
         if( !outExists || outExists < srcExists )
         {
-            // TODO: we should record the path where these tools are located in the os at compile time
             switch(toolchain)
             {
             case BS_gcc:
@@ -427,6 +436,27 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
                 break;
             }
             const int cmd = lua_gettop(L);
+
+            if( !to_host )
+            {
+                lua_getfield(L,binst,"target_toolchain_prefix");
+                if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
+                {
+                    lua_pushvalue(L,cmd);
+                    lua_concat(L,2);
+                    lua_replace(L,cmd);
+                }else
+                    lua_pop(L,1);
+                lua_getfield(L,binst,"target_toolchain_path");
+                if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
+                {
+                    lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
+                    lua_replace(L,cmd);
+                    lua_pop(L,1);
+                }else
+                    lua_pop(L,1);
+            }
+
             lua_pushvalue(L,cmd);
             lua_pushvalue(L,cflags);
             switch(lang)
@@ -744,8 +774,15 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     lua_getfield(L,builtins,"#inst");
     const int binst = lua_gettop(L);
 
-    const int toolchain = bs_getToolchain(L,binst);
-    lua_getfield(L,binst,"target_os");
+    lua_getfield(L,inst,"to_host");
+    const int to_host = lua_toboolean(L,-1);
+    lua_pop(L,1);
+
+    const int toolchain = bs_getToolchain(L,binst,to_host);
+    if( to_host )
+        lua_getfield(L,binst,"host_os");
+    else
+        lua_getfield(L,binst,"target_os");
     const int win32 = strcmp(lua_tostring(L,-1),"win32") == 0 || strcmp(lua_tostring(L,-1),"winrt") == 0;
     const int mac = strcmp(lua_tostring(L,-1),"darwin") == 0 || strcmp(lua_tostring(L,-1),"macos") == 0;
     lua_pop(L,1);
@@ -914,6 +951,26 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
         break;
     }
     const int cmd = lua_gettop(L);
+
+    if( !to_host )
+    {
+        lua_getfield(L,binst,"target_toolchain_prefix");
+        if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
+        {
+            lua_pushvalue(L,cmd);
+            lua_concat(L,2);
+            lua_replace(L,cmd);
+        }else
+            lua_pop(L,1);
+        lua_getfield(L,binst,"target_toolchain_path");
+        if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
+        {
+            lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
+            lua_replace(L,cmd);
+            lua_pop(L,1);
+        }else
+            lua_pop(L,1);
+    }
 
     lua_createtable(L,0,0);
     const int outlist = lua_gettop(L);

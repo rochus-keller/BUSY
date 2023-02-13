@@ -272,7 +272,7 @@ static void libraryDep(lua_State* L, int inst, int builtins, int isSourceSet)
 
         lua_getfield(L,builtins,"#inst");
         const int binst = lua_gettop(L);
-        const int toolchain = bs_getToolchain(L,binst);
+        const int toolchain = bs_getToolchain(L,binst,0);
         lua_pop(L,1); // binst
 
         lua_getfield(L,inst,"sources");

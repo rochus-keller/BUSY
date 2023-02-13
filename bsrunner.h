@@ -51,7 +51,7 @@ typedef enum BSLanguage { BS_unknownLang, BS_c, BS_cc, BS_objc, BS_objcc, BS_hea
 extern int bs_guessLang(const char* name);
 
 typedef enum BSToolchain {BS_msvc,BS_gcc,BS_clang} BSToolchain;
-extern int bs_getToolchain(lua_State* L, int builtinsInst);
+extern int bs_getToolchain(lua_State* L, int builtinsInst, int to_host);
 
 
 #endif // BSRUNNER_H

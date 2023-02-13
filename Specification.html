@@ -22,7 +22,7 @@ The BUSY Build System - Language and Built-ins Specification</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11953">2.2</a></span>
 Version</h4>
 <div style="margin-left:45px"><span class="label"><a name="11954">2.2.1</a></span>
-2023-02-11</div>
+2023-02-12</div>
 <h4 style="margin-left:27px"><span class="label"><a name="11944">2.3</a></span>
 Author</h4>
 <div style="margin-left:45px"><span class="label"><a name="11945">2.3.1</a></span>
@@ -1231,7 +1231,7 @@ initialized with host_os</div>
 <div style="margin-left:27px"><span class="label"><a name="11931">7.18</a></span>
 <b>param target_toolchain: CompilerType</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12650">7.18.1</a></span>
-initialized with host_toolchain_ver</div>
+initialized with host_toolchain</div>
 <div style="margin-left:27px"><span class="label"><a name="11932">7.19</a></span>
 <b>param target_toolchain_ver: int</b></div>
 <div style="margin-left:45px"><span class="label"><a name="12651">7.19.1</a></span>
@@ -1272,102 +1272,110 @@ build_dir</h4>
 The result corresponds to <code>root_build_dir + relpath()</code></div>
 <div style="margin-left:45px"><span class="label"><a name="12846">8.2.2</a></span><span class="ident">NOTE</span>
 This function should be used with care because the structure of the build directory is implementation specific; there is no guarantee that build_dir() point to a valid path. Consider using <a href="#11893">Copy</a> to copy executables and libraries to a known place in the build tree and use paths relative to <code>root_build_dir</code>.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12006">8.3</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="13028">8.3</a></span>
+cross_compiling</h4>
+<div style="margin-left:45px"><span class="label"><a name="13029">8.3.1</a></span>
+cross_compiling():bool</div>
+<div style="margin-left:45px"><span class="label"><a name="13030">8.3.2</a></span>
+This is a convenience function which just returns the following expression:</div>
+<div style="margin-left:63px"><span class="label"><a name="13031">8.3.2.1</a></span>
+<code>(host_cpu != target_cpu) || (host_os != target_os) || (host_wordsize != target_wordsize) || (host_toolchain != target_toolchain) || (target_toolchain_prefix != "")</code></div>
+<h4 style="margin-left:27px"><span class="label"><a name="12006">8.4</a></span>
 dump</h4>
-<div style="margin-left:45px"><span class="label"><a name="12391">8.3.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12391">8.4.1</a></span>
 This procedure is for debugging purpose. It expects one or two arguments. The first argument can be of any type; its type and value are printed to the console. The optional second argument is a string printed to the console.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12004">8.4</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12004">8.5</a></span>
 error</h4>
-<div style="margin-left:45px"><span class="label"><a name="12392">8.4.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12392">8.5.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stderr) and halts the program.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12005">8.5</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12005">8.6</a></span>
 message</h4>
-<div style="margin-left:45px"><span class="label"><a name="12393">8.5.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12393">8.6.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stdout).</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12709">8.6</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12709">8.7</a></span>
 modname</h4>
-<div style="margin-left:45px"><span class="label"><a name="12715">8.6.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12715">8.7.1</a></span>
 Returns the hierarchical name of the module (similar to <a href="#12014">relpath</a>); the module associated with the root of the source tree is represented by the name of the corresponding file system directory; each successive name segment corresponds to the identifier used in the <b>submod</b> declaration in the corresponding BUSY file.</div>
-<div style="margin-left:45px"><span class="label"><a name="12711">8.6.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12711">8.7.2</a></span>
 <b>modname(): string</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12712">8.6.2.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12712">8.7.2.1</a></span>
 Returns the hierarchical name relative to the module associated with the root directory of the source tree.</div>
-<div style="margin-left:45px"><span class="label"><a name="12713">8.6.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12713">8.7.3</a></span>
 <b>modname(m: module): string</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12714">8.6.3.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12714">8.7.3.1</a></span>
 Returns the hierarchical name of the designated module relative to the module associated with the root directory of the source tree.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12050">8.7</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12050">8.8</a></span>
 <b>readstring</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="12051">8.7.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12051">8.8.1</a></span>
 <b>readstring(from: path): string</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12052">8.7.1.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12052">8.8.1.1</a></span>
 Read the given file as UTF-8 string. Double quotes and \ are replaced by \" and \\. Line breaks and the like are replaced by space. Leading and trailing white space (blanks, line breaks) is stripped. The maximum supported file lengh is limited to 16'000 bytes.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12014">8.8</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12014">8.9</a></span>
 <b>relpath</b></h4>
-<div style="margin-left:45px"><span class="label"><a name="12546">8.8.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12546">8.9.1</a></span>
 The returned path is a logical path; the module associated with the root of the source tree is represented by '.'; each successive name segment corresponds to the identifier used in the <b>submod</b> declaration; there is no requirement that the physical directory hierarchy is congruent with the module hierarchy; see <a href="#12169">3.10 Modules</a> for more information.</div>
-<div style="margin-left:45px"><span class="label"><a name="12019">8.8.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12019">8.9.2</a></span>
 <b>relpath(): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12017">8.8.2.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12017">8.9.2.1</a></span>
 Returns the path relative to the module associated with the root directory of the source tree.</div>
-<div style="margin-left:45px"><span class="label"><a name="12020">8.8.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12020">8.9.3</a></span>
 <b>relpath(m: module): path</b></div>
-<div style="margin-left:63px"><span class="label"><a name="12021">8.8.3.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12021">8.9.3.1</a></span>
 Returns the path of the designated module relative to the module associated with the root directory of the source tree.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11997">8.9</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11997">8.10</a></span>
 samelist</h4>
-<div style="margin-left:45px"><span class="label"><a name="12395">8.9.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12395">8.10.1</a></span>
 Expects two arguments of the same list type and compares their elements one by one in order. Returns <b>false</b>, if the elements or their number differ, and <b>true</b> otherwise.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11998">8.10</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11998">8.11</a></span>
 sameset</h4>
-<div style="margin-left:45px"><span class="label"><a name="12396">8.10.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12396">8.11.1</a></span>
 Expects two arguments of the same list type and compares their elements. The lists are treated like sets, i.e. the order of elements is insignificant and multiple copies of the same element are counted as one. Returns <b>true</b>, if both lists contain the same elements, <b>false</b> otherwise.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12749">8.11</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12749">8.12</a></span>
 set_defaults</h4>
-<div style="margin-left:45px"><span class="label"><a name="12750">8.11.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12750">8.12.1</a></span>
 <b>set_defaults(CompilerType,Config)</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12751">8.11.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12751">8.12.2</a></span>
 Set the default configuration per toolchain. This is useful to avoid cluttering generic flags around BUSY files, or to e.g. control level of optimization. </div>
-<div style="margin-left:45px"><span class="label"><a name="12753">8.11.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12753">8.12.3</a></span>
 The defaults should be kept as minimal as possible. A library should best not set the defaults at all. The defaults should not be used to select release or debug builds; instead the build_mode predeclared variable should be considered to decide which defaults to set (if at all).</div>
-<h4 style="margin-left:27px"><span class="label"><a name="11999">8.12</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="11999">8.13</a></span>
 toint</h4>
-<div style="margin-left:45px"><span class="label"><a name="12397">8.12.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12397">8.13.1</a></span>
 Expects one argument of real type and returns the largest int less than or equal to a given real.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12000">8.13</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12000">8.14</a></span>
 toreal</h4>
-<div style="margin-left:45px"><span class="label"><a name="12398">8.13.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12398">8.14.1</a></span>
 Expects one argument of int type and returns the same number as real type.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12001">8.14</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12001">8.15</a></span>
 tostring</h4>
-<div style="margin-left:45px"><span class="label"><a name="12399">8.14.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12399">8.15.1</a></span>
 Expects one argument of base or enumeration type und returns the string representation or the argument.</div>
-<div style="margin-left:45px"><span class="label"><a name="12400">8.14.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12400">8.15.2</a></span>
 For bool type the strings "true" or "false" are returned.</div>
-<div style="margin-left:45px"><span class="label"><a name="12401">8.14.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12401">8.15.3</a></span>
 For path types, a <code>'//'</code> prefix is changed to "/" and for a <code>// letter ':'</code> prefix is changed the two leading slashes are removed.</div>
-<div style="margin-left:45px"><span class="label"><a name="12402">8.14.4</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12402">8.15.4</a></span>
 For symbols only the string part without <code>`</code> prefix is returned.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12002">8.15</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12002">8.16</a></span>
 topath</h4>
-<div style="margin-left:45px"><span class="label"><a name="12403">8.15.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12403">8.16.1</a></span>
 Expects one argument of type string. Tries to convert the string into a normalized representation as specified in <a href="#12080">3.3.8 Paths</a>. If that succeeds, the path is returned, otherwise the execution halts with an error.</div>
-<h4 style="margin-left:27px"><span class="label"><a name="12441">8.16</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12441">8.17</a></span>
 trycompile</h4>
-<div style="margin-left:45px"><span class="label"><a name="12450">8.16.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12450">8.17.1</a></span>
 This function compiles C code (without linking). Returns true, if the compiler returns with no error, false otherwise. The following versions of the function are available:</div>
-<div style="margin-left:63px"><span class="label"><a name="12868">8.16.1.1</a></span>
+<div style="margin-left:63px"><span class="label"><a name="12868">8.17.1.1</a></span>
 TODO: consider including linking and libs</div>
-<div style="margin-left:45px"><span class="label"><a name="12442">8.16.2</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12442">8.17.2</a></span>
 <b>trycompile(code:string):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12452">8.16.3</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12452">8.17.3</a></span>
 <b>trycompile(code: string; defines: string[]):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12453">8.16.4</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12453">8.17.4</a></span>
 <b>trycompile(code: string; defines: string[]; include_dirs: path[]):bool</b></div>
-<div style="margin-left:45px"><span class="label"><a name="12443">8.16.5</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12443">8.17.5</a></span>
 <b>trycompile(code: string; defines: string[]; include_dirs: path[]; cflags: string[]):bool</b></div>
-<h4 style="margin-left:27px"><span class="label"><a name="12003">8.17</a></span>
+<h4 style="margin-left:27px"><span class="label"><a name="12003">8.18</a></span>
 warning</h4>
-<div style="margin-left:45px"><span class="label"><a name="12394">8.17.1</a></span>
+<div style="margin-left:45px"><span class="label"><a name="12394">8.18.1</a></span>
 Expects one or more string arguments. Prints the concatenated arguments to the console (stderr).</div>
 </body></html>

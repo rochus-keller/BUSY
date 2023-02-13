@@ -148,26 +148,26 @@ static void push_normalized(lua_State *L, int path)
 // returns: root module
 int bs_compile (lua_State *L)
 {
-    const int top = lua_gettop(L);
-
     enum { SOURCE_DIR = 1, BUILD_DIR, PARAMS };
     int i;
     for( i = lua_gettop(L); i < 3; i++ )
-        lua_pushnil(L);
+        lua_pushnil(L); // add the missing args
+    const int top = lua_gettop(L);
+
     if( lua_isnil(L,SOURCE_DIR) )
     {
         lua_pushstring(L, "..");
-        lua_replace(L,1);
+        lua_replace(L,SOURCE_DIR);
     }
     if( lua_isnil(L,BUILD_DIR) )
     {
         lua_pushstring(L, "./output");
-        lua_replace(L,2);
+        lua_replace(L,BUILD_DIR);
     }
     if( lua_isnil(L,PARAMS) )
     {
         lua_createtable(L,0,0);
-        lua_replace(L,3);
+        lua_replace(L,PARAMS);
     }
 
     // set lua path so no environment can intervene
@@ -267,7 +267,8 @@ int bs_compile (lua_State *L)
         lua_pop(L, 1);
     }
 
-    assert( top + 1 == lua_gettop(L) );
+    const int bottom = lua_gettop(L);
+    assert( top + 1 == bottom );
     return 1;
 }
 

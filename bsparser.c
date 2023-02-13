@@ -1975,6 +1975,53 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
     BS_END_LUA_FUNC(ctx);
 }
 
+
+static void cross_compiling(BSParserContext* ctx, int n, int row, int col)
+{
+    BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
+    if( n != 0 )
+        error(ctx, row, col,"expecting no arguments" );
+    lua_getfield(ctx->L,ctx->builtins,"#inst");
+    const int binst = lua_gettop(ctx->L);
+    int res = 0;
+    lua_getfield(ctx->L,binst,"host_cpu");
+    lua_getfield(ctx->L,binst,"target_cpu");
+    res = !lua_equal(ctx->L,-1,-2);
+    lua_pop(ctx->L,2);
+    if( !res )
+    {
+        lua_getfield(ctx->L,binst,"host_os");
+        lua_getfield(ctx->L,binst,"target_os");
+        res = !lua_equal(ctx->L,-1,-2);
+        lua_pop(ctx->L,2);
+    }
+    if( !res )
+    {
+        lua_getfield(ctx->L,binst,"host_wordsize");
+        lua_getfield(ctx->L,binst,"target_wordsize");
+        res = !lua_equal(ctx->L,-1,-2);
+        lua_pop(ctx->L,2);
+    }
+    if( !res )
+    {
+        lua_getfield(ctx->L,binst,"host_toolchain");
+        lua_getfield(ctx->L,binst,"target_toolchain");
+        res = !lua_equal(ctx->L,-1,-2);
+        lua_pop(ctx->L,2);
+    }
+    if( !res )
+    {
+        lua_getfield(ctx->L,binst,"target_toolchain_prefix");
+        lua_pushstring(ctx->L,"");
+        res = !lua_equal(ctx->L,-1,-2);
+        lua_pop(ctx->L,2);
+    }
+    lua_pop(ctx->L,1);
+
+    lua_pushboolean(ctx->L,res);
+    lua_getfield(ctx->L,ctx->builtins, "bool");
+    BS_END_LUA_FUNC(ctx);
+}
 static void set_defaults(BSParserContext* ctx, int n, int row, int col)
 {
     BS_BEGIN_LUA_FUNC(ctx,2); // out: value, type
@@ -2437,6 +2484,9 @@ static void evalCall(BSParserContext* ctx, BSScope* scope)
         break;
     case 18:
         set_defaults(ctx,n,lpar.loc.row, lpar.loc.col);
+        break;
+    case 19:
+        cross_compiling(ctx,n,lpar.loc.row, lpar.loc.col);
         break;
     default:
         error(ctx, lpar.loc.row, lpar.loc.col,"procedure not yet implemented" );
