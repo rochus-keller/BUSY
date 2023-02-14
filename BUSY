@@ -14,7 +14,9 @@ let lib * : Library {
 		./bsparser.c    ./lbaselib.c   ./lfunc.c   ./lmem.c      ./lstate.c    
 		./bsqmakegen.c  ./lcode.c      ./lgc.c     ./loadlib.c   ./lstring.c   ./lundump.c
 		./bsrunner.c    ./ldblib.c     ./linit.c   ./lobject.c   ./lstrlib.c   ./lvm.c
+		./lua.c
 	]
+	.defines += "BS_USE_LINKED_LUA"
 }
 
 let src * : SourceSet {

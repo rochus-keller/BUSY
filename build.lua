@@ -33,7 +33,7 @@ local function parseParam(str)
 	local i = S.find(str,"=")
 	if i == nil then
 		if params[str] then error("parameter already set: "..tostring(str)) end
-		params[str] = true
+		params[str] = "true"
 	else
 		local key = S.sub(str,1,i-1)
 		local val = S.sub(str,i+1)

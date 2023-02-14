@@ -2011,8 +2011,8 @@ static void cross_compiling(BSParserContext* ctx, int n, int row, int col)
     }
     if( !res )
     {
+        lua_getfield(ctx->L,binst,"#toolchain_prefix");
         lua_getfield(ctx->L,binst,"target_toolchain_prefix");
-        lua_pushstring(ctx->L,"");
         res = !lua_equal(ctx->L,-1,-2);
         lua_pop(ctx->L,2);
     }

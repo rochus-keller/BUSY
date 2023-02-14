@@ -376,8 +376,7 @@ static int pmain (lua_State *L) {
   return 0;
 }
 
-
-int main (int argc, char **argv) {
+int lua_main (int argc, char **argv) {
   int status;
   struct Smain s;
   lua_State *L = lua_open();  /* create state */
@@ -393,3 +392,8 @@ int main (int argc, char **argv) {
   return (status || s.status) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+#ifndef BS_USE_LINKED_LUA
+int main (int argc, char **argv) {
+    return lua_main(argc,argv);
+}
+#endif

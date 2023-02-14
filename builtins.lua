@@ -315,7 +315,7 @@ local debug = {}
 debug["gcc"] = { ["cflags"] = { "-g" } }
 debug["clang"] = debug["gcc"]
 debug["msvc"] = { ["cflags"] = { "/Zi", "-MDd", "-Fddebug" } } -- creates debug.mdb in the current directory
-if _G["#build_mode"] ~= nil then
+if _G["#build_mode"] ~= nil then -- to be preset by IDE
 	inst.build_mode = _G["#build_mode"]
 	if inst.build_mode == "optimized" then
 		inst["#ctdefaults"] = optimized
@@ -330,6 +330,8 @@ else
 	inst.build_mode = "optimized"
 	inst["#ctdefaults"] = optimized
 end
+inst["#toolchain_path"] = "."  -- to be set by IDE
+inst["#toolchain_prefix"] = "" -- to be set by IDE
 
 
 return globals

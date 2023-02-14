@@ -437,25 +437,29 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             }
             const int cmd = lua_gettop(L);
 
+            const char* toolchain_prefix = "#toolchain_prefix";
+            const char* toolchain_path = "#toolchain_path";
             if( !to_host )
             {
-                lua_getfield(L,binst,"target_toolchain_prefix");
-                if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
-                {
-                    lua_pushvalue(L,cmd);
-                    lua_concat(L,2);
-                    lua_replace(L,cmd);
-                }else
-                    lua_pop(L,1);
-                lua_getfield(L,binst,"target_toolchain_path");
-                if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
-                {
-                    lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
-                    lua_replace(L,cmd);
-                    lua_pop(L,1);
-                }else
-                    lua_pop(L,1);
+                toolchain_prefix = "target_toolchain_prefix";
+                toolchain_path = "target_toolchain_path";
             }
+            lua_getfield(L,binst,toolchain_prefix);
+            if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
+            {
+                lua_pushvalue(L,cmd);
+                lua_concat(L,2);
+                lua_replace(L,cmd);
+            }else
+                lua_pop(L,1);
+            lua_getfield(L,binst,toolchain_path);
+            if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
+            {
+                lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
+                lua_replace(L,cmd);
+                lua_pop(L,1);
+            }else
+                lua_pop(L,1);
 
             lua_pushvalue(L,cmd);
             lua_pushvalue(L,cflags);
@@ -952,25 +956,29 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     }
     const int cmd = lua_gettop(L);
 
+    const char* toolchain_prefix = "#toolchain_prefix";
+    const char* toolchain_path = "#toolchain_path";
     if( !to_host )
     {
-        lua_getfield(L,binst,"target_toolchain_prefix");
-        if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
-        {
-            lua_pushvalue(L,cmd);
-            lua_concat(L,2);
-            lua_replace(L,cmd);
-        }else
-            lua_pop(L,1);
-        lua_getfield(L,binst,"target_toolchain_path");
-        if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
-        {
-            lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
-            lua_replace(L,cmd);
-            lua_pop(L,1);
-        }else
-            lua_pop(L,1);
+        toolchain_prefix = "target_toolchain_prefix";
+        toolchain_path = "target_toolchain_path";
     }
+    lua_getfield(L,binst,toolchain_prefix);
+    if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
+    {
+        lua_pushvalue(L,cmd);
+        lua_concat(L,2);
+        lua_replace(L,cmd);
+    }else
+        lua_pop(L,1);
+    lua_getfield(L,binst,toolchain_path);
+    if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
+    {
+        lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
+        lua_replace(L,cmd);
+        lua_pop(L,1);
+    }else
+        lua_pop(L,1);
 
     lua_createtable(L,0,0);
     const int outlist = lua_gettop(L);
@@ -1305,6 +1313,75 @@ static BSPathStatus apply_arg_expansion(lua_State* L,int inst, int builtins, con
     return BS_OK;
 }
 
+static void callLua(lua_State* L, int builtins, int inst, int app, int script, const char* source)
+{
+#ifdef BS_USE_LINKED_LUA
+    lua_getfield(L,inst,"args");
+    const int arglist = lua_gettop(L);
+
+    int argc = 1 + 1 + lua_objlen(L,arglist);
+    char * argv[30];
+    if( argc >= 30 )
+        luaL_error(L,"script requires more arguments than supported: %s", lua_tostring(L,script));
+    argv[0] = (char*)bs_denormalize_path(lua_tostring(L,app));
+    argv[1] = (char*)bs_denormalize_path(lua_tostring(L,script));
+    argv[argc] = 0;
+
+    size_t j;
+    for( j = 1; j <= lua_objlen(L,arglist); j++ )
+    {
+        lua_rawgeti(L,arglist,j);
+        if( apply_arg_expansion(L,inst,builtins,source,lua_tostring(L,-1)) != BS_OK )
+            luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
+        lua_replace(L,-2);
+        argv[j+1] = (char*)lua_tostring(L,-1);
+    }
+    if( lua_main(argc,argv) != 0 )
+    {
+        // stderr was already written to the console
+        lua_pushnil(L);
+        lua_error(L);
+    }
+
+    lua_pop(L,1 + lua_objlen(L,arglist)); // arglist, args
+#else
+    lua_pushstring(L,"");
+    const int args = lua_gettop(L);
+
+    lua_getfield(L,inst,"args");
+    const int arglist = lua_gettop(L);
+    size_t j;
+    for( j = 1; j <= lua_objlen(L,arglist); j++ )
+    {
+        lua_pushvalue(L,args);
+        lua_pushstring(L," ");
+        lua_rawgeti(L,arglist,j);
+        if( apply_arg_expansion(L,inst,builtins,source,lua_tostring(L,-1)) != BS_OK )
+            luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
+        lua_replace(L,-2);
+        lua_concat(L,3);
+        lua_replace(L,args);
+    }
+    lua_pop(L,1); // arglist
+
+
+    lua_pushfstring(L, "%s %s %s", bs_denormalize_path(lua_tostring(L,app) ),
+                    bs_denormalize_path(lua_tostring(L,script) ),
+                    lua_tostring(L,args) );
+    const int cmd = lua_gettop(L);
+
+    fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+    fflush(stdout);
+    if( bs_exec(lua_tostring(L,cmd)) != 0 )
+    {
+        // stderr was already written to the console
+        lua_pushnil(L);
+        lua_error(L);
+    }
+    lua_pop(L,2); // args, cmd
+#endif
+}
+
 static void script(lua_State* L,int inst, int cls, int builtins)
 {
     const int top = lua_gettop(L);
@@ -1360,40 +1437,10 @@ static void script(lua_State* L,int inst, int cls, int builtins)
     bs_thisapp2(L);
     const int app = lua_gettop(L);
 
-    lua_pushstring(L,"");
-    const int args = lua_gettop(L);
+    callLua(L,builtins,inst,app,script,0);
 
-    lua_getfield(L,inst,"args");
-    const int arglist = lua_gettop(L);
-    for( j = 1; j <= lua_objlen(L,arglist); j++ )
-    {
-        lua_pushvalue(L,args);
-        lua_pushstring(L," ");
-        lua_rawgeti(L,arglist,j);
-        if( apply_arg_expansion(L,inst,builtins,0,lua_tostring(L,-1)) != BS_OK )
-            luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
-        lua_replace(L,-2);
-        lua_concat(L,3);
-        lua_replace(L,args);
-    }
-    lua_pop(L,1); // arglist
+    lua_pop(L,4); // out, abDir, script, app
 
-
-    lua_pushfstring(L, "%s %s %s", bs_denormalize_path(lua_tostring(L,app) ),
-                    bs_denormalize_path(lua_tostring(L,script) ),
-                    lua_tostring(L,args) );
-    const int cmd = lua_gettop(L);
-
-    fprintf(stdout,"%s\n", lua_tostring(L,cmd));
-    fflush(stdout);
-    if( bs_exec(lua_tostring(L,cmd)) != 0 )
-    {
-        // stderr was already written to the console
-        lua_pushnil(L);
-        lua_error(L);
-    }
-
-    lua_pop(L,6); // out, abDir, script, app, args, cmd
     const int bottom = lua_gettop(L);
     assert( top == bottom );
 }
@@ -1439,39 +1486,9 @@ static void runforeach(lua_State* L,int inst, int cls, int builtins)
             lua_replace(L,source);
         }
 
-        lua_pushstring(L,"");
-        const int args = lua_gettop(L);
+        callLua(L,builtins,inst,app,script,lua_tostring(L,source));
 
-        lua_getfield(L,inst,"args");
-        const int arglist = lua_gettop(L);
-        size_t j;
-        for( j = 1; j <= lua_objlen(L,arglist); j++ )
-        {
-            lua_pushvalue(L,args);
-            lua_pushstring(L," ");
-            lua_rawgeti(L,arglist,j);
-            if( apply_arg_expansion(L,inst,builtins,lua_tostring(L,source),lua_tostring(L,-1)) != BS_OK )
-                luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
-            lua_replace(L,-2);
-            lua_concat(L,3);
-            lua_replace(L,args);
-        }
-        lua_pop(L,1); // arglist
-
-        lua_pushfstring(L, "%s %s %s", bs_denormalize_path(lua_tostring(L,app) ),
-                        bs_denormalize_path(lua_tostring(L,script) ),
-                        lua_tostring(L,args) );
-        const int cmd = lua_gettop(L);
-
-        fprintf(stdout,"%s\n", lua_tostring(L,cmd));
-        fflush(stdout);
-        if( bs_exec(lua_tostring(L,cmd)) != 0 )
-        {
-            // stderr was already written to the console
-            lua_pushnil(L);
-            lua_error(L);
-        }
-        lua_pop(L,3); // args, cmd, source
+        lua_pop(L,1); // source
     }
 
     lua_pop(L,4); // abDir, script, app, sources

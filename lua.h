@@ -243,7 +243,7 @@ LUA_API void  (lua_concat) (lua_State *L, int n);
 LUA_API lua_Alloc (lua_getallocf) (lua_State *L, void **ud);
 LUA_API void lua_setallocf (lua_State *L, lua_Alloc f, void *ud);
 
-
+LUA_API int lua_main (int argc, char **argv);
 
 /* 
 ** ===============================================================
