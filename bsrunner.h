@@ -38,6 +38,8 @@ typedef enum BSOutKind { // #kind
 
 extern int bs_run(lua_State* L);
 extern int bs_precheck(lua_State* L);
+extern int bs_markActive(lua_State* L); // params: productinst, array of decls in exec order,
+extern int bs_markAllActive(lua_State* L); // params: array of productinst, array of decls in exec order,
 extern int bs_createBuildDirs(lua_State* L);
 extern int bs_thisapp2(lua_State *L); // pushes a path on stack or throws error
 

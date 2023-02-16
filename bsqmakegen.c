@@ -2148,7 +2148,7 @@ static int tryrun(lua_State* L, int builtins, const char* cmd)
     return success;
 }
 
-int bs_genQmake(lua_State* L) // args: root module def, list of productinst
+int bs_genQmake(lua_State* L) // args: root module def, array of productinst
 {
     enum { ROOT = 1, PRODS };
     const int top = lua_gettop(L);

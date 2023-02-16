@@ -140,12 +140,8 @@ static void push_normalized(lua_State *L, int path)
     }
 }
 
-// opt param: path to source root directory (default '..')
-// opt param: path to output root dir (default ./output)
-// opt param: table with parameter values
 // NOTE: if BUSY is built information about the OS and toolchain is melted into the executable and doesn't have
 //   to be explicitly set when BUSY is used.
-// returns: root module
 int bs_compile (lua_State *L)
 {
     enum { SOURCE_DIR = 1, BUILD_DIR, PARAMS };
@@ -367,8 +363,9 @@ static int fetchInstOfDecl(lua_State* L, int decl)
     return 1;
 }
 
-static int findProductsToProcess(lua_State *L, int ROOT, int PRODS, int builtins )
+int bs_findProductsToProcess(lua_State *L )
 {
+    enum { ROOT = 1, PRODS, builtins };
     lua_createtable(L,10,0);
     const int res = lua_gettop(L);
     int n = 0;
@@ -462,7 +459,11 @@ static int bs_execute (lua_State *L)
 
     lua_pop(L,3); // source_dir, binst, build_dir
 
-    findProductsToProcess(L,ROOT,PRODS,builtins);
+    lua_pushcfunction(L, bs_findProductsToProcess);
+    lua_pushvalue(L,ROOT);
+    lua_pushvalue(L,PRODS);
+    lua_pushvalue(L,builtins);
+    lua_call(L,3,1);
     lua_replace(L,PRODS);
 
     lua_pop(L,1); // builtins
@@ -521,7 +522,11 @@ static int bs_generate (lua_State *L)
     fflush(stdout);
     lua_pop(L,3); // source_dir, binst, build_dir
 
-    findProductsToProcess(L,ROOT,PRODS,builtins);
+    lua_pushcfunction(L, bs_findProductsToProcess);
+    lua_pushvalue(L,ROOT);
+    lua_pushvalue(L,PRODS);
+    lua_pushvalue(L,builtins);
+    lua_call(L,3,1);
     lua_replace(L,PRODS);
 
     lua_pop(L,1); // builtins

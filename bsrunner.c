@@ -2125,6 +2125,71 @@ int bs_precheck(lua_State* L) // args: productinst, no returns
     return 0;
 }
 
+int bs_markAllActive(lua_State* L)
+{
+    enum { PRODS = 1, EXECORDER };
+
+    int i;
+    for( i = 1; i <= lua_objlen(L,PRODS); i++ )
+    {
+        lua_pushcfunction(L,bs_markActive);
+        lua_rawgeti(L,PRODS,i);
+        lua_pushvalue(L,EXECORDER);
+        lua_call(L,2,0);
+    }
+    return 0;
+}
+
+int bs_markActive(lua_State* L) // args: productinst, order, no returns
+{
+    enum { PRODINST = 1, EXECORDER };
+
+    const int top = lua_gettop(L);
+
+    lua_getfield(L,PRODINST,"#decl");
+    const int decl = lua_gettop(L);
+
+    lua_getfield(L,decl,"#active");
+    if( !lua_isnil(L,-1) )
+    {
+        lua_pop(L,2); // decl, active
+        return 0;
+    }
+    lua_pop(L,1); // active
+
+    lua_pushinteger(L,0); // pre-mark as visited
+    lua_setfield(L,decl,"#active");
+
+    lua_getfield(L,PRODINST,"deps");
+    const int deps = lua_gettop(L);
+    const int ndeps = lua_objlen(L,deps);
+    int i;
+    for( i = 1; i <= ndeps; i++ )
+    {
+        // move along dependency tree and mark
+        lua_pushcfunction(L, bs_markActive);
+        lua_rawgeti(L,deps,i);
+        lua_pushvalue(L,EXECORDER);
+        lua_call(L,2,0);
+    }
+    lua_pop(L,1); // deps
+
+    lua_pushvalue(L,decl);
+    const int n = lua_objlen(L,EXECORDER)+1;
+    lua_rawseti(L,EXECORDER, n );
+
+    lua_pushinteger(L,n); // mark with the order or execution
+    lua_setfield(L,decl,"#active");
+
+    lua_pop(L,1); // decl
+
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+
+    return 0;
+}
+
+
 int bs_run(lua_State* L) // args: productinst, returns: inst
 {
     const int inst = 1;
