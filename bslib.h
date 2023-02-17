@@ -23,7 +23,7 @@
 #include "lua.h"
 
 #define BS_BSLIBNAME	"BUSY"
-#define BS_BSVERSION    "2023-02-16"
+#define BS_BSVERSION    "2023-02-17"
 
 LUALIB_API int bs_open_busy (lua_State *L);
 
@@ -32,6 +32,10 @@ LUALIB_API int bs_compile (lua_State *L);
 // opt param: path to output root dir (default ./output)
 // opt param: table with parameter values
 // returns: root module
+
+LUALIB_API int bs_execute (lua_State *L);
+// param: root module def
+// opt param: set of product desigs to be built
 
 LUALIB_API int bs_findProductsToProcess(lua_State *L);
 // param: root module returned by bs_compile

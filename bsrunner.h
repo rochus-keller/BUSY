@@ -55,5 +55,9 @@ extern int bs_guessLang(const char* name);
 typedef enum BSToolchain {BS_msvc,BS_gcc,BS_clang} BSToolchain;
 extern int bs_getToolchain(lua_State* L, int builtinsInst, int to_host);
 
+#ifdef BS_ALT_RUNCMD
+typedef int (*BSRunCmd)(const char* cmd, void* data);
+extern void bs_preset_runcmd(lua_State *L, BSRunCmd, void*);
+#endif
 
 #endif // BSRUNNER_H

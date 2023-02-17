@@ -16,7 +16,7 @@ let lib * : Library {
 		./bsrunner.c    ./ldblib.c     ./linit.c   ./lobject.c   ./lstrlib.c   ./lvm.c
 		./lua.c
 	]
-	.defines += "BS_USE_LINKED_LUA"
+	.defines += [ "BS_USE_LINKED_LUA" "BS_ALT_RUNCMD" ]
 }
 
 let src * : SourceSet {

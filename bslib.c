@@ -420,9 +420,7 @@ int bs_findProductsToProcess(lua_State *L )
     return 1; // leaves res on stack
 }
 
-// param: root module def
-// opt param: set of product desigs to be built
-static int bs_execute (lua_State *L)
+int bs_execute (lua_State *L)
 {
     enum { ROOT = 1, PRODS };
     const int top = lua_gettop(L);

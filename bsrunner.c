@@ -24,6 +24,59 @@
 #include <assert.h>
 #include <string.h>
 
+#ifdef BS_ALT_RUNCMD
+void bs_preset_runcmd(lua_State *L, BSRunCmd cmd, void* data)
+{
+    if( cmd == 0 )
+        lua_pushnil(L);
+    else
+        lua_pushlightuserdata(L, cmd);
+    lua_setglobal(L,"#runcmd");
+    if( cmd == 0 )
+        lua_pushnil(L);
+    else
+        lua_pushlightuserdata(L, data);
+    lua_setglobal(L,"#runcmddata");
+}
+#endif
+
+static int runcmd(lua_State* L, const char* cmd)
+{
+#ifdef BS_ALT_RUNCMD
+    lua_getglobal(L,"#runcmd");
+    if( lua_islightuserdata(L,-1) )
+    {
+        BSRunCmd f = (BSRunCmd)lua_topointer(L,-1);
+        void* data = 0;
+        lua_getglobal(L,"#runcmddata");
+        if( lua_islightuserdata(L,-1) )
+            data = (void*)lua_topointer(L,-1);
+        const int res = f(cmd,data);
+        lua_pop(L,2);
+        return res;
+    }else
+    {
+        lua_pop(L,1);
+        return bs_exec(cmd);
+    }
+#else
+    return bs_exec(cmd);
+#endif
+}
+
+static int copycmd(lua_State* L, const char* normalizedToPath, const char* normalizedFromPath)
+{
+#ifdef BS_ALT_RUNCMD
+    const char* to = bs_denormalize_path(normalizedToPath);
+    const char* from = bs_denormalize_path(normalizedFromPath);
+    const int len = 4 + 1 + 2 + strlen(from) + 1 + 2 + strlen(to) + 1;
+    sprintf( (char*)bs_global_buffer(), "copy \"%s\" \"%s\"", from, to );
+    return runcmd(L, bs_global_buffer());
+#else
+    return bs_copy(normalizedToPath,normalizedFromPath);
+#endif
+}
+
 int bs_declpath(lua_State* L, int decl, const char* separator)
 {
     if( decl < 0 )
@@ -284,6 +337,35 @@ static void copyItems(lua_State* L, int inlist, int outlist, BSOutKind what )
     }
 }
 
+static void prefixCmd(lua_State* L, int cmd, int binst, int to_host)
+{
+    const char* toolchain_prefix = "#toolchain_prefix";
+    const char* toolchain_path = "#toolchain_path";
+    if( !to_host )
+    {
+        toolchain_prefix = "target_toolchain_prefix";
+        toolchain_path = "target_toolchain_path";
+    }
+
+    lua_getfield(L,binst,toolchain_prefix);
+    if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
+    {
+        lua_pushvalue(L,cmd);
+        lua_concat(L,2);
+        lua_replace(L,cmd); // prefix cmd with toolchain_prefix
+    }else
+        lua_pop(L,1);
+
+    lua_getfield(L,binst,toolchain_path);
+    if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
+    {
+        lua_pushfstring(L,"\"%s/%s\"", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
+        lua_replace(L,cmd); // prefix cmd with path and enclose in ""
+        lua_pop(L,1);
+    }else
+        lua_pop(L,1);
+}
+
 static void compilesources(lua_State* L, int inst, int builtins, int inlist)
 {
     const int top = lua_gettop(L);
@@ -426,40 +508,21 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             switch(toolchain)
             {
             case BS_gcc:
-                lua_pushstring(L,"gcc ");
+                lua_pushstring(L,"gcc");
                 break;
             case BS_clang:
-                lua_pushstring(L,"clang ");
+                lua_pushstring(L,"clang");
                 break;
             case BS_msvc:
-                lua_pushstring(L,"cl ");
+                lua_pushstring(L,"cl");
                 break;
             }
             const int cmd = lua_gettop(L);
 
-            const char* toolchain_prefix = "#toolchain_prefix";
-            const char* toolchain_path = "#toolchain_path";
-            if( !to_host )
-            {
-                toolchain_prefix = "target_toolchain_prefix";
-                toolchain_path = "target_toolchain_path";
-            }
-            lua_getfield(L,binst,toolchain_prefix);
-            if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
-            {
-                lua_pushvalue(L,cmd);
-                lua_concat(L,2);
-                lua_replace(L,cmd);
-            }else
-                lua_pop(L,1);
-            lua_getfield(L,binst,toolchain_path);
-            if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
-            {
-                lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
-                lua_replace(L,cmd);
-                lua_pop(L,1);
-            }else
-                lua_pop(L,1);
+            prefixCmd(L, cmd, binst, to_host);
+
+            lua_pushstring(L," ");
+            lua_concat(L,2); // append " " to cmd
 
             lua_pushvalue(L,cmd);
             lua_pushvalue(L,cflags);
@@ -504,7 +567,7 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             lua_replace(L,cmd);
             fprintf(stdout,"%s\n", lua_tostring(L,cmd));
             fflush(stdout);
-            if( bs_exec(lua_tostring(L,cmd)) != 0 ) // works for all gcc, clang and cl
+            if( runcmd(L,lua_tostring(L,cmd)) != 0 ) // works for all gcc, clang and cl
             {
                 // stderr was already written to the console
                 lua_pushnil(L);
@@ -872,31 +935,82 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     switch(toolchain)
     {
     case BS_gcc:
+        switch(resKind)
+        {
+        case BS_Executable:
+        case BS_DynamicLib:
+            lua_pushstring(L, "gcc");
+            break;
+        case BS_StaticLib:
+            lua_pushstring(L, "ar");
+            break;
+         }
+        break;
+    case BS_clang:
+        switch(resKind)
+        {
+        case BS_Executable:
+        case BS_DynamicLib:
+            lua_pushstring(L, "clang");
+            break;
+        case BS_StaticLib:
+            if( win32 )
+                lua_pushstring(L, "llvm-lib");
+            else
+                lua_pushstring(L, "ar");
+            break;
+        }
+        break;
+    case BS_msvc:
+        switch(resKind)
+        {
+        case BS_Executable:
+        case BS_DynamicLib:
+            lua_pushstring(L, "link");
+            break;
+        case BS_StaticLib:
+            lua_pushstring(L, "lib");
+            break;
+        }
+        break;
+    }
+    const int cmd = lua_gettop(L);
+
+    prefixCmd(L, cmd, binst, to_host);
+
+    switch(toolchain)
+    {
+    case BS_gcc:
         // TODO: since we always use gcc (not g++ and the like) additional flags and libs might be needed
         // see https://stackoverflow.com/questions/172587/what-is-the-difference-between-g-and-gcc
         // g++ on link time is equivalent to gcc -lstdc++ -shared-libgcc
         switch(resKind)
         {
         case BS_Executable:
-            lua_pushfstring(L,"gcc @\"%s\" -o \"%s\"",
+            lua_pushfstring(L,"%s @\"%s\" -o \"%s\"",
+                            lua_tostring(L,cmd),
                             bs_denormalize_path(lua_tostring(L,rsp)),
                             bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_DynamicLib:
-            lua_pushfstring(L,"gcc %s @\"%s\" -o \"%s\"",
+            lua_pushfstring(L,"%s %s @\"%s\" -o \"%s\"",
+                            lua_tostring(L,cmd),
                             (mac ? "-dynamiclib " : "-shared "),
                             bs_denormalize_path(lua_tostring(L,rsp)),
                             bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_StaticLib:
             if( !mac )
-                lua_pushfstring(L,"ar r \"%s\" @\"%s\"",
+                lua_pushfstring(L,"%s r \"%s\" @\"%s\"",
+                            lua_tostring(L,cmd),
                             bs_denormalize_path(lua_tostring(L,outfile)),
                             bs_denormalize_path(lua_tostring(L,rsp)) );
             else
             {
                 useRsp = 0; // on macs only a few years old ar and gcc version 4 is installed which doesn't support @file
-                lua_pushfstring(L,"ar r \"%s\" ", bs_denormalize_path(lua_tostring(L,outfile)) );
+                lua_pushfstring(L,"%s r \"%s\" ",
+                                lua_tostring(L,cmd),
+                                bs_denormalize_path(lua_tostring(L,outfile)) );
             }
             break;
         }
@@ -905,12 +1019,14 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
         switch(resKind)
         {
         case BS_Executable:
-            lua_pushfstring(L,"clang @\"%s\" -o \"%s\"",
+            lua_pushfstring(L,"%s @\"%s\" -o \"%s\"",
+                            lua_tostring(L,cmd),
                             bs_denormalize_path(lua_tostring(L,rsp)),
                             bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_DynamicLib:
-            lua_pushfstring(L,"clang %s @\"%s\" -o \"%s\"",
+            lua_pushfstring(L,"%s %s @\"%s\" -o \"%s\"",
+                            lua_tostring(L,cmd),
                             (mac ? "-dynamiclib " : "-shared "),
                             bs_denormalize_path(lua_tostring(L,rsp)),
                             bs_denormalize_path(lua_tostring(L,outfile)) );
@@ -923,9 +1039,12 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
             else if( mac )
             {
                 useRsp = 0; // dito, see above
-                lua_pushfstring(L,"ar r \"%s\" ", bs_denormalize_path(lua_tostring(L,outfile)) );
+                lua_pushfstring(L,"%s r \"%s\" ",
+                                lua_tostring(L,cmd),
+                                bs_denormalize_path(lua_tostring(L,outfile)) );
             }else
-                lua_pushfstring(L,"ar r \"%s\" @\"%s\"",
+                lua_pushfstring(L,"%s r \"%s\" @\"%s\"",
+                                lua_tostring(L,cmd),
                                 bs_denormalize_path(lua_tostring(L,outfile)),
                                 bs_denormalize_path(lua_tostring(L,rsp)) );
             break;
@@ -935,50 +1054,29 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
         switch(resKind)
         {
         case BS_Executable:
-            lua_pushfstring(L,"link /nologo @\"%s\" /out:\"%s\"",
+            lua_pushfstring(L,"%s /nologo @\"%s\" /out:\"%s\"",
+                            lua_tostring(L,cmd),
                             bs_denormalize_path(lua_tostring(L,rsp)),
                             bs_denormalize_path(lua_tostring(L,outfile)) );
             break;
         case BS_DynamicLib:
             // TODO: should we use -rpath=path ?
-            lua_pushfstring(L,"link /nologo /dll @\"%s\" /out:\"%s\" /implib:\"%s.lib\"",
+            lua_pushfstring(L,"%s /nologo /dll @\"%s\" /out:\"%s\" /implib:\"%s.lib\"",
+                            lua_tostring(L,cmd),
                             bs_denormalize_path(lua_tostring(L,rsp)),
                             bs_denormalize_path(lua_tostring(L,outfile)),
                             bs_denormalize_path(lua_tostring(L,outfile)) ); // the importlib is called xyz.dll.lib
             break;
         case BS_StaticLib:
-            lua_pushfstring(L,"lib /nologo /out:\"%s\" @\"%s\"",
+            lua_pushfstring(L,"%s /nologo /out:\"%s\" @\"%s\"",
+                            lua_tostring(L,cmd),
                             bs_denormalize_path(lua_tostring(L,outfile)),
                             bs_denormalize_path(lua_tostring(L,rsp)) );
             break;
         }
         break;
     }
-    const int cmd = lua_gettop(L);
-
-    const char* toolchain_prefix = "#toolchain_prefix";
-    const char* toolchain_path = "#toolchain_path";
-    if( !to_host )
-    {
-        toolchain_prefix = "target_toolchain_prefix";
-        toolchain_path = "target_toolchain_path";
-    }
-    lua_getfield(L,binst,toolchain_prefix);
-    if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
-    {
-        lua_pushvalue(L,cmd);
-        lua_concat(L,2);
-        lua_replace(L,cmd);
-    }else
-        lua_pop(L,1);
-    lua_getfield(L,binst,toolchain_path);
-    if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
-    {
-        lua_pushfstring(L,"%s/%s", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
-        lua_replace(L,cmd);
-        lua_pop(L,1);
-    }else
-        lua_pop(L,1);
+    lua_replace(L,cmd);
 
     lua_createtable(L,0,0);
     const int outlist = lua_gettop(L);
@@ -1032,7 +1130,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     {
         fprintf(stdout,"%s\n", lua_tostring(L,cmd));
         fflush(stdout);
-        if( bs_exec(lua_tostring(L,cmd)) != 0 ) // works for all gcc, clang and cl
+        if( runcmd(L,lua_tostring(L,cmd)) != 0 ) // works for all gcc, clang and cl
         {
             // stderr was already written to the console
             lua_pushnil(L);
@@ -1365,14 +1463,14 @@ static void callLua(lua_State* L, int builtins, int inst, int app, int script, c
     lua_pop(L,1); // arglist
 
 
-    lua_pushfstring(L, "%s %s %s", bs_denormalize_path(lua_tostring(L,app) ),
+    lua_pushfstring(L, "\"%s\" \"%s\" %s", bs_denormalize_path(lua_tostring(L,app) ),
                     bs_denormalize_path(lua_tostring(L,script) ),
                     lua_tostring(L,args) );
     const int cmd = lua_gettop(L);
 
     fprintf(stdout,"%s\n", lua_tostring(L,cmd));
     fflush(stdout);
-    if( bs_exec(lua_tostring(L,cmd)) != 0 )
+    if( runcmd(L,lua_tostring(L,cmd)) != 0 )
     {
         // stderr was already written to the console
         lua_pushnil(L);
@@ -1576,7 +1674,7 @@ int bs_runmoc(lua_State* L)
     const int includePrivateHeader = bs_exists2(bs_global_buffer());
     lua_pop(L,1);
 
-    lua_pushfstring(L, "%s %s -o %s%s", lua_tostring(L,MOC),
+    lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\"%s", lua_tostring(L,MOC),
                     bs_denormalize_path(lua_tostring(L,source) ),
                     bs_denormalize_path(lua_tostring(L,outFile)),
                     lua_tostring(L,defines));
@@ -1602,7 +1700,7 @@ int bs_runmoc(lua_State* L)
         //fprintf(stdout,"%s\n", lua_tostring(L,cmd));
         //fflush(stdout);
         // only call if outfile is older than source
-        if( bs_exec(lua_tostring(L,cmd)) != 0 )
+        if( runcmd(L,lua_tostring(L,cmd)) != 0 )
         {
             // stderr was already written to the console
             lua_pushnil(L);
@@ -1775,7 +1873,7 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
         int len = 0;
         const char* name = bs_path_part(lua_tostring(L,source),BS_baseName, &len);
         lua_pushlstring(L,name,len);
-        lua_pushfstring(L, "%s %s -o %s -name %s", bs_denormalize_path(lua_tostring(L,app) ),
+        lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\" -name \"%s\"", bs_denormalize_path(lua_tostring(L,app) ),
                         bs_denormalize_path(lua_tostring(L,source) ),
                         bs_denormalize_path(lua_tostring(L,outFile)),
                         lua_tostring(L,-1));
@@ -1790,7 +1888,7 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
             fprintf(stdout,"%s\n", lua_tostring(L,cmd));
             fflush(stdout);
             // only call if outfile is older than source
-            if( bs_exec(lua_tostring(L,cmd)) != 0 )
+            if( runcmd(L,lua_tostring(L,cmd)) != 0 )
             {
                 // stderr was already written to the console
                 lua_pushnil(L);
@@ -1868,7 +1966,7 @@ static void runuic(lua_State* L,int inst, int cls, int builtins)
         lua_replace(L,-2);
         const int outFile = lua_gettop(L);
 
-        lua_pushfstring(L, "%s %s -o %s", bs_denormalize_path(lua_tostring(L,app) ),
+        lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\"", bs_denormalize_path(lua_tostring(L,app) ),
                         bs_denormalize_path(lua_tostring(L,source) ),
                         bs_denormalize_path(lua_tostring(L,outFile)));
         const int cmd = lua_gettop(L);
@@ -1881,7 +1979,7 @@ static void runuic(lua_State* L,int inst, int cls, int builtins)
             fprintf(stdout,"%s\n", lua_tostring(L,cmd));
             fflush(stdout);
             // only call if outfile is older than source
-            if( bs_exec(lua_tostring(L,cmd)) != 0 )
+            if( runcmd(L,lua_tostring(L,cmd)) != 0 )
             {
                 // stderr was already written to the console
                 lua_pushnil(L);
@@ -1992,7 +2090,7 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
                 luaL_error(L,"outputs in Copy instance '%s' require relative paths", lua_tostring(L,-1));
             }
 
-            if( bs_copy(lua_tostring(L,to), lua_tostring(L,from) ))
+            if( copycmd(L,lua_tostring(L,to), lua_tostring(L,from) ))
                 luaL_error(L,"cannot copy %s to %s", lua_tostring(L,from), lua_tostring(L,to));
 
             lua_pop(L,1); // to
@@ -2129,7 +2227,7 @@ int bs_markAllActive(lua_State* L)
 {
     enum { PRODS = 1, EXECORDER };
 
-    int i;
+    size_t i;
     for( i = 1; i <= lua_objlen(L,PRODS); i++ )
     {
         lua_pushcfunction(L,bs_markActive);
