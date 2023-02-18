@@ -79,8 +79,10 @@ static int copycmd(lua_State* L, const char* normalizedToPath, const char* norma
 
 int bs_declpath(lua_State* L, int decl, const char* separator)
 {
+    const int top = lua_gettop(L);
+
     if( decl < 0 )
-        decl += lua_gettop(L) + 1;
+        decl += top + 1;
     lua_getfield(L,decl,"#name");
     const int name = lua_gettop(L);
     lua_getfield(L,decl,"#owner");
@@ -101,6 +103,8 @@ int bs_declpath(lua_State* L, int decl, const char* separator)
         lua_replace(L,module);
     }
     lua_pop(L,1); // module
+
+    assert( top + 1 == lua_gettop(L) );
     return 1;
 }
 
@@ -922,6 +926,9 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     }
     lua_concat(L,2);
     const int outfile = lua_gettop(L);
+
+    lua_pushvalue(L,outfile);
+    lua_setfield(L,inst,"#product");
 
     const time_t outExists = bs_exists(lua_tostring(L,outfile));
 
@@ -2090,8 +2097,13 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
                 luaL_error(L,"outputs in Copy instance '%s' require relative paths", lua_tostring(L,-1));
             }
 
-            if( copycmd(L,lua_tostring(L,to), lua_tostring(L,from) ))
-                luaL_error(L,"cannot copy %s to %s", lua_tostring(L,from), lua_tostring(L,to));
+            const time_t fromExists = bs_exists(lua_tostring(L,from));
+            const time_t toExists = bs_exists(lua_tostring(L,to));
+            if( !toExists || toExists < fromExists )
+            {
+                if( copycmd(L,lua_tostring(L,to), lua_tostring(L,from) ))
+                    luaL_error(L,"cannot copy %s to %s", lua_tostring(L,from), lua_tostring(L,to));
+            }
 
             lua_pop(L,1); // to
         }
