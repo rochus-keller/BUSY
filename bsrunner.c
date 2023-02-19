@@ -363,7 +363,12 @@ static void prefixCmd(lua_State* L, int cmd, int binst, int to_host)
     lua_getfield(L,binst,toolchain_path);
     if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
     {
-        lua_pushfstring(L,"\"%s/%s\"", bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
+#if defined(_WIN32) && !defined(BS_ALT_RUNCMD)
+        lua_pushfstring(L,"%s/%s",
+#else
+        lua_pushfstring(L,"\"%s/%s\"",
+#endif
+                        bs_denormalize_path(lua_tostring(L,-1)), lua_tostring(L,cmd) );
         lua_replace(L,cmd); // prefix cmd with path and enclose in ""
         lua_pop(L,1);
     }else
@@ -1470,7 +1475,12 @@ static void callLua(lua_State* L, int builtins, int inst, int app, int script, c
     lua_pop(L,1); // arglist
 
 
-    lua_pushfstring(L, "\"%s\" \"%s\" %s", bs_denormalize_path(lua_tostring(L,app) ),
+#if defined(_WIN32) && !defined(BS_ALT_RUNCMD)
+    lua_pushfstring(L, "%s \"%s\" %s",
+#else
+    lua_pushfstring(L, "\"%s\" \"%s\" %s",
+#endif
+                    bs_denormalize_path(lua_tostring(L,app) ),
                     bs_denormalize_path(lua_tostring(L,script) ),
                     lua_tostring(L,args) );
     const int cmd = lua_gettop(L);
@@ -1681,7 +1691,13 @@ int bs_runmoc(lua_State* L)
     const int includePrivateHeader = bs_exists2(bs_global_buffer());
     lua_pop(L,1);
 
-    lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\"%s", lua_tostring(L,MOC),
+#if defined(_WIN32) && !defined(BS_ALT_RUNCMD)
+    // on windows in the console running a quoted command is ok, but the C system() command fails
+    lua_pushfstring(L, "%s \"%s\" -o \"%s\"%s",
+#else
+    lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\"%s",
+#endif
+                    lua_tostring(L,MOC),
                     bs_denormalize_path(lua_tostring(L,source) ),
                     bs_denormalize_path(lua_tostring(L,outFile)),
                     lua_tostring(L,defines));
@@ -1704,8 +1720,8 @@ int bs_runmoc(lua_State* L)
 
     if( !outExists || outExists < srcExists )
     {
-        //fprintf(stdout,"%s\n", lua_tostring(L,cmd));
-        //fflush(stdout);
+        fprintf(stdout,"%s\n", lua_tostring(L,cmd));
+        fflush(stdout);
         // only call if outfile is older than source
         if( runcmd(L,lua_tostring(L,cmd)) != 0 )
         {
@@ -1880,7 +1896,12 @@ static void runrcc(lua_State* L,int inst, int cls, int builtins)
         int len = 0;
         const char* name = bs_path_part(lua_tostring(L,source),BS_baseName, &len);
         lua_pushlstring(L,name,len);
-        lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\" -name \"%s\"", bs_denormalize_path(lua_tostring(L,app) ),
+#if defined(_WIN32) && !defined(BS_ALT_RUNCMD)
+        lua_pushfstring(L, "%s \"%s\" -o \"%s\" -name \"%s\"",
+#else
+        lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\" -name \"%s\"",
+#endif
+                        bs_denormalize_path(lua_tostring(L,app) ),
                         bs_denormalize_path(lua_tostring(L,source) ),
                         bs_denormalize_path(lua_tostring(L,outFile)),
                         lua_tostring(L,-1));
@@ -1973,7 +1994,12 @@ static void runuic(lua_State* L,int inst, int cls, int builtins)
         lua_replace(L,-2);
         const int outFile = lua_gettop(L);
 
-        lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\"", bs_denormalize_path(lua_tostring(L,app) ),
+#if defined(_WIN32) && !defined(BS_ALT_RUNCMD)
+        lua_pushfstring(L, "%s \"%s\" -o \"%s\"",
+#else
+        lua_pushfstring(L, "\"%s\" \"%s\" -o \"%s\"",
+#endif
+                        bs_denormalize_path(lua_tostring(L,app) ),
                         bs_denormalize_path(lua_tostring(L,source) ),
                         bs_denormalize_path(lua_tostring(L,outFile)));
         const int cmd = lua_gettop(L);
