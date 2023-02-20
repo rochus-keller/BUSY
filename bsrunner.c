@@ -863,6 +863,14 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     const int mac = strcmp(lua_tostring(L,-1),"darwin") == 0 || strcmp(lua_tostring(L,-1),"macos") == 0;
     lua_pop(L,1);
 
+    lua_getfield(L,binst,"#ctdefaults");
+    if( to_host )
+        lua_getfield(L,binst,"host_toolchain");
+    else
+        lua_getfield(L,binst,"target_toolchain");
+    lua_rawget(L,-2);
+    lua_replace(L,-2);
+    const int ctdefaults = lua_gettop(L);
 
     lua_getfield(L,binst,"root_build_dir");
     const int rootOutDir = lua_gettop(L);
@@ -880,6 +888,10 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     const int lib_files = lua_gettop(L);
     lua_pushstring(L,"");
     const int frameworks = lua_gettop(L);
+
+    if( !lua_isnil(L,ctdefaults) )
+        addall2(L,ctdefaults,ldflags,lib_dirs,lib_names,lib_files,frameworks,
+                toolchain == BS_msvc || (win32 && toolchain == BS_clang), mac, win32);
 
     addall2(L,inst,ldflags,lib_dirs,lib_names,lib_files,frameworks,
             toolchain == BS_msvc || (win32 && toolchain == BS_clang), mac, win32);
@@ -1151,7 +1163,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     }
     lua_pop(L,1); // cmd
 
-    lua_pop(L,11); // binst, rootOutDir, relDir, ldflags...frameworks, outbase, out, rsp
+    lua_pop(L,12); // binst, rootOutDir, relDir, ctdefaults, ldflags...frameworks, outbase, out, rsp
     const int bottom = lua_gettop(L);
     assert( top == bottom );
 }

@@ -314,7 +314,8 @@ optimized["msvc"] = { ["cflags"] = { "/O2", "/MD" } }
 local debug = {}
 debug["gcc"] = { ["cflags"] = { "-g" } }
 debug["clang"] = debug["gcc"]
-debug["msvc"] = { ["cflags"] = { "/Zi", "-MDd", "-Fddebug" } } -- creates debug.mdb in the current directory
+debug["msvc"] = { ["cflags"] = { "/Zi", "-MDd", "-Fddebug" }, -- creates debug.mdb in the current directory
+				  ["ldflags"] = { "/DEBUG" } } 
 if _G["#build_mode"] ~= nil then -- to be preset by IDE
 	inst.build_mode = _G["#build_mode"]
 	if inst.build_mode == "optimized" then
