@@ -135,6 +135,8 @@ With the `-G` option you can tell BUSY to generate code for another build system
 
 Builds are specified using BUSY files including code written in the BUSY specification language; see [The BUSY Build System - Language and Built-ins Specification](http://software.rochus-keller.ch/busy_spec.html) for detailed information about the specification language.
 
+A BUSY file is a file with the filename "BUSY", or alternatively "BUSY.busy"; if both files are present in a directory, the file named "BUSY" is given priority.
+
 There is a BUSY file in the root of the source tree and any subdirectory which includes files or other subdirectories relevant to the build.
 
 The BUSY files are the "modules" of the specification language. Declarations are only visible within the module unless declared public (`*`, visible to outer and nested modules) or protected (`-`, visible only to nested modules). Submodules must be explicitly declared and associated with the corresponding directories using the `submod` keyword. 

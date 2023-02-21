@@ -28,7 +28,7 @@ typedef struct BSRowCol
     unsigned int col: 12;
 } BSRowCol;
 
-typedef enum { BS_Info, BS_Debug, BS_Warning, BS_Error, BS_Critical } BSLogLevel;
+typedef enum { BS_Info, BS_Debug, BS_Message, BS_Warning, BS_Error, BS_Critical } BSLogLevel;
 typedef void (*BSLogger)(BSLogLevel, void* data, const char* file, BSRowCol loc, const char* format, va_list);
                 // file & loc.row may be 0; format doesn't require terminal \n
 

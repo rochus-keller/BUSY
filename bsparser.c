@@ -113,7 +113,7 @@ static void warning(BSParserContext* ctx, int row, int col, const char* format, 
     va_end(args);
 }
 
-static void message(BSParserContext* ctx, const char* format, ... )
+static void information(BSParserContext* ctx, const char* format, ... )
 {
     BSRowCol loc;
     loc.row = 0;
@@ -263,6 +263,7 @@ static void addXref(BSParserContext* ctx, BSRowCol loc, int decl)
 
     // #xref table: filepath -> list_of_idents
     // list_of_idents: rowcol -> set_of_decls
+    //             or: rowcol -> path
 
     // decl.#xref table: filepath -> set of rowcol
 
@@ -272,6 +273,27 @@ static void addXref(BSParserContext* ctx, BSRowCol loc, int decl)
     const int list_of_idents = lua_gettop(ctx->L);
 
     const unsigned int rowCol = bs_torowcol(loc.row, loc.col);
+
+    if( lua_isstring(ctx->L, decl ) )
+    {
+        lua_pushvalue(ctx->L,decl);
+        const int path = lua_gettop(ctx->L);
+        if( *lua_tostring(ctx->L, path) == '.' )
+        {
+            lua_getfield(ctx->L,ctx->module.table,"#dir");
+            bs_add_path(ctx->L, -1, path );
+            lua_replace(ctx->L,path);
+            lua_pop(ctx->L,1);
+        }
+        if( bs_exists(lua_tostring(ctx->L, path) ) )
+        {
+            lua_pushinteger(ctx->L,rowCol);
+            lua_pushvalue(ctx->L,path);
+            lua_rawset(ctx->L,list_of_idents);
+        }
+        lua_pop(ctx->L,2); // list_of_idents, path
+        return;
+    }
 
     lua_pushinteger(ctx->L,rowCol);
     lua_rawget(ctx->L,list_of_idents);
@@ -504,6 +526,7 @@ static void submodule(BSParserContext* ctx, int subdir)
                         if( path[i] == '/' )
                             error(ctx, pt.loc.row, pt.loc.col,"expecting an immediate subdirectory" );
                     }
+                    // NOTE: no xref path here because it is a directory and we already have the ident
                 }
             }
         }else
@@ -521,6 +544,9 @@ static void submodule(BSParserContext* ctx, int subdir)
         {
             altpath = t.val;
             altpathlen = t.len;
+            lua_pushlstring(ctx->L,altpath,altpathlen);
+            addXref(ctx,t.loc,-1);
+            lua_pop(ctx->L,1);
             pt = t;
         }else
             error(ctx, pt.loc.row, pt.loc.col,"expecting a path after 'else'" );
@@ -1963,7 +1989,7 @@ static void print(BSParserContext* ctx, int n, int row, int col, int kind)
             ctx->logger(BS_Warning,ctx->loggerData,labelOrFilepath(ctx), loc, lua_tostring(ctx->L,-1), args);
             break;
         default:
-            ctx->logger(BS_Info,ctx->loggerData,ctx->label, loc, lua_tostring(ctx->L,-1), args);
+            ctx->logger(BS_Message,ctx->loggerData,ctx->label, loc, lua_tostring(ctx->L,-1), args);
             break;
         }
     }
@@ -2795,6 +2821,7 @@ static int factor(BSParserContext* ctx, BSScope* scope, int lhsType)
             lua_pushlstring(ctx->L, path, len);
             if( prefix )
                 lua_concat(ctx->L,2);
+            addXref(ctx,t.loc,-1);
             lua_getfield(ctx->L,ctx->builtins,"path");
             // result is an unquoted '.' | '..' | ('../' | './' | '//') fsname { '/' fsname }
         }
@@ -4658,26 +4685,43 @@ int bs_parse(lua_State* L)
 
     lua_pushvalue(L,BS_PathToSourceRoot);
     lua_setfield(L,BS_NewModule,"#dir");
+
     lua_pushvalue(L,BS_PathToSourceRoot);
     lua_pushstring(L,"/");
     lua_pushstring(L,"BUSY");
     lua_concat(L,3);
-    if( !bs_exists( lua_tostring(L,-1) ) )
+    const int busyFileName = lua_gettop(L);
+    if( !bs_exists( lua_tostring(L,busyFileName) ) )
     {
-        lua_getfield(L,BS_NewModule,"#altmod");
-        if( lua_isnil(L,-1) )
-            lua_pop(L,1);
-        else if( !bs_exists( lua_tostring(L,-1) ) )
-            moduleerror(&ctx,BS_NewModule,"neither can find '%s' nor alternative path '%s'",
-                        lua_tostring(L,-2), lua_tostring(L,-1) );
-        else
-            lua_replace(L,-2);
-        lua_pushboolean(L,1);
-        lua_setfield(L,BS_NewModule,"#dummy");
-        // message(&ctx,"# analyzing %s on behalf of %s\n", lua_tostring(L,-1), ctx.dirpath);
+        lua_pushstring(L,".busy");
+        lua_concat(L,2); // now busyFileName ends with BUSY.busy
+        if( !bs_exists( lua_tostring(L,busyFileName) ) )
+        {
+            lua_getfield(L,BS_NewModule,"#altmod");
+            const int altFileName = lua_gettop(L);
+            if( lua_isnil(L,altFileName) )
+            {
+                va_list args;
+                va_end(args);
+                BSRowCol loc;
+                loc.row = 0; loc.col = 0;
+                lua_pushvalue(L,BS_PathToSourceRoot);
+                ctx.logger(BS_Error, ctx.loggerData, lua_tostring(L,-1), loc, "this is not a valid BUSY module!", args );
+                lua_pushnil(L);
+                lua_error(L);
+            }else if( !bs_exists( lua_tostring(L,altFileName) ) )
+                moduleerror(&ctx,BS_NewModule,"neither can find '%s' nor alternative path '%s'",
+                            lua_tostring(L,busyFileName), lua_tostring(L,altFileName) );
+            else
+                lua_replace(L,busyFileName);
+            lua_pushboolean(L,1);
+            lua_setfield(L,BS_NewModule,"#dummy");
+            // message(&ctx,"# analyzing %s on behalf of %s\n", lua_tostring(L,-1), ctx.dirpath);
+        }else
+            information(&ctx,"# analyzing %s", lua_tostring(L,busyFileName));
     }else
-        message(&ctx,"# analyzing %s", lua_tostring(L,-1));
-    ctx.filepath = lua_tostring(L,-1);
+        information(&ctx,"# analyzing %s", lua_tostring(L,busyFileName));
+    ctx.filepath = lua_tostring(L,busyFileName);
     lua_setfield(L,BS_NewModule,"#file");
 
     if( haveXref )
