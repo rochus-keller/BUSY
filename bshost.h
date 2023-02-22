@@ -38,6 +38,8 @@ extern int bs_isWinRoot2(const char* denormalizedPath); // 1..yes, 0..no
 
 extern time_t bs_exists(const char* normalizedPath); // changed time if exists, 0 if not
 extern time_t bs_exists2(const char* denormalizedPath); // changed time if exists, 0 if not
+extern int bs_touch(const char* normalizedPath);
+extern int bs_touch2(const char* denormalizedPath);
 extern BSPathStatus bs_thisapp();
 
 extern BSPathStatus bs_apply_source_expansion(const char* normalizedPath, const char* string, int onlyFileParts); // returns denormalized

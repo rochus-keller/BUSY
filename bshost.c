@@ -31,9 +31,11 @@
 #include <direct.h>
 #include <libloaderapi.h>
 #include <sys/stat.h>
+#include <sys/utime.h>
 #include <errno.h>
 #define getcwd _getcwd
 #define stat _stat
+#define utime _utime
 #define PATH_MAX MAX_PATH
 
 static int appPath(char* buf, int len)
@@ -59,6 +61,7 @@ int bs_mkdir2(const char* denormalizedPath)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <utime.h>
 
 // https://stackoverflow.com/questions/933850/how-do-i-find-the-location-of-the-executable-in-c
 static int appPath(char* buf, int len)
@@ -923,6 +926,12 @@ BSPathPart bs_tokenType(const char* what, int len)
     return BS_NoPathPart;
 }
 
+int bs_touch(const char* normalizedPath)
+{
+    return utime(bs_denormalize_path(normalizedPath),0); // returns zero on success, -1 otherwise
+}
 
-
-
+int bs_touch2(const char* denormalizedPath)
+{
+    return utime(denormalizedPath,0); // returns zero on success, -1 otherwise
+}

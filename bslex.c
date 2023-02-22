@@ -54,7 +54,7 @@ void bs_defaultLogger(BSLogLevel l, void* data,const char* file, BSRowCol loc, c
 {
     FILE* out;
 
-    if( l == BS_Info || l == BS_Debug )
+    if( l == BS_Info || l == BS_Message || l == BS_Debug )
         out = stdout;
     else
         out = stderr;
@@ -62,6 +62,8 @@ void bs_defaultLogger(BSLogLevel l, void* data,const char* file, BSRowCol loc, c
     const char* tag = "";
     switch( l )
     {
+    default:
+        break;
     case BS_Debug:
         tag = "DGB:";
         break;
