@@ -20,7 +20,7 @@
 * http://www.gnu.org/copyleft/gpl.html.
 */
 
-#include "bslogger.h"
+#include "bscallbacks.h"
 
 typedef struct BSLexer BSLexer;
 

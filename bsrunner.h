@@ -52,8 +52,12 @@ extern int bs_mocname(lua_State* L);
 typedef enum BSLanguage { BS_unknownLang, BS_c, BS_cc, BS_objc, BS_objcc, BS_header } BSLanguage;
 extern int bs_guessLang(const char* name);
 
-typedef enum BSToolchain {BS_msvc,BS_gcc,BS_clang} BSToolchain;
-extern int bs_getToolchain(lua_State* L, int builtinsInst, int to_host);
+typedef enum BSToolchain {BS_notc, BS_msvc,BS_gcc,BS_clang} BSToolchain;
+extern BSToolchain bs_getToolchain(lua_State* L, int builtinsInst, int to_host);
+
+typedef enum BSOperatingSystem {BS_noos, BS_linux,BS_mac,BS_windows} BSOperatingSystem;
+extern BSOperatingSystem bs_getOperatingSystem(lua_State* L, int builtinsInst, int to_host);
+
 
 #ifdef BS_ALT_RUNCMD
 typedef int (*BSRunCmd)(const char* cmd, void* data);

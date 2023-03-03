@@ -24,6 +24,8 @@
 #include <assert.h>
 #include <string.h>
 
+// TODO: reimplement bsrunner using bsvisitor; BS_ALT_RUNCMD no longer needed
+
 #ifdef BS_ALT_RUNCMD
 void bs_preset_runcmd(lua_State *L, BSRunCmd cmd, void* data)
 {
@@ -294,13 +296,13 @@ static void addall(lua_State* L,int inst,int cflags, int cflags_c, int cflags_cc
 
 }
 
-int bs_getToolchain(lua_State* L, int builtinsInst, int to_host)
+BSToolchain bs_getToolchain(lua_State* L, int builtinsInst, int to_host)
 {
     if( to_host )
         lua_getfield(L,builtinsInst,"host_toolchain");
     else
         lua_getfield(L,builtinsInst,"target_toolchain");
-    int toolchain;
+    BSToolchain toolchain;
     if( strcmp(lua_tostring(L,-1),"msvc") == 0 )
         toolchain = BS_msvc;
     else if( strcmp(lua_tostring(L,-1),"gcc") == 0 )
@@ -309,6 +311,25 @@ int bs_getToolchain(lua_State* L, int builtinsInst, int to_host)
         toolchain = BS_clang;
     else
         luaL_error(L,"toolchain not supported: %s",lua_tostring(L,-1) );
+    lua_pop(L,1);
+    return toolchain;
+}
+
+BSOperatingSystem bs_getOperatingSystem(lua_State* L, int builtinsInst, int to_host)
+{
+    if( to_host )
+        lua_getfield(L,builtinsInst,"host_os");
+    else
+        lua_getfield(L,builtinsInst,"target_os");
+    BSOperatingSystem toolchain;
+    if( strcmp(lua_tostring(L,-1),"linux") == 0 )
+        toolchain = BS_linux;
+    else if( strcmp(lua_tostring(L,-1),"macos") == 0 || strcmp(lua_tostring(L,-1),"darwin") == 0 )
+        toolchain = BS_mac;
+    else if( strcmp(lua_tostring(L,-1),"win32") == 0 || strcmp(lua_tostring(L,-1),"winrt") == 0 )
+        toolchain = BS_windows;
+    else
+        luaL_error(L,"operating system not supported: %s",lua_tostring(L,-1) );
     lua_pop(L,1);
     return toolchain;
 }
@@ -2155,42 +2176,43 @@ static void copy(lua_State* L,int inst, int cls, int builtins)
 
 static void message(lua_State* L,int inst, int precheck)
 {
+    const int top = lua_gettop(L);
+
     lua_getfield(L,inst,"msg_type");
     const int msg_type = lua_gettop(L);
 
-    // TODO: do we need this?
     const int row = 0;
     const int col = 0;
     const char* label = 0;
 
+    lua_getfield(L,inst,"text");
+    const int text = lua_gettop(L);
     if( strcmp(lua_tostring(L,msg_type),"error") == 0 )
     {
-        lua_getfield(L,inst,"text");
         if( label )
-            fprintf(stderr,"# %s:%d:%d:ERR: %s\n", label, row, col, lua_tostring(L,-1));
+            fprintf(stderr,"# %s:%d:%d:ERR: %s\n", label, row, col, lua_tostring(L,text));
         else
-            fprintf(stderr,"# ERR: %s\n", lua_tostring(L,-1));
+            fprintf(stderr,"# ERR: %s\n", lua_tostring(L,text));
         fflush(stderr);
         lua_pushnil(L);
         lua_error(L);
     }else if( strcmp(lua_tostring(L,msg_type),"warning") == 0 && !precheck )
     {
-        lua_getfield(L,inst,"text");
         if( label )
-            fprintf(stderr,"# %s:%d:%d:WRN: %s\n", label, row, col, lua_tostring(L,-1));
+            fprintf(stderr,"# %s:%d:%d:WRN: %s\n", label, row, col, lua_tostring(L,text));
         else
-            fprintf(stderr,"# WRN: %s\n", lua_tostring(L,-1));
+            fprintf(stderr,"# WRN: %s\n", lua_tostring(L,text));
         fflush(stderr);
     }else if( !precheck )
     {
-        lua_getfield(L,inst,"text");
         if( label )
-            fprintf(stdout,"# %s:%d:%d: %s\n", label, row, col, lua_tostring(L,lua_gettop(L)));
+            fprintf(stdout,"# %s:%d:%d: %s\n", label, row, col, lua_tostring(L,text));
         else
-            fprintf(stdout,"# %s\n", lua_tostring(L,lua_gettop(L)));
+            fprintf(stdout,"# %s\n", lua_tostring(L,text));
         fflush(stdout);
     }
-    lua_pop(L,3); // msg_type, rdir, text
+    lua_pop(L,2); // msg_type, text
+    assert( top == lua_gettop(L) );
 }
 
 int bs_createBuildDirs(lua_State* L) // lua function; params: rootModuleDef, rootPath

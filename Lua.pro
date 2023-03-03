@@ -58,7 +58,8 @@ HEADERS += \
     bshost.h \
     bsdetect.h \
     bsqmakegen.h \
-    bslogger.h
+    bsvisitor.h \
+    bscallbacks.h
 
 SOURCES += \
     lapi.c \
@@ -98,7 +99,8 @@ SOURCES += \
     bslib.c \
     bsrunner.c \
     bshost.c \
-    bsqmakegen.c
+    bsqmakegen.c \
+    bsvisitor.c
 
 
 

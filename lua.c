@@ -392,6 +392,32 @@ int lua_main (int argc, char **argv) {
   return (status || s.status) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+int lua_main_with_reporter (int argc, char **argv, lua_reporter log, void* data)
+{
+    if( log == 0 )
+        return lua_main(argc, argv);
+    int status;
+    struct Smain s;
+    lua_State *L = lua_open();  /* create state */
+    if (L == NULL) {
+      log("cannot create state: not enough memory",data);
+      return EXIT_FAILURE;
+    }
+    s.argc = argc;
+    s.argv = argv;
+    status = lua_cpcall(L, &pmain, &s);
+
+    if (status && !lua_isnil(L, -1)) {
+      const char *msg = lua_tostring(L, -1);
+      if (msg == NULL) msg = "(error object is not a string)";
+      log(msg,data);
+      lua_pop(L, 1);
+    }
+
+    lua_close(L);
+    return (status || s.status) ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
 #ifndef BS_USE_LINKED_LUA
 int main (int argc, char **argv) {
     return lua_main(argc,argv);

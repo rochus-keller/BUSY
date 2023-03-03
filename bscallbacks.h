@@ -28,9 +28,29 @@ typedef struct BSRowCol
     unsigned int col: 12;
 } BSRowCol;
 
+/////// Logger:
 typedef enum { BS_Info, BS_Debug, BS_Message, BS_Warning, BS_Error, BS_Critical } BSLogLevel;
 typedef void (*BSLogger)(BSLogLevel, void* data, const char* file, BSRowCol loc, const char* format, va_list);
                 // file & loc.row may be 0; format doesn't require terminal \n
+
+/////// Visitor:
+typedef enum BSBuildOperation { BS_Compile,
+                                BS_LinkExe, BS_LinkDll, BS_LinkLib,
+                                BS_RunMoc, BS_RunRcc, BS_RunUic, BS_RunLua,
+                                BS_Copy } BSBuildOperation;
+
+typedef enum BSBuildParam { BS_infile, BS_outfile,
+                            BS_cflag, BS_define, BS_include_dir,
+                            BS_ldflag, BS_lib_dir, BS_lib_name, BS_lib_file, BS_framework,
+                            BS_defFile, BS_name, BS_arg,
+                          } BSBuildParam;
+
+// toolchain : BSToolchain
+// os : BSOperatingSystem
+typedef int (*BSBeginOp)(BSBuildOperation, const char* command, int toolchain, int os, void* data); // returns 0 if ok or -1 if cancel
+typedef void (*BSOpParam)(BSBuildParam, const char* value, void* data);
+typedef void (*BSEndOp)(void* data);
+typedef void (*BSForkGroup)(int n, void* data); // n >= 0: start group, < 0: end group
 
 #endif // BSLOGGER_H
 

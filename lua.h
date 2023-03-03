@@ -245,6 +245,9 @@ LUA_API void lua_setallocf (lua_State *L, lua_Alloc f, void *ud);
 
 LUA_API int lua_main (int argc, char **argv);
 
+typedef void (*lua_reporter)(const char* msg, void* data);
+LUA_API int lua_main_with_reporter (int argc, char **argv, lua_reporter r, void* data);
+
 /* 
 ** ===============================================================
 ** some useful macros

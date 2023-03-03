@@ -25,6 +25,7 @@
 #include "bsqmakegen.h"
 #include "bshost.h"
 #include "bsunicode.h"
+#include "bsvisitor.h"
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
@@ -486,6 +487,88 @@ int bs_execute (lua_State *L)
     return 0;
 }
 
+static int Test_BSBeginOp(BSBuildOperation op, const char* command, int t, int o, void* data)
+{
+    switch(op)
+    {
+    case BS_Compile:
+        fprintf(stdout,"COMPILE: ");
+        break;
+    case BS_LinkExe:
+    case BS_LinkDll:
+    case BS_LinkLib:
+        fprintf(stdout,"LINK: ");
+        break;
+    case BS_RunMoc:
+        fprintf(stdout,"MOC: ");
+        break;
+    case BS_RunRcc:
+        fprintf(stdout,"RCC: ");
+        break;
+    case BS_RunUic:
+        fprintf(stdout,"UIC: ");
+        break;
+    case BS_RunLua:
+        fprintf(stdout,"LUA: ");
+        break;
+    case BS_Copy:
+        fprintf(stdout,"COPY: ");
+        break;
+    default:
+        fprintf(stdout,"BEGIN OP: %d ", op);
+        break;
+    }
+    fprintf(stdout, "%s\n", command );
+    fflush(stdout);
+
+    return 0;
+}
+
+static void Test_BSOpParam(BSBuildParam p, const char* value, void* data)
+{
+    switch(p)
+    {
+    case BS_infile:
+        fprintf(stdout,"  INFILE: ");
+        break;
+    case BS_outfile:
+        fprintf(stdout,"  OUTFILE: ");
+        break;
+    case BS_cflag:
+        fprintf(stdout,"  CFLAG: ");
+        break;
+    case BS_define:
+        fprintf(stdout,"  DEFINE: ");
+        break;
+    case BS_include_dir:
+        fprintf(stdout,"  INCLUDEDIR: ");
+        break;
+    case BS_ldflag:
+        fprintf(stdout,"  LDFLAG: ");
+        break;
+    case BS_lib_dir:
+        fprintf(stdout,"  LIBDIR: ");
+        break;
+    case BS_lib_name:
+        fprintf(stdout,"  LIBNAME: ");
+        break;
+    default:
+        fprintf(stdout,"  PARAM: ");
+        break;
+    }
+    fprintf(stdout, "%s\n", value );
+    fflush(stdout);
+}
+
+static void Test_BSForkGroup(int n, void* data)
+{
+    if( n >= 0 )
+        fprintf(stdout,"BEGIN PARALLEL: %d\n", n);
+    else
+        fprintf(stdout,"END PARALLEL\n");
+    fflush(stdout);
+}
+
 // param: what, root module def
 // opt param: set of product desigs to be built
 static int bs_generate (lua_State *L)
@@ -544,6 +627,21 @@ static int bs_generate (lua_State *L)
         lua_pushvalue(L,ROOT);
         lua_pushvalue(L,PRODS);
         lua_call(L,2,0);
+    }else if( strcmp(lua_tostring(L,WHAT),"test") == 0 )
+    {
+        for( i = 1; i <= lua_objlen(L,PRODS); i++ )
+        {
+            lua_pushcfunction(L, bs_visit);
+            lua_rawgeti(L,PRODS,i);
+            BSVisitorCtx* ctx = (BSVisitorCtx*)lua_newuserdata(L, sizeof(BSVisitorCtx) );
+            ctx->d_data = 0;
+            ctx->d_log = 0;
+            ctx->d_end = 0;
+            ctx->d_begin = Test_BSBeginOp;
+            ctx->d_param = Test_BSOpParam;
+            ctx->d_fork = Test_BSForkGroup;
+            lua_call(L,2,0);
+        }
     }else
         luaL_error(L,"unknown generator '%s'", lua_tostring(L,WHAT));
 

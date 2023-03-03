@@ -21,7 +21,7 @@
 */
 
 #include "lua.h"
-#include "bslogger.h"
+#include "bscallbacks.h"
 
 typedef enum BSNodeType { // #kind
     BS_Invalid,
