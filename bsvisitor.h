@@ -36,7 +36,10 @@ typedef struct BSVisitorCtx {
 extern int bs_visit(lua_State* L);
 // param: productinst
 // param: BSVisitorCtx userdata
+// no return
 
+extern int bs_resetOut(lua_State* L);
+// param: module def
 
 
 #endif // BSVISITOR_H

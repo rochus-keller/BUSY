@@ -762,7 +762,6 @@ static void builddeps(lua_State* L, int inst)
     int i;
     for( i = 1; i <= ndeps; i++ )
     {
-        // TODO: check for circular deps
         lua_pushcfunction(L, bs_visit);
         lua_rawgeti(L,deps,i);
         lua_pushvalue(L,CTX);
@@ -1577,6 +1576,8 @@ static void message(lua_State* L,BSVisitorCtx* ctx, int precheck)
 
 int bs_visit(lua_State* L)
 {
+    const int top = lua_gettop(L);
+
     lua_getfield(L,PRODINST,"#out");
     const int built = !lua_isnil(L,-1);
     lua_pop(L,1);
@@ -1630,5 +1631,45 @@ int bs_visit(lua_State* L)
         luaL_error(L,"don't know how to build instances of class '%s'", name);
 
     lua_pop(L,3); // cls, builtins, name
-    return 1; // inst
+
+    assert( top == lua_gettop(L) );
+    return 0; // inst
+}
+
+int bs_resetOut(lua_State* L)
+{
+    enum { MODEF = 1 };
+
+    const int top = lua_gettop(L);
+    size_t i;
+    for( i = 1; i <= lua_objlen(L,MODEF); i++ )
+    {
+        lua_rawgeti(L,MODEF,i);
+        const int sub = lua_gettop(L);
+
+        lua_getfield(L,sub,"#kind");
+        const int k = lua_tointeger(L,-1);
+        lua_pop(L,1);
+
+        if( k == BS_ModuleDef )
+        {
+            lua_pushcfunction(L,bs_resetOut);
+            lua_pushvalue(L,sub);
+            lua_call(L,1,0);
+        }else if( k == BS_VarDecl )
+        {
+            lua_getfield(L,sub,"#inst");
+            const int PRODINST = lua_gettop(L);
+            if( lua_istable(L,PRODINST) )
+            {
+                lua_pushnil(L);
+                lua_setfield(L,PRODINST,"#out");
+            }
+            lua_pop(L,1); // PRODINST
+        }
+
+        lua_pop(L,1); // sub
+    }
+    assert( top == lua_gettop(L) );
+    return 0;
 }
