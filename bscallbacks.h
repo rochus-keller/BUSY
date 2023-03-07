@@ -37,7 +37,9 @@ typedef void (*BSLogger)(BSLogLevel, void* data, const char* file, BSRowCol loc,
 typedef enum BSBuildOperation { BS_Compile,
                                 BS_LinkExe, BS_LinkDll, BS_LinkLib,
                                 BS_RunMoc, BS_RunRcc, BS_RunUic, BS_RunLua,
-                                BS_Copy } BSBuildOperation;
+                                BS_Copy,
+                                BS_EnteringProduct // just to inform where we are, no BSEndOp sent
+                              } BSBuildOperation;
 
 typedef enum BSBuildParam { BS_infile, BS_outfile,
                             BS_cflag, BS_define, BS_include_dir,

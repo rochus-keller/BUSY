@@ -41,5 +41,7 @@ extern int bs_visit(lua_State* L);
 extern int bs_resetOut(lua_State* L);
 // param: module def
 
+extern BSVisitorCtx* bs_newctx(lua_State* L);
+// returns new context, initialized to zero
 
 #endif // BSVISITOR_H

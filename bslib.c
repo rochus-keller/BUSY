@@ -514,6 +514,9 @@ static int Test_BSBeginOp(BSBuildOperation op, const char* command, int t, int o
     case BS_Copy:
         fprintf(stdout,"COPY: ");
         break;
+    case BS_EnteringProduct:
+        fprintf(stdout,"### running ");
+        break;
     default:
         fprintf(stdout,"BEGIN OP: %d ", op);
         break;
@@ -633,7 +636,7 @@ static int bs_generate (lua_State *L)
         {
             lua_pushcfunction(L, bs_visit);
             lua_rawgeti(L,PRODS,i);
-            BSVisitorCtx* ctx = (BSVisitorCtx*)lua_newuserdata(L, sizeof(BSVisitorCtx) );
+            BSVisitorCtx* ctx = bs_newctx(L);
             ctx->d_data = 0;
             ctx->d_log = 0;
             ctx->d_end = 0;

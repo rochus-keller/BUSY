@@ -275,6 +275,16 @@ static void compilesources(lua_State* L, BSVisitorCtx* ctx, int builtins, int in
     const int tmp = lua_gettop(L);
     copyItems(L,inlist,tmp, BS_SourceFiles);
     int n = lua_objlen(L,tmp);
+
+    lua_createtable(L,n,0);
+    const int generated = lua_gettop(L);
+    for( i = 1; i <= n; i++ )
+    {
+        lua_rawgeti(L,tmp,i);
+        lua_rawseti(L,generated,i);
+    }
+    lua_setfield(L,PRODINST,"#generated");
+
     for( i = 1; i <= lua_objlen(L,sources); i++ )
     {
         // copy all sources to a new table to avoid changing the original sources
@@ -1598,9 +1608,17 @@ int bs_visit(lua_State* L)
     const int builtins = lua_gettop(L);
 
     lua_getfield(L,cls,"#name");
-    const char* name = lua_tostring(L,-1);
+    const char* clsName = lua_tostring(L,-1);
 
     builddeps(L,PRODINST);
+
+    if( ctx->d_begin )
+    {
+        lua_getfield(L,PRODINST,"#decl");
+        calcdesig(L,-1);
+        ctx->d_begin(BS_EnteringProduct,lua_tostring(L,-1),0,0, ctx->d_data);
+        lua_pop(L,2); // decl, desig
+    }
 
     // use isa instead of strcmp so that users can subclass the built-in classes
     if( isa( L, builtins, cls, "Library" ) )
@@ -1628,9 +1646,9 @@ int bs_visit(lua_State* L)
     else if( isa( L, builtins, cls, "Uic") )
         runuic(L,ctx,cls,builtins);
     else
-        luaL_error(L,"don't know how to build instances of class '%s'", name);
+        luaL_error(L,"don't know how to build instances of class '%s'", clsName);
 
-    lua_pop(L,3); // cls, builtins, name
+    lua_pop(L,3); // cls, builtins, clsName
 
     assert( top == lua_gettop(L) );
     return 0; // inst
@@ -1672,4 +1690,11 @@ int bs_resetOut(lua_State* L)
     }
     assert( top == lua_gettop(L) );
     return 0;
+}
+
+BSVisitorCtx*bs_newctx(lua_State* L)
+{
+    BSVisitorCtx* ctx = (BSVisitorCtx*)lua_newuserdata(L, sizeof(BSVisitorCtx) );
+    memset(ctx,0,sizeof(BSVisitorCtx));
+    return ctx;
 }
