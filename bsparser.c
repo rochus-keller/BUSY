@@ -3494,7 +3494,7 @@ static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken
     const int blockdecl = lua_gettop(ctx->L);
     lua_pushinteger(ctx->L,BS_BlockDef);
     lua_setfield(ctx->L,blockdecl,"#kind");
-    addLocInfo(ctx,lbrace->loc,blockdecl); // TODO: do we also need end of block loc?
+    addLocInfo(ctx,lbrace->loc,blockdecl);
     // point to surrounding scope
     lua_pushvalue(ctx->L,scope->table);
     lua_setfield(ctx->L,blockdecl,"#up");
@@ -3517,6 +3517,14 @@ static void nestedblock(BSParserContext* ctx, BSScope* scope, int _this, BSToken
     nested.n = 0;
     nested.table = blockdecl;
     block(ctx, &nested, lbrace, pascal);
+
+    if( ctx->locInfo )
+    {
+        lua_pushinteger(ctx->L, lbrace->loc.row );
+        lua_setfield(ctx->L, blockdecl, "#endrow");
+        lua_pushinteger(ctx->L, lbrace->loc.col );
+        lua_setfield(ctx->L, blockdecl, "#endcol");
+    }
 
     lua_pop(ctx->L,1); // blockinst
     BS_END_LUA_FUNC(ctx);
@@ -4526,6 +4534,8 @@ static void block(BSParserContext* ctx, BSScope* scope, BSToken* inLbrace, int p
             error(ctx, t.loc.row, t.loc.col,"unexpected '%s'", bslex_tostring(t.tok) );
         else if( !pascal )
             nextToken(ctx); // eat rbrace
+        if( inLbrace )
+            inLbrace->loc = t.loc; // deliver end of block loc to caller
     }else if( t.tok == Tok_Eof && inLbrace )
         error(ctx, inLbrace->loc.row, inLbrace->loc.col,"non-terminated block" );
     BS_END_LUA_FUNC(ctx);
