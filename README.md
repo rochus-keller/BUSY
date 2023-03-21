@@ -201,7 +201,7 @@ lua build.lua ../LeanQt -P target_toolchain_path=//home/me/toolchain/bin -P HAVE
 Building BUSY is really simple:
 
 1) Open a terminal and set current directory to the BUSY source code directory
-2) Run `cc *.c -O2 -lm -O2 -o lua` or `cl /O2 /MD /Fe:lua.exe *.c` depending on whether you are on a Unix or Windows machine
+2) Run `cc *.c -O2 -lm -o lua` or `cl /O2 /MD /Fe:lua.exe *.c` depending on whether you are on a Unix or Windows machine
 3) Wait a few seconds; the result is a Lua executable with BUSY integrated.
 
 ## Additional Credits
