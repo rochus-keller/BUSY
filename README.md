@@ -6,7 +6,7 @@ BUSY (for *BU*ild *SY*stem) is a lean, cross-platform build system for the GCC, 
 
 Compared to other build systems like CMake, QMake, Meson or GN, BUSY is characterized by a **statically typed** build specification language, and by the possibility to build a project directly from scratch without any further requirements to the host system; BUSY is so lean that it is even suited to be directly integrated with the source tree of a project. 
 
-Here is an **example project** using BUSY: https://github.com/rochus-keller/nappgui/. NAppGUI is an extensive cross-platform GUI library written in C89 (with parts in C++99 and Objective-C) by Francisco García. See the README on how to build the project and check the BUSY files in the root and the src directory (and subdirectories). See below and in the syntax directory for more information about the specification language. Those who know GN will recognize various concepts in BUSY.
+Here is an **example project** using BUSY: https://github.com/rochus-keller/nappgui/. NAppGUI is an extensive cross-platform GUI library written in C89 (with parts in C++98 and Objective-C) by Francisco García. See the README on how to build the project and check the BUSY files in the root and the src directory (and subdirectories). See below and in the syntax directory for more information about the specification language. Those who know GN will recognize various concepts in BUSY.
 
 Here are a few excerpts for convenience:
 
@@ -92,6 +92,8 @@ end
 Another, a more complex example using BUSY is the [Oberon+ compiler and IDE](https://github.com/rochus-keller/Oberon); see https://github.com/rochus-keller/LeanQt/blob/main/Readme.md on how to run the build. It also demonstrates the special support of BUSY for the Qt moc and rcc tools. 
 
 BUSY is based on and integrated with the Lua virtual machine (but it is written in C89, not in Lua). Lua is by far one of the easiest to build code bases on all platforms; the only requirement is a C89 compiler; BUSY follows this tradition and benefits from the great work of the Lua authors.
+
+If you're looking for a powerful C/C++ IDE fully integrated with BUSY and supporting multi-core builds, check out [LeanCreator](https://github.com/rochus-keller/LeanCreator/).
 
 ### Why yet another build system?
 
