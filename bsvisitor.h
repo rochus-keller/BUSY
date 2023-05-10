@@ -26,6 +26,7 @@
 
 typedef struct BSVisitorCtx {
     void* d_data;
+    void* d_loggerData;
     BSLogger d_log;
     BSBeginOp d_begin;
     BSOpParam d_param;

@@ -639,6 +639,7 @@ static int bs_generate (lua_State *L)
             BSVisitorCtx* ctx = bs_newctx(L);
             ctx->d_data = 0;
             ctx->d_log = 0;
+            ctx->d_loggerData = 0;
             ctx->d_end = 0;
             ctx->d_begin = Test_BSBeginOp;
             ctx->d_param = Test_BSOpParam;

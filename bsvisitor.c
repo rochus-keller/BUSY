@@ -1569,15 +1569,15 @@ static void message(lua_State* L,BSVisitorCtx* ctx, int precheck)
     lua_getfield(L,PRODINST,"text");
     if( strcmp(lua_tostring(L,msg_type),"error") == 0 )
     {
-        ctx->d_log(BS_Error, ctx->d_data, label, loc, lua_tostring(L,-1), args);
+        ctx->d_log(BS_Error, ctx->d_loggerData, label, loc, lua_tostring(L,-1), args);
         lua_pushnil(L);
         lua_error(L);
     }else if( strcmp(lua_tostring(L,msg_type),"warning") == 0 && !precheck )
     {
-        ctx->d_log(BS_Warning, ctx->d_data, label, loc, lua_tostring(L,-1), args);
+        ctx->d_log(BS_Warning, ctx->d_loggerData, label, loc, lua_tostring(L,-1), args);
     }else if( !precheck )
     {
-        ctx->d_log(BS_Message, ctx->d_data, label, loc, lua_tostring(L,-1), args);
+        ctx->d_log(BS_Message, ctx->d_loggerData, label, loc, lua_tostring(L,-1), args);
     }
     lua_pop(L,2); // msg_type, text
 
@@ -1597,7 +1597,10 @@ int bs_visit(lua_State* L)
     BSVisitorCtx* ctx = (BSVisitorCtx*)lua_topointer(L,CTX);
 
     if( ctx->d_log == 0 )
+    {
         ctx->d_log = bs_defaultLogger;
+        ctx->d_loggerData = 0;
+    }
 
     lua_getmetatable(L,PRODINST);
     const int cls = lua_gettop(L);
