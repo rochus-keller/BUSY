@@ -142,7 +142,7 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
       }
       case 'p': {
         char buff[4*sizeof(void *) + 8]; /* should be enough space for a `%p' */
-        sprintf(buff, "%p", va_arg(argp, void *));
+        snprintf(buff, sizeof(buff), "%p", va_arg(argp, void *));
         pushstr(L, buff);
         break;
       }
@@ -181,8 +181,7 @@ const char *luaO_pushfstring (lua_State *L, const char *fmt, ...) {
 
 void luaO_chunkid (char *out, const char *source, size_t bufflen) {
   if (*source == '=') {
-    strncpy(out, source+1, bufflen);  /* remove first char */
-    out[bufflen-1] = '\0';  /* ensures null termination */
+    snprintf(out, bufflen, "%s", source+1);  /* remove first char */
   }
   else {  /* out = "source", or "...source" */
     if (*source == '@') {
@@ -190,25 +189,26 @@ void luaO_chunkid (char *out, const char *source, size_t bufflen) {
       source++;  /* skip the `@' */
       bufflen -= sizeof(" '...' ");
       l = strlen(source);
-      strcpy(out, "");
       if (l > bufflen) {
         source += (l-bufflen);  /* get last part of file name */
-        strcat(out, "...");
+        snprintf(out, bufflen + sizeof(" '...' "), "...%s", source);
       }
-      strcat(out, source);
+      else {
+        snprintf(out, bufflen + sizeof(" '...' "), "%s", source);
+      }
     }
     else {  /* out = [string "string"] */
       size_t len = strcspn(source, "\n\r");  /* stop at first newline */
       bufflen -= sizeof(" [string \"...\"] ");
       if (len > bufflen) len = bufflen;
-      strcpy(out, "[string \"");
       if (source[len] != '\0') {  /* must truncate? */
-        strncat(out, source, len);
-        strcat(out, "...");
+        snprintf(out, bufflen + sizeof(" [string \"...\"] "),
+                 "[string \"%.*s...\"]", (int)len, source);
       }
-      else
-        strcat(out, source);
-      strcat(out, "\"]");
+      else {
+        snprintf(out, bufflen + sizeof(" [string \"...\"] "),
+                 "[string \"%s\"]", source);
+      }
     }
   }
 }
