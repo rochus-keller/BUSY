@@ -20,7 +20,7 @@ me@rochus-keller.ch
 
 == Introduction
 
-BUSY (for _BU_ild _SY_stem) is a lean, cross-platform build system for the GCC, Clang and MSVC toolchains. It requires only a C89 compiler to bootstrap and produces a single small binary. Compared to CMake, QMake, Meson or GN, BUSY is characterized by a statically typed build specification language and the ability to build a project directly from scratch without any further requirements on the host system.
+BUSY (for __BU__ild __SY__stem) is a lean, cross-platform build system for the GCC, Clang and MSVC toolchains. It requires only a C89 compiler to bootstrap and produces a single small binary. Compared to CMake, QMake, Meson or GN, BUSY is characterized by a statically typed build specification language and the ability to build a project directly from scratch without any further requirements on the host system.
 
 BUSY is based on and integrated with the Lua virtual machine (written in C89, not in Lua). Lua is one of the easiest code bases to build on all platforms; the only requirement is a C89 compiler. BUSY follows this tradition and benefits from the great work of the Lua authors.
 

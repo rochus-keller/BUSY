@@ -193,6 +193,7 @@ typedef struct NinjaCtx {
     DynBuf args;       /* script arguments */
     DynBuf name;       /* rcc resource name */
     DynBuf mocargs;    /* extra moc arguments (e.g. -p/-b private header) */
+    DynBuf depfiles;   /* output files of dependency products (implicit deps) */
     StrSet emitted;    /* build outputs already written, for deduplication */
 } NinjaCtx;
 
@@ -217,6 +218,7 @@ static void ctx_init(NinjaCtx* ctx)
     db_init(&ctx->args);
     db_init(&ctx->name);
     db_init(&ctx->mocargs);
+    db_init(&ctx->depfiles);
     strset_init(&ctx->emitted);
 }
 
@@ -237,6 +239,7 @@ static void ctx_free(NinjaCtx* ctx)
     db_free(&ctx->args);
     db_free(&ctx->name);
     db_free(&ctx->mocargs);
+    db_free(&ctx->depfiles);
     strset_free(&ctx->emitted);
 }
 
@@ -257,6 +260,7 @@ static void ctx_clear(NinjaCtx* ctx)
     db_clear(&ctx->args);
     db_clear(&ctx->name);
     db_clear(&ctx->mocargs);
+    db_clear(&ctx->depfiles);
 }
 
 
@@ -291,7 +295,8 @@ static void ninja_param(BSBuildParam p, const char* value, void* data)
         db_append_escaped(&ctx->infiles, value);
         break;
     case BS_outfile:
-        db_clear(&ctx->outfile);
+        if( ctx->outfile.len > 0 )
+            db_append(&ctx->outfile, " ");
         db_append_escaped(&ctx->outfile, value);
         break;
     case BS_cflag:
@@ -307,7 +312,15 @@ static void ninja_param(BSBuildParam p, const char* value, void* data)
         }else
         {
             db_append(&ctx->defines, "-D");
-            db_append(&ctx->defines, value);
+            if( strstr(value,"\\\"") != NULL )
+            {
+                /* strings can potentially include whitespace or shell
+                   metacharacters, thus quotes (same convention as bsrunner) */
+                db_append(&ctx->defines, "\"");
+                db_append(&ctx->defines, value);
+                db_append(&ctx->defines, "\"");
+            }else
+                db_append(&ctx->defines, value);
         }
         break;
     case BS_include_dir:
@@ -323,6 +336,11 @@ static void ninja_param(BSBuildParam p, const char* value, void* data)
             db_append(&ctx->includes, value);
             db_append(&ctx->includes, "\"");
         }
+        break;
+    case BS_depfile:
+        if( ctx->depfiles.len > 0 )
+            db_append(&ctx->depfiles, " ");
+        db_append_escaped(&ctx->depfiles, value);
         break;
     case BS_ldflag:
         db_append(&ctx->ldflags, " ");
@@ -541,18 +559,33 @@ static void write_lua(NinjaCtx* ctx)
 {
     FILE* out = ctx->out;
 
+    /* dependency products become implicit deps (rebuild on change, but not
+       part of $in so the script path stays addressable via $luascript) */
+    DynBuf deps;
+    db_init(&deps);
+    if( ctx->depfiles.len > 0 )
+    {
+        db_append(&deps, " | ");
+        db_append(&deps, db_str(&ctx->depfiles));
+    }
+
     if( ctx->outfile.len > 0 )
     {
-        fprintf(out, "build %s: run_lua %s\n",
+        fprintf(out, "build %s: run_lua %s%s\n",
                 db_str(&ctx->outfile),
-                db_str(&ctx->infiles));
+                db_str(&ctx->infiles),
+                db_str(&deps));
     }else
     {
-        fprintf(out, "build %s.stamp: run_lua %s\n",
+        /* a script without declared outputs produces its stamp file instead */
+        fprintf(out, "build %s.stamp: run_lua_stamp %s%s\n",
                 db_str(&ctx->infiles),
-                db_str(&ctx->infiles));
+                db_str(&ctx->infiles),
+                db_str(&deps));
     }
+    db_free(&deps);
     fprintf(out, "  luacmd = %s\n", db_str(&ctx->command));
+    fprintf(out, "  luascript = %s\n", db_str(&ctx->infiles));
     if( ctx->args.len > 0 )
         fprintf(out, "  luaargs =%s\n", db_str(&ctx->args));
 }
@@ -693,7 +726,10 @@ static void write_rules(FILE* out, int toolchain, int os)
 
     /* lua script */
     fprintf(out, "rule run_lua\n");
-    fprintf(out, "  command = $luacmd \"$in\" $luaargs\n");
+    fprintf(out, "  command = $luacmd \"$luascript\" $luaargs\n");
+    fprintf(out, "  description = LUA $out\n\n");
+    fprintf(out, "rule run_lua_stamp\n");
+    fprintf(out, "  command = $luacmd \"$luascript\" $luaargs && touch \"$out\"\n");
     fprintf(out, "  description = LUA $out\n\n");
 }
 

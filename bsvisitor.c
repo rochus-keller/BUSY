@@ -987,6 +987,63 @@ static BSPathStatus apply_arg_expansion(lua_State* L,int inst, int builtins, con
     return BS_OK;
 }
 
+static void emitoutfiles(lua_State* L, BSVisitorCtx* ctx, int out)
+{
+    const int top = lua_gettop(L); // 'out' indexes the current stack top
+
+    const int n = lua_objlen(L,out);
+    int i;
+    for( i = 1; i <= n; i++ )
+    {
+        lua_rawgeti(L,out,i);
+        const int item = lua_gettop(L);
+        if( lua_istable(L,item) )
+            emitoutfiles(L,ctx,item);
+        else if( lua_isstring(L,item) )
+            ctx->d_param(BS_depfile, bs_denormalize_path(lua_tostring(L,item)), ctx->d_data);
+        lua_pop(L,1); // item
+    }
+
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+}
+
+static void emitdepfiles(lua_State* L, BSVisitorCtx* ctx, int builtins, int dep)
+{
+    const int top = lua_gettop(L);
+    int emitted = 0;
+
+    lua_getfield(L,dep,"#out");
+    const int out = lua_gettop(L);
+    if( lua_istable(L,out) )
+    {
+        emitted = lua_objlen(L,out);
+        emitoutfiles(L,ctx,out);
+    }
+    lua_pop(L,1); // out
+
+    if( !emitted )
+    {
+        lua_getmetatable(L,dep);
+        const int cls = lua_gettop(L);
+        if( isa(L,builtins,cls,"LuaScript") || isa(L,builtins,cls,"LuaScriptForeach") )
+        {
+            bs_getModuleVar(L,dep,"#dir");
+            const int dir = lua_gettop(L);
+            lua_getfield(L,dep,"script");
+            const int script = lua_gettop(L);
+            addPath(L,dir,script); // leaves script unchanged if already absolute
+            lua_pushfstring(L,"%s.stamp", bs_denormalize_path(lua_tostring(L,-1)));
+            ctx->d_param(BS_depfile, lua_tostring(L,-1), ctx->d_data);
+            lua_pop(L,4); // stampstr, abspath, script, dir
+        }
+        lua_pop(L,1); // cls
+    }
+
+    const int bottom = lua_gettop(L);
+    assert( top == bottom );
+}
+
 static void callLua(lua_State* L, BSVisitorCtx* ctx, int builtins, int inst, int app, int script, const char* source)
 {
     const int top = lua_gettop(L);
@@ -1012,6 +1069,39 @@ static void callLua(lua_State* L, BSVisitorCtx* ctx, int builtins, int inst, int
         lua_pop(L,1); // arglist
 
         ctx->d_param(BS_infile, bs_denormalize_path(lua_tostring(L,script)), ctx->d_data);
+
+        lua_getfield(L,inst,"#out");
+        const int sout = lua_gettop(L);
+        if( lua_istable(L,sout) )
+        {
+            const int nout = lua_objlen(L,sout);
+            int i;
+            for( i = 1; i <= nout; i++ )
+            {
+                lua_rawgeti(L,sout,i);
+                if( lua_isstring(L,-1) )
+                    ctx->d_param(BS_outfile, bs_denormalize_path(lua_tostring(L,-1)), ctx->d_data);
+                lua_pop(L,1);
+            }
+        }
+        lua_pop(L,1); // sout
+
+        lua_getfield(L,inst,"deps");
+        const int deps = lua_gettop(L);
+        if( lua_istable(L,deps) )
+        {
+            const int ndeps = lua_objlen(L,deps);
+            int i;
+            for( i = 1; i <= ndeps; i++ )
+            {
+                lua_rawgeti(L,deps,i);
+                const int dep = lua_gettop(L);
+                if( lua_istable(L,dep) )
+                    emitdepfiles(L,ctx,builtins,dep);
+                lua_pop(L,1); // dep
+            }
+        }
+        lua_pop(L,1); // deps
     }
 
     if( ctx->d_end )

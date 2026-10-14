@@ -32,7 +32,7 @@ This specification was written in CrossLine (see https://github.com/rochus-kelle
 [[introduction]]
 === Introduction
 
-BUSY (for _BU_ild _SY_stem) is a lean, cross-platform build system with very little system requirements and easy bootsrapping.
+BUSY (for __BU__ild __SY__stem) is a lean, cross-platform build system with very little system requirements and easy bootsrapping.
 
 The BUSY build specifcation language features modularity, information hiding, static typing with strong type checking, immutability and garbage collection. The language is not a full programming language by intention.
 
