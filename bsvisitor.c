@@ -355,6 +355,12 @@ static void compilesources(lua_State* L, BSVisitorCtx* ctx, int builtins, int in
         case BS_clang:
             lua_pushstring(L,"clang");
             break;
+        case BS_tcc:
+            lua_pushstring(L,"tcc");
+            break;
+        case BS_slimcc:
+            lua_pushstring(L,"slimcc");
+            break;
         case BS_msvc:
             lua_pushstring(L,"cl");
             break;
@@ -411,6 +417,43 @@ static void compilesources(lua_State* L, BSVisitorCtx* ctx, int builtins, int in
             ctx->d_param(BS_outfile, bs_denormalize_path(lua_tostring(L,out)), ctx->d_data);
 
             ctx->d_param(BS_infile, bs_denormalize_path(lua_tostring(L,src)), ctx->d_data);
+
+            /* source files provided by dependency products (e.g. outputs of
+               a LuaScript codegen step, including generated headers) must
+               exist before this compile runs */
+            {
+                const int nin = lua_objlen(L,inlist);
+                int d;
+                for( d = 1; d <= nin; d++ )
+                {
+                    lua_rawgeti(L,inlist,d);
+                    const int entry = lua_gettop(L);
+                    if( lua_istable(L,entry) )
+                    {
+                        lua_getfield(L,entry,"#kind");
+                        const int kind = lua_tointeger(L,-1);
+                        lua_pop(L,1);
+                        if( kind == BS_SourceFiles )
+                        {
+                            const int ne = lua_objlen(L,entry);
+                            int e;
+                            for( e = 1; e <= ne; e++ )
+                            {
+                                lua_rawgeti(L,entry,e);
+                                if( lua_isstring(L,-1) &&
+                                    strcmp(lua_tostring(L,-1),lua_tostring(L,src)) != 0 )
+                                {
+                                    ctx->d_param(BS_depfile,
+                                        bs_denormalize_path(lua_tostring(L,-1)),
+                                        ctx->d_data);
+                                }
+                                lua_pop(L,1);
+                            }
+                        }
+                    }
+                    lua_pop(L,1); // entry
+                }
+            }
         }
 
         if( ctx->d_end )
@@ -627,11 +670,14 @@ static void link(lua_State* L, BSVisitorCtx* ctx, int builtins, int inlist, int 
     default:
         break;
     case BS_gcc:
+    case BS_tcc:
+    case BS_slimcc:
         switch(resKind)
         {
         case BS_Executable:
         case BS_DynamicLib:
-            lua_pushstring(L, "gcc");
+            lua_pushstring(L, toolchain == BS_gcc ? "gcc" :
+                              toolchain == BS_tcc ? "tcc" : "slimcc");
             break;
         case BS_StaticLib:
             lua_pushstring(L, "ar");
@@ -1008,6 +1054,30 @@ static void emitoutfiles(lua_State* L, BSVisitorCtx* ctx, int out)
     assert( top == bottom );
 }
 
+static void pushstamp(lua_State* L, int builtins, int inst, int sourceIndex)
+{
+    lua_getfield(L,builtins,"#inst");
+    lua_getfield(L,-1,"root_build_dir");
+    lua_replace(L,-2);
+    bs_getModuleVar(L,inst,"#rdir");
+    addPath(L,-2,-1);
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
+
+    lua_getfield(L,inst,"#decl");
+    calcdesig(L,-1);
+    lua_replace(L,-2);
+    if( sourceIndex )
+        lua_pushfstring(L,"./%s_%d.stamp",lua_tostring(L,-1),sourceIndex);
+    else
+        lua_pushfstring(L,"./%s.stamp",lua_tostring(L,-1));
+    addPath(L,outDir,-1);
+    lua_replace(L,-2);
+    lua_replace(L,-2);
+    lua_replace(L,outDir);
+}
+
 static void emitdepfiles(lua_State* L, BSVisitorCtx* ctx, int builtins, int dep)
 {
     const int top = lua_gettop(L);
@@ -1026,16 +1096,25 @@ static void emitdepfiles(lua_State* L, BSVisitorCtx* ctx, int builtins, int dep)
     {
         lua_getmetatable(L,dep);
         const int cls = lua_gettop(L);
-        if( isa(L,builtins,cls,"LuaScript") || isa(L,builtins,cls,"LuaScriptForeach") )
+        if( isa(L,builtins,cls,"LuaScriptForeach") )
         {
-            bs_getModuleVar(L,dep,"#dir");
-            const int dir = lua_gettop(L);
-            lua_getfield(L,dep,"script");
-            const int script = lua_gettop(L);
-            addPath(L,dir,script); // leaves script unchanged if already absolute
-            lua_pushfstring(L,"%s.stamp", bs_denormalize_path(lua_tostring(L,-1)));
-            ctx->d_param(BS_depfile, lua_tostring(L,-1), ctx->d_data);
-            lua_pop(L,4); // stampstr, abspath, script, dir
+            lua_getfield(L,dep,"sources");
+            const int sources = lua_gettop(L);
+            size_t i;
+            for( i = 1; i <= lua_objlen(L,sources); i++ )
+            {
+                pushstamp(L,builtins,dep,(int)i);
+                ctx->d_param(BS_depfile,
+                    bs_denormalize_path(lua_tostring(L,-1)), ctx->d_data);
+                lua_pop(L,1);
+            }
+            lua_pop(L,1); // sources
+        }else if( isa(L,builtins,cls,"LuaScript") )
+        {
+            pushstamp(L,builtins,dep,0);
+            ctx->d_param(BS_depfile,
+                bs_denormalize_path(lua_tostring(L,-1)), ctx->d_data);
+            lua_pop(L,1);
         }
         lua_pop(L,1); // cls
     }
@@ -1044,7 +1123,7 @@ static void emitdepfiles(lua_State* L, BSVisitorCtx* ctx, int builtins, int dep)
     assert( top == bottom );
 }
 
-static void callLua(lua_State* L, BSVisitorCtx* ctx, int builtins, int inst, int app, int script, const char* source)
+static void callLua(lua_State* L, BSVisitorCtx* ctx, int builtins, int inst, int app, int script, const char* source, int outs, int sourceIndex)
 {
     const int top = lua_gettop(L);
 
@@ -1069,22 +1148,26 @@ static void callLua(lua_State* L, BSVisitorCtx* ctx, int builtins, int inst, int
         lua_pop(L,1); // arglist
 
         ctx->d_param(BS_infile, bs_denormalize_path(lua_tostring(L,script)), ctx->d_data);
+        if( source )
+            ctx->d_param(BS_depfile, bs_denormalize_path(source), ctx->d_data);
 
-        lua_getfield(L,inst,"#out");
-        const int sout = lua_gettop(L);
-        if( lua_istable(L,sout) )
+        const int nout = outs ? lua_objlen(L,outs) : 0;
+        if( nout )
         {
-            const int nout = lua_objlen(L,sout);
             int i;
             for( i = 1; i <= nout; i++ )
             {
-                lua_rawgeti(L,sout,i);
+                lua_rawgeti(L,outs,i);
                 if( lua_isstring(L,-1) )
                     ctx->d_param(BS_outfile, bs_denormalize_path(lua_tostring(L,-1)), ctx->d_data);
                 lua_pop(L,1);
             }
+        }else
+        {
+            pushstamp(L,builtins,inst,sourceIndex);
+            ctx->d_param(BS_stampfile, bs_denormalize_path(lua_tostring(L,-1)), ctx->d_data);
+            lua_pop(L,1);
         }
-        lua_pop(L,1); // sout
 
         lua_getfield(L,inst,"deps");
         const int deps = lua_gettop(L);
@@ -1102,6 +1185,31 @@ static void callLua(lua_State* L, BSVisitorCtx* ctx, int builtins, int inst, int
             }
         }
         lua_pop(L,1); // deps
+
+        lua_getfield(L,inst,"inputs");
+        const int inputs = lua_gettop(L);
+        if( lua_istable(L,inputs) )
+        {
+            bs_getModuleVar(L,inst,"#dir");
+            const int absDir = lua_gettop(L);
+            const int ninputs = lua_objlen(L,inputs);
+            int i;
+            for( i = 1; i <= ninputs; i++ )
+            {
+                lua_rawgeti(L,inputs,i);
+                const int inpath = lua_gettop(L);
+                if( *lua_tostring(L,inpath) != '/' )
+                {
+                    addPath(L,absDir,inpath);
+                    lua_replace(L,inpath);
+                }
+                ctx->d_param(BS_depfile,
+                    bs_denormalize_path(lua_tostring(L,inpath)), ctx->d_data);
+                lua_pop(L,1); // inpath
+            }
+            lua_pop(L,1); // absDir
+        }
+        lua_pop(L,1); // inputs
     }
 
     if( ctx->d_end )
@@ -1166,7 +1274,7 @@ static void script(lua_State* L,BSVisitorCtx* ctx, int cls, int builtins)
     bs_thisapp2(L);
     const int app = lua_gettop(L);
 
-    callLua(L,ctx,builtins,PRODINST,app,script,0);
+    callLua(L,ctx,builtins,PRODINST,app,script,0,out,0);
 
     lua_pop(L,4); // out, abDir, script, app
 
@@ -1178,11 +1286,24 @@ static void runforeach(lua_State* L,BSVisitorCtx* ctx, int cls, int builtins)
 {
     const int top = lua_gettop(L);
 
-    lua_pushnil(L);
+    lua_createtable(L,0,0);
+    const int out = lua_gettop(L);
+    lua_pushinteger(L,BS_SourceFiles);
+    lua_setfield(L,out,"#kind");
+    lua_pushvalue(L,out);
     lua_setfield(L,PRODINST,"#out");
 
     bs_getModuleVar(L,PRODINST,"#dir");
     const int absDir = lua_gettop(L);
+
+    lua_getfield(L,builtins,"#inst");
+    lua_getfield(L,-1,"root_build_dir");
+    lua_replace(L,-2);
+    bs_getModuleVar(L,PRODINST,"#rdir");
+    addPath(L,-2,-1);
+    lua_replace(L,-3);
+    lua_pop(L,1);
+    const int outDir = lua_gettop(L);
 
     lua_getfield(L,PRODINST,"script");
     const int script = lua_gettop(L);
@@ -1199,6 +1320,8 @@ static void runforeach(lua_State* L,BSVisitorCtx* ctx, int cls, int builtins)
     size_t i;
     lua_getfield(L,PRODINST,"sources");
     const int sources = lua_gettop(L);
+    lua_getfield(L,PRODINST,"outputs");
+    const int outputs = lua_gettop(L);
     if( ctx->d_fork )
         ctx->d_fork( lua_objlen(L,sources), ctx->d_data );
     for( i = 1; i <= lua_objlen(L,sources); i++ )
@@ -1211,14 +1334,37 @@ static void runforeach(lua_State* L,BSVisitorCtx* ctx, int cls, int builtins)
             lua_replace(L,source);
         }
 
-        callLua(L,ctx, builtins,PRODINST,app,script,lua_tostring(L,source));
+        lua_createtable(L,0,0);
+        const int edgeouts = lua_gettop(L);
+        size_t j;
+        for( j = 1; j <= lua_objlen(L,outputs); j++ )
+        {
+            lua_rawgeti(L,outputs,j);
+            const int path = lua_gettop(L);
+            if( apply_arg_expansion(L,PRODINST,builtins,lua_tostring(L,source),lua_tostring(L,path)) != BS_OK )
+                luaL_error(L,"cannot do source expansion, invalid placeholders in path: %s", lua_tostring(L,path));
+            lua_replace(L,path);
+            if( *lua_tostring(L,path) == '/' )
+                luaL_error(L,"the 'outputs' field requires relative paths");
+            addPath(L,outDir,path);
+            lua_replace(L,path);
 
+            lua_pushvalue(L,path);
+            lua_rawseti(L,edgeouts,lua_objlen(L,edgeouts)+1);
+            lua_pushvalue(L,path);
+            lua_rawseti(L,out,lua_objlen(L,out)+1);
+            lua_pop(L,1); // path
+        }
+
+        callLua(L,ctx,builtins,PRODINST,app,script,lua_tostring(L,source),edgeouts,(int)i);
+
+        lua_pop(L,1); // edgeouts
         lua_pop(L,1); // source
     }
     if( ctx->d_fork )
         ctx->d_fork( -1, ctx->d_data );
 
-    lua_pop(L,4); // abDir, script, app, sources
+    lua_pop(L,7); // out, absDir, script, app, sources, outDir, outputs
     const int bottom = lua_gettop(L);
     assert( top == bottom );
 }

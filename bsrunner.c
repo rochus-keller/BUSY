@@ -135,6 +135,10 @@ int bs_guessLang(const char* name)
         return BS_c;
     if( strcmp(p,".h") == 0 )
         return BS_header;
+    if( strcmp(p,".def") == 0 )
+        return BS_header;
+    if( strcmp(p,".inc") == 0 )
+        return BS_header;
     if( strcmp(p,".cc") == 0 )
         return BS_cc;
     if( strcmp(p,".hh") == 0 )
@@ -309,6 +313,10 @@ BSToolchain bs_getToolchain(lua_State* L, int builtinsInst, int to_host)
         toolchain = BS_gcc;
     else if( strcmp(lua_tostring(L,-1),"clang") == 0 )
         toolchain = BS_clang;
+    else if( strcmp(lua_tostring(L,-1),"tcc") == 0 )
+        toolchain = BS_tcc;
+    else if( strcmp(lua_tostring(L,-1),"slimcc") == 0 )
+        toolchain = BS_slimcc;
     else
         luaL_error(L,"toolchain not supported: %s",lua_tostring(L,-1) );
     lua_pop(L,1);

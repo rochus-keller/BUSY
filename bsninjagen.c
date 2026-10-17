@@ -178,6 +178,7 @@ typedef struct NinjaCtx {
     BSBuildOperation op;
     int toolchain;
     int os;
+    int is_stampfile;
     DynBuf command;    /* the tool command (gcc, ar, moc, etc.) */
     DynBuf infiles;    /* space-separated escaped input files for build line */
     DynBuf outfile;    /* escaped output file for build line */
@@ -203,6 +204,7 @@ static void ctx_init(NinjaCtx* ctx)
     ctx->op = BS_Compile;
     ctx->toolchain = 0;
     ctx->os = 0;
+    ctx->is_stampfile = 0;
     db_init(&ctx->command);
     db_init(&ctx->infiles);
     db_init(&ctx->outfile);
@@ -246,6 +248,7 @@ static void ctx_free(NinjaCtx* ctx)
 static void ctx_clear(NinjaCtx* ctx)
 {
     db_clear(&ctx->command);
+    ctx->is_stampfile = 0;
     db_clear(&ctx->infiles);
     db_clear(&ctx->outfile);
     db_clear(&ctx->cflags);
@@ -298,6 +301,12 @@ static void ninja_param(BSBuildParam p, const char* value, void* data)
         if( ctx->outfile.len > 0 )
             db_append(&ctx->outfile, " ");
         db_append_escaped(&ctx->outfile, value);
+        break;
+    case BS_stampfile:
+        if( ctx->outfile.len > 0 )
+            db_append(&ctx->outfile, " ");
+        db_append_escaped(&ctx->outfile, value);
+        ctx->is_stampfile = 1;
         break;
     case BS_cflag:
         db_append(&ctx->cflags, " ");
@@ -410,11 +419,27 @@ static void write_compile(NinjaCtx* ctx)
     FILE* out = ctx->out;
     const int ismsvc = (ctx->toolchain == BS_msvc);
 
-    fprintf(out, "build %s: %s %s\n",
+    /* dep-provided source files become order-only deps: the files must exist
+       before the first compile, while later changes propagate via the .d depfile */
+    DynBuf deps;
+    db_init(&deps);
+    if( ctx->depfiles.len > 0 )
+    {
+        db_append(&deps, " || ");
+        db_append(&deps, db_str(&ctx->depfiles));
+    }
+
+    fprintf(out, "build %s: %s %s%s\n",
             db_str(&ctx->outfile),
             ismsvc ? "cc_msvc" : "cc_gcc",
-            db_str(&ctx->infiles));
+            db_str(&ctx->infiles),
+            db_str(&deps));
+    db_free(&deps);
     fprintf(out, "  cc = %s\n", db_str(&ctx->command));
+    /* tcc 0.9.x knows -MD/-MF but not -MMD.  Note $out.d must appear in
+       the rule's command directly */
+    fprintf(out, "  depopt = %s\n",
+            ctx->toolchain == BS_tcc ? "-MD" : "-MMD");
     fprintf(out, "  cflags =%s%s%s\n",
             db_str(&ctx->cflags),
             db_str(&ctx->defines),
@@ -569,20 +594,11 @@ static void write_lua(NinjaCtx* ctx)
         db_append(&deps, db_str(&ctx->depfiles));
     }
 
-    if( ctx->outfile.len > 0 )
-    {
-        fprintf(out, "build %s: run_lua %s%s\n",
-                db_str(&ctx->outfile),
-                db_str(&ctx->infiles),
-                db_str(&deps));
-    }else
-    {
-        /* a script without declared outputs produces its stamp file instead */
-        fprintf(out, "build %s.stamp: run_lua_stamp %s%s\n",
-                db_str(&ctx->infiles),
-                db_str(&ctx->infiles),
-                db_str(&deps));
-    }
+    fprintf(out, "build %s: %s %s%s\n",
+            db_str(&ctx->outfile),
+            ctx->is_stampfile ? "run_lua_stamp" : "run_lua",
+            db_str(&ctx->infiles),
+            db_str(&deps));
     db_free(&deps);
     fprintf(out, "  luacmd = %s\n", db_str(&ctx->command));
     fprintf(out, "  luascript = %s\n", db_str(&ctx->infiles));
@@ -645,7 +661,7 @@ static void write_rules(FILE* out, int toolchain, int os)
     fprintf(out, "rule cc_gcc\n");
     fprintf(out, "  depfile = $out.d\n");
     fprintf(out, "  deps = gcc\n");
-    fprintf(out, "  command = $cc -c $cflags -o \"$out\" \"$in\" -MMD -MF \"$out.d\"\n");
+    fprintf(out, "  command = $cc -c $cflags -o \"$out\" \"$in\" $depopt -MF \"$out.d\"\n");
     fprintf(out, "  description = CC $out\n\n");
 
     /* MSVC compile rule with /showIncludes tracking */

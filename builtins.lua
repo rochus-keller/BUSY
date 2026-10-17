@@ -97,6 +97,8 @@ enumtype("CompilerType")
 	enumitem("gcc")
 	--enumitem("intel")
 	enumitem("clang")
+	enumitem("tcc")
+	enumitem("slimcc")
 	
 enumtype("WordSize")
 	enumitem("16")
@@ -204,7 +206,8 @@ class("Action", globals.Product)
 
 class("Script", globals.Action)
 	field("args", listOf(globals.string))
-	--field("inputs", listOf(globals.Product))
+	-- additional input files the script consumes (tracked as deps)
+	field("inputs", listOf(globals.path))
 	field("script", globals.path)
 	--field("data", listOf(globals.path))
 	field("outputs", listOf(globals.path))
@@ -310,10 +313,14 @@ inst["#ctdefaults"] = {} -- a table with optional entries CompilerType->Config
 local optimized = {}
 optimized["gcc"] = { ["cflags"] = { "-O2" } }
 optimized["clang"] = optimized["gcc"]
+optimized["tcc"] = optimized["gcc"]
+optimized["slimcc"] = optimized["gcc"]
 optimized["msvc"] = { ["cflags"] = { "/O2", "/MD" } }
 local debug = {}
 debug["gcc"] = { ["cflags"] = { "-g" } }
 debug["clang"] = debug["gcc"]
+debug["tcc"] = debug["gcc"]
+debug["slimcc"] = debug["gcc"]
 debug["msvc"] = { ["cflags"] = { "/Zi", "-MDd", "-Fddebug", "/FS" }, -- creates debug.mdb in the current directory; /FS for multithreaded write to pdb
 				  ["ldflags"] = { "/DEBUG" } } 
 if _G["#build_mode"] ~= nil then -- to be preset by IDE

@@ -47,6 +47,7 @@ typedef enum BSBuildParam { BS_infile, BS_outfile,
                             BS_defFile, BS_name, BS_arg,
                             BS_moc_arg, /* extra moc argument token (e.g. -p, a dir, -b, a header) */
                             BS_depfile, /* output file of a dependency product, e.g. for a LuaScript edge */
+                            BS_stampfile,
                           } BSBuildParam;
 
 // toolchain : BSToolchain

@@ -12,7 +12,7 @@
 
 === Version
 
-2026-07-16
+2026-10-17
 
 === Author
 
@@ -20,7 +20,8 @@ me@rochus-keller.ch
 
 == Introduction
 
-BUSY (for __BU__ild __SY__stem) is a lean, cross-platform build system for the GCC, Clang and MSVC toolchains. It requires only a C89 compiler to bootstrap and produces a single small binary. Compared to CMake, QMake, Meson or GN, BUSY is characterized by a statically typed build specification language and the ability to build a project directly from scratch without any further requirements on the host system.
+BUSY (for __BU__ild __SY__stem) is a lean, cross-platform build system for the GCC, Clang and MSVC toolchains (TinyCC and slimcc are supported as GCC-compatible bootstrap compilers).
+It requires only a C89 compiler to bootstrap and produces a single small binary. Compared to CMake, QMake, Meson or GN, BUSY is characterized by a statically typed build specification language and the ability to build a project directly from scratch without any further requirements on the host system.
 
 BUSY is based on and integrated with the Lua virtual machine (written in C89, not in Lua). Lua is one of the easiest code bases to build on all platforms; the only requirement is a C89 compiler. BUSY follows this tradition and benefits from the great work of the Lua authors.
 
@@ -715,6 +716,17 @@ let generate : LuaScript {
 }
 ....
 
+Generated headers listed in `.outputs` are created before any product depending on `generate` is compiled. Files the script reads in addition to its arguments are listed in `.inputs`, so that the script is run again when they change:
+
+....
+let tables : LuaScript {
+    .script = ./gentables.lua
+    .inputs += [ ./tables.def ./opcodes.txt ]
+    .args += [ abspath(./tables.def) "{{current_build_dir}}/tables.h" ]
+    .outputs += [ ./tables.h ]
+}
+....
+
 *LuaScriptForeach* runs a script once per source file:
 
 ....
@@ -1004,9 +1016,9 @@ The Ninja backend handles all BUSY product types and toolchains:
 |===
 |Product type |Ninja rule |Description
 
-|Compile (GCC/Clang)
+|Compile (GCC/Clang/TinyCC/slimcc)
 |`cc_gcc`
-|Compilation with depfile tracking (`-MMD -MF`)
+|Compilation with depfile tracking (`-MMD -MF`, `-MD -MF` for TinyCC)
 
 |Compile (MSVC)
 |`cc_msvc`
@@ -1041,11 +1053,12 @@ The Ninja backend handles all BUSY product types and toolchains:
 |Copies files to the output directory
 
 |Lua script
-|`run_lua`
-|Executes a Lua script as a build step
+|`run_lua`, `run_lua_stamp`
+|Executes a Lua script as a build step; reruns when the script, its `inputs` or the outputs of its dependencies change; a script without outputs gets a stamp file in the build directory
 |===
 
-All three toolchains (GCC, Clang, MSVC) and all supported platforms (Linux, macOS, Windows) are handled with correct flag syntax, library naming conventions (`lib` prefix on Unix, `.lib` / `.dll` on Windows), and shared library flags (`-shared`, `-dynamiclib`, `/dll`).
+All toolchains (GCC, Clang, MSVC, TinyCC, slimcc) and all supported platforms (Linux, macOS, Windows) are handled with correct flag syntax,
+library naming conventions (`lib` prefix on Unix, `.lib` / `.dll` on Windows), and shared library flags (`-shared`, `-dynamiclib`, `/dll`).
 
 === When to Use Ninja vs. Direct Build
 

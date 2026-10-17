@@ -1053,6 +1053,14 @@
 #    error "Compiler not supported"
 #  endif
 
+#elif defined(__slimcc__)
+/* slimcc (chibicc-derived C compiler); plain C, no extensions needed */
+#  define Q_CC_SLIMCC
+
+#elif defined(__TINYC__)
+/* TinyCC */
+#  define Q_CC_TINYC
+
 #else
 #  error "Qt has not been tested with this compiler - see http://www.qt-project.org/"
 #endif

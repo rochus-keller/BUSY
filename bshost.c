@@ -503,6 +503,11 @@ BSCompiler bs_host_compiler()
 #elif defined(Q_CC_CLANG)
     res.name = "clang";   // - C++ front-end for the LLVM compiler
     res.ver = Q_CC_CLANG;
+#elif defined(__slimcc__)
+    res.name = "slimcc";
+#elif defined(__TINYC__)
+    res.name = "tcc";
+    res.ver = __TINYC__;
 #elif defined(Q_CC_GNU)
     res.name = "gcc";   // - GNU C++
     res.ver = Q_CC_GNU;
