@@ -12,7 +12,7 @@
 
 === Version
 
-2026-10-17
+2026-10-20
 
 === Author
 
@@ -931,6 +931,7 @@ cmake --build build
 BUSY can build projects directly without any external build tool. For iterative development, however, incremental builds via Ninja can be faster, since Ninja uses fine-grained file-level dependency tracking (compiler depfiles) to recompile only what changed.
 
 The Ninja backend generates a `build.ninja` file in the output directory. You then use the `ninja` command to run the actual build.
+For each product, Ninja emits a phony target, and that product's dependencies are order-only prerequisites of all its build edges.
 
 === Generating Ninja Files
 
@@ -1019,6 +1020,10 @@ The Ninja backend handles all BUSY product types and toolchains:
 |Compile (GCC/Clang/TinyCC/slimcc)
 |`cc_gcc`
 |Compilation with depfile tracking (`-MMD -MF`, `-MD -MF` for TinyCC)
+
+|Assembler sources (`.s`, `.S`)
+|`cc_gcc`
+|Compiled with GCC-compatible compiler drivers; `.S` sources are preprocessed
 
 |Compile (MSVC)
 |`cc_msvc`
@@ -1165,6 +1170,7 @@ Consequently:
 The CMake backend is build-oriented and deliberately minimal. Current limitations:
 
 * *Single-platform snapshot.* Like the QMake and Ninja backends, the generator runs after BUSY's analysis phase, so all `if target_os == ...` / `if target_toolchain == ...` conditionals are already resolved. The generated `CMakeLists.txt` therefore reflects *the platform and toolchain it was generated on* and is not itself cross-platform. Generate it on (or for) each target platform you need.
+* *Assembler sources.* The generated `project()` enables `C` and `CXX` but not `ASM`, so `.s` and `.S` inputs are not supported.
 * *No install/package export.* No `install()` rules and no `find_package`-compatible `XConfig.cmake`/`XTargets.cmake` are generated. Consumption is via `add_subdirectory`, not `find_package`.
 * *`Copy` targets copy built artifacts only.* The `Copy` class is translated using `${CMAKE_COMMAND} -E copy_if_different` (no Python or external tool required), driven by the product's `use_deps` filter and `outputs` patterns. For a dependency that produces a build artifact (executable, library, object set) the copy source is `$<TARGET_FILE:...>`, which also establishes the build-ordering dependency; this covers the tool-copy case (LeanQt's `copy_moc`/`copy_rcc`/`copy_uic`) that the moc/rcc/uic steps rely on (see <<qt-tools,Qt Tools>>). Copying arbitrary non-target source files listed directly in a `Copy` product's `sources` is not translated.
 * *Single generated file.* The whole project is emitted as one `CMakeLists.txt` at the source root rather than a hierarchy of `add_subdirectory` files.

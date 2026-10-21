@@ -135,10 +135,16 @@ int bs_guessLang(const char* name)
         return BS_c;
     if( strcmp(p,".h") == 0 )
         return BS_header;
+    if( strcmp(p,".moc") == 0 )
+        return BS_header;
     if( strcmp(p,".def") == 0 )
         return BS_header;
     if( strcmp(p,".inc") == 0 )
         return BS_header;
+    if( strcmp(p,".s") == 0 )
+        return BS_asm;
+    if( strcmp(p,".S") == 0 )
+        return BS_asm;
     if( strcmp(p,".cc") == 0 )
         return BS_cc;
     if( strcmp(p,".hh") == 0 )
@@ -494,6 +500,8 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             lua_pop(L,1);
             continue;
         }
+        if( toolchain == BS_msvc && lang == BS_asm )
+            luaL_error(L,"assembler sources are not supported with the msvc toolchain: %s",lua_tostring(L,file));
 
 #if 0
         FILE* tmp = fopen("files.txt","a");
@@ -551,6 +559,12 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             case BS_clang:
                 lua_pushstring(L,"clang");
                 break;
+            case BS_tcc:
+                lua_pushstring(L,"tcc");
+                break;
+            case BS_slimcc:
+                lua_pushstring(L,"slimcc");
+                break;
             case BS_msvc:
                 lua_pushstring(L,"cl");
                 break;
@@ -588,6 +602,8 @@ static void compilesources(lua_State* L, int inst, int builtins, int inlist)
             {
             case BS_gcc:
             case BS_clang:
+            case BS_tcc:
+            case BS_slimcc:
                 lua_pushstring(L," -c -o ");
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,out) ) );
                 lua_pushfstring(L,"\"%s\" ", bs_denormalize_path(lua_tostring(L,src) ) );
@@ -988,11 +1004,14 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     switch(toolchain)
     {
     case BS_gcc:
+    case BS_tcc:
+    case BS_slimcc:
         switch(resKind)
         {
         case BS_Executable:
         case BS_DynamicLib:
-            lua_pushstring(L, "gcc");
+            lua_pushstring(L, toolchain == BS_gcc ? "gcc" :
+                              toolchain == BS_tcc ? "tcc" : "slimcc");
             break;
         case BS_StaticLib:
             lua_pushstring(L, "ar");
@@ -1034,6 +1053,8 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     switch(toolchain)
     {
     case BS_gcc:
+    case BS_tcc:
+    case BS_slimcc:
         // TODO: since we always use gcc (not g++ and the like) additional flags and libs might be needed
         // see https://stackoverflow.com/questions/172587/what-is-the-difference-between-g-and-gcc
         // g++ on link time is equivalent to gcc -lstdc++ -shared-libgcc
@@ -1183,7 +1204,7 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     {
         fprintf(stdout,"%s\n", lua_tostring(L,cmd));
         fflush(stdout);
-        if( runcmd(L,lua_tostring(L,cmd)) != 0 ) // works for all gcc, clang and cl
+        if( runcmd(L,lua_tostring(L,cmd)) != 0 )
         {
             // stderr was already written to the console
             lua_pushnil(L);

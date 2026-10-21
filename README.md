@@ -131,7 +131,7 @@ With the `-M` option one of the build modes `optimized`, `nonoptimized` or `debu
 
 With the `-c` option only the parser/analyzer is run to check the BUSY files. No build is run, no files or directories are generated.
 
-With the `-G` option you can tell BUSY to generate code for another build system. Currently the option `-G qmake` is supported to generate the project files required to use QtCreator with the project. In a future version of BUSY, other backends like `-G ninja` will be supported. If no `-G` option is provided, BUSY just runs the build itself.
+With the `-G` option you can tell BUSY to generate code for another build system. Currently the option `-G qmake` is supported to generate the project files required to use QtCreator with the project; also `-G ninja` and `-G cmake` are supported (see the users guide for more information). If no `-G` option is provided, BUSY just runs the build itself.
 
 ### Specifying builds
 
@@ -156,7 +156,7 @@ type Config* = class {
 		/* and so on */
 		configs: Config[] 
 	}
-``` 
+```
 
 There is also a class hierarchy; e.g. the classes `Executable`, `Library` and `SourceSet` are all subclasses of `Product`, which has a field `deps: Product[]` to represent build time dependencies between products (i.e. targets). Note that this is all regular syntax which can be used in any BUSY file; there are no magic classes (like e.g. in Meson) which are somehow defined behind the curtains in another language. 
 
@@ -178,7 +178,7 @@ The current BUSY version is feature complete for the use with [LeanQt](https://g
 - [x] QMake backend (tested with LeanQt on Linux, Windows and Mac with QtCreator 3 and 4)
 - [x] Tutorials
 - [x] Implement Ninja backend
-- [ ] Implement CMake backend
+- [x] Implement CMake backend
 
 NOTE:
 

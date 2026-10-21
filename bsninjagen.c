@@ -52,6 +52,8 @@ static void db_free(DynBuf* b)
 static void db_clear(DynBuf* b)
 {
     b->len = 0;
+    if( b->data )
+        b->data[0] = 0;
 }
 
 static void db_append(DynBuf* b, const char* s)
@@ -196,6 +198,12 @@ typedef struct NinjaCtx {
     DynBuf mocargs;    /* extra moc arguments (e.g. -p/-b private header) */
     DynBuf depfiles;   /* output files of dependency products (implicit deps) */
     StrSet emitted;    /* build outputs already written, for deduplication */
+    StrSet product_phonies;
+    StrSet product_deps_seen;
+    DynBuf product_id;
+    DynBuf product_deps;
+    DynBuf product_outputs;
+    int product_active;
 } NinjaCtx;
 
 static void ctx_init(NinjaCtx* ctx)
@@ -222,6 +230,12 @@ static void ctx_init(NinjaCtx* ctx)
     db_init(&ctx->mocargs);
     db_init(&ctx->depfiles);
     strset_init(&ctx->emitted);
+    strset_init(&ctx->product_phonies);
+    strset_init(&ctx->product_deps_seen);
+    db_init(&ctx->product_id);
+    db_init(&ctx->product_deps);
+    db_init(&ctx->product_outputs);
+    ctx->product_active = 0;
 }
 
 static void ctx_free(NinjaCtx* ctx)
@@ -243,6 +257,11 @@ static void ctx_free(NinjaCtx* ctx)
     db_free(&ctx->mocargs);
     db_free(&ctx->depfiles);
     strset_free(&ctx->emitted);
+    strset_free(&ctx->product_phonies);
+    strset_free(&ctx->product_deps_seen);
+    db_free(&ctx->product_id);
+    db_free(&ctx->product_deps);
+    db_free(&ctx->product_outputs);
 }
 
 static void ctx_clear(NinjaCtx* ctx)
@@ -264,6 +283,77 @@ static void ctx_clear(NinjaCtx* ctx)
     db_clear(&ctx->name);
     db_clear(&ctx->mocargs);
     db_clear(&ctx->depfiles);
+}
+
+static void append_product_target(DynBuf* buf, const char* product)
+{
+    DynBuf id;
+    db_init(&id);
+    db_append(&id,"__busy_product_");
+    db_append(&id,product);
+    db_append_escaped(buf,db_str(&id));
+    db_free(&id);
+}
+
+static void finish_product(NinjaCtx* ctx)
+{
+    if( !ctx->product_active )
+        return;
+
+    DynBuf target;
+    db_init(&target);
+    append_product_target(&target,db_str(&ctx->product_id));
+    fprintf(ctx->out,"build %s: phony",db_str(&target));
+    if( ctx->product_outputs.len > 0 )
+        fprintf(ctx->out," %s",db_str(&ctx->product_outputs));
+    else if( ctx->product_deps.len > 0 )
+        fprintf(ctx->out," %s",db_str(&ctx->product_deps));
+    fputc('\n',ctx->out);
+    db_free(&target);
+    ctx->product_active = 0;
+}
+
+static void ninja_product(BSProductEvent event, const char* product,
+                          const char* dependency, void* data)
+{
+    NinjaCtx* ctx = (NinjaCtx*)data;
+    if( event == BS_ProductBegin )
+    {
+        finish_product(ctx);
+        db_clear(&ctx->product_id);
+        db_append(&ctx->product_id,product);
+        db_clear(&ctx->product_deps);
+        db_clear(&ctx->product_outputs);
+        strset_free(&ctx->product_deps_seen);
+        strset_init(&ctx->product_deps_seen);
+        ctx->product_active = !strset_seen(&ctx->product_phonies,product);
+    }else if( event == BS_ProductDependency && ctx->product_active )
+    {
+        DynBuf dep;
+        db_init(&dep);
+        append_product_target(&dep,dependency);
+        if( !strset_contains(&ctx->product_deps_seen,db_str(&dep)) )
+        {
+            strset_seen(&ctx->product_deps_seen,db_str(&dep));
+            if( ctx->product_deps.len > 0 )
+                db_append(&ctx->product_deps," ");
+            db_append(&ctx->product_deps,db_str(&dep));
+        }
+        db_free(&dep);
+    }else if( event == BS_ProductEnd )
+        finish_product(ctx);
+}
+
+static void append_product_orderdeps(NinjaCtx* ctx, DynBuf* deps)
+{
+    if( ctx->product_active && ctx->product_deps.len > 0 )
+    {
+        if( deps->len == 0 || strstr(db_str(deps)," | ") != 0 )
+            db_append(deps," || ");
+        else
+            db_append(deps," ");
+        db_append(deps,db_str(&ctx->product_deps));
+    }
 }
 
 
@@ -419,15 +509,9 @@ static void write_compile(NinjaCtx* ctx)
     FILE* out = ctx->out;
     const int ismsvc = (ctx->toolchain == BS_msvc);
 
-    /* dep-provided source files become order-only deps: the files must exist
-       before the first compile, while later changes propagate via the .d depfile */
     DynBuf deps;
     db_init(&deps);
-    if( ctx->depfiles.len > 0 )
-    {
-        db_append(&deps, " || ");
-        db_append(&deps, db_str(&ctx->depfiles));
-    }
+    append_product_orderdeps(ctx,&deps);
 
     fprintf(out, "build %s: %s %s%s\n",
             db_str(&ctx->outfile),
@@ -452,10 +536,14 @@ static void write_link_exe(NinjaCtx* ctx)
     /* emits a link-executable build statement. */
     FILE* out = ctx->out;
     const int ismsvc = (ctx->toolchain == BS_msvc);
+    DynBuf deps;
+    db_init(&deps);
+    append_product_orderdeps(ctx,&deps);
 
-    fprintf(out, "build %s: link_exe %s\n",
+    fprintf(out, "build %s: link_exe %s%s\n",
             db_str(&ctx->outfile),
-            db_str(&ctx->infiles));
+            db_str(&ctx->infiles),
+            db_str(&deps));
     fprintf(out, "  linker = %s\n", db_str(&ctx->command));
     fprintf(out, "  ldflags =%s%s%s%s%s\n",
             db_str(&ctx->ldflags),
@@ -465,6 +553,7 @@ static void write_link_exe(NinjaCtx* ctx)
             db_str(&ctx->frameworks));
     if( ismsvc )
         fprintf(out, "  ismsvc = 1\n");
+    db_free(&deps);
 }
 
 static void write_link_dll(NinjaCtx* ctx)
@@ -473,10 +562,14 @@ static void write_link_dll(NinjaCtx* ctx)
     FILE* out = ctx->out;
     const int ismsvc = (ctx->toolchain == BS_msvc);
     const int ismac = (ctx->os == BS_mac);
+    DynBuf deps;
+    db_init(&deps);
+    append_product_orderdeps(ctx,&deps);
 
-    fprintf(out, "build %s: link_dll %s\n",
+    fprintf(out, "build %s: link_dll %s%s\n",
             db_str(&ctx->outfile),
-            db_str(&ctx->infiles));
+            db_str(&ctx->infiles),
+            db_str(&deps));
     fprintf(out, "  linker = %s\n", db_str(&ctx->command));
     fprintf(out, "  ldflags =%s%s%s%s%s\n",
             db_str(&ctx->ldflags),
@@ -490,17 +583,23 @@ static void write_link_dll(NinjaCtx* ctx)
         fprintf(out, "  ismsvc = 1\n");
     if( ismac )
         fprintf(out, "  ismac = 1\n");
+    db_free(&deps);
 }
 
 static void write_link_lib(NinjaCtx* ctx)
 {
     /* emits a static-library archive build statement. */
     FILE* out = ctx->out;
+    DynBuf deps;
+    db_init(&deps);
+    append_product_orderdeps(ctx,&deps);
 
-    fprintf(out, "build %s: ar %s\n",
+    fprintf(out, "build %s: ar %s%s\n",
             db_str(&ctx->outfile),
-            db_str(&ctx->infiles));
+            db_str(&ctx->infiles),
+            db_str(&deps));
     fprintf(out, "  arcmd = %s\n", db_str(&ctx->command));
+    db_free(&deps);
 }
 
 /* When a Qt tool is built by this project (e.g. LeanQt builds and copies its own moc/rcc),
@@ -527,6 +626,7 @@ static void write_moc(NinjaCtx* ctx)
     DynBuf dep;
     db_init(&dep);
     append_tool_orderdep(ctx,&dep);
+    append_product_orderdeps(ctx,&dep);
 
     fprintf(out, "build %s: moc %s%s\n",
             db_str(&ctx->outfile),
@@ -546,6 +646,7 @@ static void write_rcc(NinjaCtx* ctx)
     DynBuf dep;
     db_init(&dep);
     append_tool_orderdep(ctx,&dep);
+    append_product_orderdeps(ctx,&dep);
 
     fprintf(out, "build %s: rcc %s%s\n",
             db_str(&ctx->outfile),
@@ -562,6 +663,7 @@ static void write_uic(NinjaCtx* ctx)
     DynBuf dep;
     db_init(&dep);
     append_tool_orderdep(ctx,&dep);
+    append_product_orderdeps(ctx,&dep);
 
     fprintf(out, "build %s: uic %s%s\n",
             db_str(&ctx->outfile),
@@ -574,10 +676,15 @@ static void write_uic(NinjaCtx* ctx)
 static void write_copy(NinjaCtx* ctx)
 {
     FILE* out = ctx->out;
+    DynBuf deps;
+    db_init(&deps);
+    append_product_orderdeps(ctx,&deps);
 
-    fprintf(out, "build %s: cp %s\n",
+    fprintf(out, "build %s: cp %s%s\n",
             db_str(&ctx->outfile),
-            db_str(&ctx->infiles));
+            db_str(&ctx->infiles),
+            db_str(&deps));
+    db_free(&deps);
 }
 
 static void write_lua(NinjaCtx* ctx)
@@ -593,6 +700,7 @@ static void write_lua(NinjaCtx* ctx)
         db_append(&deps, " | ");
         db_append(&deps, db_str(&ctx->depfiles));
     }
+    append_product_orderdeps(ctx,&deps);
 
     fprintf(out, "build %s: %s %s%s\n",
             db_str(&ctx->outfile),
@@ -647,6 +755,12 @@ static void ninja_end(void* data)
         break;
     default:
         break;
+    }
+    if( ctx->product_active && ctx->outfile.len > 0 )
+    {
+        if( ctx->product_outputs.len > 0 )
+            db_append(&ctx->product_outputs," ");
+        db_append(&ctx->product_outputs,db_str(&ctx->outfile));
     }
 }
 
@@ -807,9 +921,11 @@ int bs_genNinja(lua_State* L)
         vctx->d_param = ninja_param;
         vctx->d_end = ninja_end;
         vctx->d_fork = 0;
+        vctx->d_product = ninja_product;
         lua_call(L,2,0);
     }
 
+    finish_product(&nctx);
     fclose(out);
 
     ctx_free(&nctx);

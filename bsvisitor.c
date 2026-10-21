@@ -32,6 +32,26 @@ static int calcdesig(lua_State* L, int decl)
     return bs_declpath(L,decl,".");
 }
 
+static void productEvent(lua_State* L, BSVisitorCtx* ctx, int inst,
+                         BSProductEvent event, int dependency)
+{
+    if( ctx->d_product == 0 )
+        return;
+
+    lua_getfield(L,inst,"#decl");
+    calcdesig(L,-1);
+    const char* product = lua_tostring(L,-1);
+    if( dependency )
+    {
+        lua_getfield(L,dependency,"#decl");
+        calcdesig(L,-1);
+        ctx->d_product(event,product,lua_tostring(L,-1),ctx->d_data);
+        lua_pop(L,2); // dependency declaration, designator
+    }else
+        ctx->d_product(event,product,0,ctx->d_data);
+    lua_pop(L,2); // declaration, designator
+}
+
 static int isa(lua_State* L, int builtins, int cls, const char* what )
 {
     lua_getfield(L,builtins,what);
@@ -311,6 +331,8 @@ static void compilesources(lua_State* L, BSVisitorCtx* ctx, int builtins, int in
             lua_pop(L,1);
             continue;
         }
+        if( toolchain == BS_msvc && lang == BS_asm )
+            luaL_error(L,"assembler sources are not supported with the msvc toolchain: %s",lua_tostring(L,file));
 
         if( *lua_tostring(L,file) != '/' )
             addPath(L,absDir,file); // path could be absolute!
@@ -417,43 +439,6 @@ static void compilesources(lua_State* L, BSVisitorCtx* ctx, int builtins, int in
             ctx->d_param(BS_outfile, bs_denormalize_path(lua_tostring(L,out)), ctx->d_data);
 
             ctx->d_param(BS_infile, bs_denormalize_path(lua_tostring(L,src)), ctx->d_data);
-
-            /* source files provided by dependency products (e.g. outputs of
-               a LuaScript codegen step, including generated headers) must
-               exist before this compile runs */
-            {
-                const int nin = lua_objlen(L,inlist);
-                int d;
-                for( d = 1; d <= nin; d++ )
-                {
-                    lua_rawgeti(L,inlist,d);
-                    const int entry = lua_gettop(L);
-                    if( lua_istable(L,entry) )
-                    {
-                        lua_getfield(L,entry,"#kind");
-                        const int kind = lua_tointeger(L,-1);
-                        lua_pop(L,1);
-                        if( kind == BS_SourceFiles )
-                        {
-                            const int ne = lua_objlen(L,entry);
-                            int e;
-                            for( e = 1; e <= ne; e++ )
-                            {
-                                lua_rawgeti(L,entry,e);
-                                if( lua_isstring(L,-1) &&
-                                    strcmp(lua_tostring(L,-1),lua_tostring(L,src)) != 0 )
-                                {
-                                    ctx->d_param(BS_depfile,
-                                        bs_denormalize_path(lua_tostring(L,-1)),
-                                        ctx->d_data);
-                                }
-                                lua_pop(L,1);
-                            }
-                        }
-                    }
-                    lua_pop(L,1); // entry
-                }
-            }
         }
 
         if( ctx->d_end )
@@ -1490,11 +1475,8 @@ static void runmoc(lua_State* L,BSVisitorCtx* ctx, int cls, int builtins)
         if( ctx->d_end )
             ctx->d_end(ctx->d_data);
 
-        if( lang == BS_header )
-        {
-            lua_pushvalue(L,outFile);
-            lua_rawseti(L,outlist,++n);
-        }
+        lua_pushvalue(L,outFile);
+        lua_rawseti(L,outlist,++n);
 
         lua_pop(L,3); // source, defs, outFile
     }
@@ -1643,6 +1625,7 @@ static void runuic(lua_State* L,BSVisitorCtx* ctx, int cls, int builtins)
     }
 
     size_t i;
+    int n = 0;
     lua_getfield(L,PRODINST,"sources");
     const int sources = lua_gettop(L);
     if( ctx->d_fork )
@@ -1676,6 +1659,8 @@ static void runuic(lua_State* L,BSVisitorCtx* ctx, int cls, int builtins)
         if( ctx->d_end )
             ctx->d_end(ctx->d_data);
 
+        lua_pushvalue(L,outFile);
+        lua_rawseti(L,outlist,++n);
         lua_pop(L,2); // source, outFile
     }
     if( ctx->d_fork )
@@ -1875,6 +1860,21 @@ int bs_visit(lua_State* L)
 
     builddeps(L,PRODINST);
 
+    productEvent(L,ctx,PRODINST,BS_ProductBegin,0);
+    lua_getfield(L,PRODINST,"deps");
+    if( ctx->d_product && lua_istable(L,-1) )
+    {
+        const int deps = lua_gettop(L);
+        size_t i;
+        for( i = 1; i <= lua_objlen(L,deps); i++ )
+        {
+            lua_rawgeti(L,deps,i);
+            productEvent(L,ctx,PRODINST,BS_ProductDependency,lua_gettop(L));
+            lua_pop(L,1);
+        }
+    }
+    lua_pop(L,1); // deps
+
     if( ctx->d_begin )
     {
         lua_getfield(L,PRODINST,"#decl");
@@ -1910,6 +1910,8 @@ int bs_visit(lua_State* L)
         runuic(L,ctx,cls,builtins);
     else
         luaL_error(L,"don't know how to build instances of class '%s'", clsName);
+
+    productEvent(L,ctx,PRODINST,BS_ProductEnd,0);
 
     lua_pop(L,3); // cls, builtins, clsName
 

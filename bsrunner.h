@@ -49,7 +49,7 @@ extern int bs_declpath(lua_State* L, int decl, const char* separator);
 extern int bs_runmoc(lua_State* L);
 extern int bs_mocname(lua_State* L);
 
-typedef enum BSLanguage { BS_unknownLang, BS_c, BS_cc, BS_objc, BS_objcc, BS_header } BSLanguage;
+typedef enum BSLanguage { BS_unknownLang, BS_c, BS_cc, BS_objc, BS_objcc, BS_header, BS_asm } BSLanguage;
 extern int bs_guessLang(const char* name);
 
 typedef enum BSToolchain {BS_notc, BS_msvc,BS_gcc,BS_clang,BS_tcc,BS_slimcc} BSToolchain;

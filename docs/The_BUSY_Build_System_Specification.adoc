@@ -12,7 +12,7 @@
 
 === Version
 
-2026-10-17
+2026-10-20
 
 === Author
 
@@ -588,6 +588,8 @@ A Product is also called a "build target". Products are inputs and outputs of bu
 
 The tools and commands used to create this product type will be determined by the source files in its <<sources>>. Products containing multiple compiler-incompatible languages are not allowed (e.g. a target containing both C and C++ sources is acceptable, but a target containing C and Rust sources is not).
 
+On GCC-compatible toolchains, `.s` and `.S` files may be included as assembler sources and are compiled with the C compiler driver. `.S` files are preprocessed; `.s` files are not. The common `cflags`, `defines`, and `include_dirs` fields apply, but `cflags_c`, `cflags_cc`, and Objective-C-specific flags do not. Assembler sources are not supported with the MSVC toolchain.
+
 [[executable]]
 ====== Class _Executable_ 
 
@@ -739,7 +741,7 @@ For <<lua-script>> and <<lua-script-foreach>> targets, args is the list of argum
 
 *Type*: `string[]`
 
-cflags are compiler flags passed to all invocations of the C, C++, Objective C, and Objective C++ compilers.
+cflags are compiler flags passed to all invocations of the C, C++, Objective C, and Objective C++ compilers, and to assembler sources on GCC-compatible toolchains.
 
 Each element of the list is passed verbatim to the compiler in charge, i.e. cflags doesn't absctract away specific compiler command line syntax.
 

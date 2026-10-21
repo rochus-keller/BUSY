@@ -62,12 +62,38 @@ static void l_message (const char *pname, const char *msg) {
   fflush(stderr);
 }
 
+struct lua_reporter_data {
+  lua_reporter log;
+  void *data;
+};
+
+static const char reporter_registry_key[] = "busy_lua_reporter";
+
+static int report_to_reporter (lua_State *L, const char *pname,
+                               const char *msg) {
+  struct lua_reporter_data *reporter;
+  const char *formatted;
+  lua_getfield(L, LUA_REGISTRYINDEX, reporter_registry_key);
+  reporter = (struct lua_reporter_data *)lua_touserdata(L, -1);
+  lua_pop(L, 1);
+  if (reporter == NULL || reporter->log == NULL)
+    return 0;
+  if (pname)
+    formatted = lua_pushfstring(L, "%s: %s", pname, msg);
+  else
+    formatted = lua_pushfstring(L, "%s", msg);
+  reporter->log(formatted, reporter->data);
+  lua_pop(L, 1);
+  return 1;
+}
+
 
 static int report (lua_State *L, int status) {
   if (status && !lua_isnil(L, -1)) {
     const char *msg = lua_tostring(L, -1);
     if (msg == NULL) msg = "(error object is not a string)";
-    l_message(progname, msg);
+    if (!report_to_reporter(L, progname, msg))
+      l_message(progname, msg);
     lua_pop(L, 1);
   }
   return status;
@@ -223,10 +249,13 @@ static void dotty (lua_State *L) {
     if (status == 0 && lua_gettop(L) > 0) {  /* any result to print? */
       lua_getglobal(L, "print");
       lua_insert(L, 1);
-      if (lua_pcall(L, lua_gettop(L)-1, 0, 0) != 0)
-        l_message(progname, lua_pushfstring(L,
+      if (lua_pcall(L, lua_gettop(L)-1, 0, 0) != 0) {
+        const char *msg = lua_pushfstring(L,
                                "error calling " LUA_QL("print") " (%s)",
-                               lua_tostring(L, -1)));
+                               lua_tostring(L, -1));
+        if (!report_to_reporter(L, progname, msg))
+          l_message(progname, msg);
+      }
     }
   }
   lua_settop(L, 0);  /* clear stack */
@@ -398,11 +427,16 @@ int lua_main_with_reporter (int argc, char **argv, lua_reporter log, void* data)
         return lua_main(argc, argv);
     int status;
     struct Smain s;
+    struct lua_reporter_data reporter;
     lua_State *L = lua_open();  /* create state */
     if (L == NULL) {
       log("cannot create state: not enough memory",data);
       return EXIT_FAILURE;
     }
+    reporter.log = log;
+    reporter.data = data;
+    lua_pushlightuserdata(L, &reporter);
+    lua_setfield(L, LUA_REGISTRYINDEX, reporter_registry_key);
     s.argc = argc;
     s.argv = argv;
     status = lua_cpcall(L, &pmain, &s);

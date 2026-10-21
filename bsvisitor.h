@@ -23,6 +23,14 @@
 #include "bsrunner.h"
 #include "bscallbacks.h"
 
+typedef enum BSProductEvent {
+    BS_ProductBegin,
+    BS_ProductDependency,
+    BS_ProductEnd
+} BSProductEvent;
+
+typedef void (*BSProductCallback)(BSProductEvent event, const char* product,
+                                  const char* dependency, void* data);
 
 typedef struct BSVisitorCtx {
     void* d_data;
@@ -32,6 +40,7 @@ typedef struct BSVisitorCtx {
     BSOpParam d_param;
     BSEndOp d_end;
     BSForkGroup d_fork;
+    BSProductCallback d_product;
 } BSVisitorCtx;
 
 extern int bs_visit(lua_State* L);
