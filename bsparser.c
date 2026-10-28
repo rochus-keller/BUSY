@@ -579,28 +579,16 @@ static void submodule(BSParserContext* ctx, int subdir)
                 expression(ctx,&ctx->module,0);
                 lua_getfield(ctx->L,-1,"#kind");
                 const int kind = lua_tointeger(ctx->L,-1);
-                lua_pop(ctx->L,2); // type, kind
+                lua_pop(ctx->L,1); // kind
                 if( kind != BS_BaseType )
                     error(ctx, t.loc.row, t.loc.col,"parameter value must be of basic type" );
-                switch( lua_type(ctx->L,-1) )
-                {
-                case LUA_TBOOLEAN:
-                    lua_pushstring(ctx->L, lua_toboolean(ctx->L,-1) ? "true" : "false");
-                    lua_replace(ctx->L,-2);
-                    break;
-                case LUA_TNUMBER:
-                    lua_pushstring(ctx->L, lua_tostring(ctx->L,-1));
-                    lua_replace(ctx->L,-2);
-                    break;
-                case LUA_TSTRING:
-                    break;
-                }
                 t = peekToken(ctx,1);
             }else
             {
-                lua_pushstring(ctx->L,"true");
+                lua_pushboolean(ctx->L,1);
+                lua_getfield(ctx->L,ctx->builtins,"bool");
             }
-            const int val = lua_gettop(ctx->L);
+            // stack: nm, val, type
             // check if param is already set, otherwise set it
             lua_pushvalue(ctx->L,nm);
             lua_rawget(ctx->L,BS_Params);
@@ -609,14 +597,19 @@ static void submodule(BSParserContext* ctx, int subdir)
             if( overridden )
             {
                 warning(ctx,pname.loc.row,pname.loc.col,"parameter %s is overridden by outer value", lua_tostring(ctx->L,nm));
-                lua_pop(ctx->L,2); // nm, val
+                lua_pop(ctx->L,3); // nm, val, type
             }else
             {
-                lua_createtable(ctx->L,0,0);
+                // the param value is a table which carries the value in index 1 and its type in index 2;
+                // the value is already evaluated and must not be lexed again
+                lua_createtable(ctx->L,2,0);
+                lua_pushvalue(ctx->L,-3);
+                lua_rawseti(ctx->L,-2,1);
                 lua_pushvalue(ctx->L,-2);
-                lua_rawseti(ctx->L,-2,1); // the param value is a table which carries the value in index 1
-                lua_replace(ctx->L,-2);
-                // stack: nm, tables
+                lua_rawseti(ctx->L,-2,2);
+                lua_replace(ctx->L,-3);
+                lua_pop(ctx->L,1); // type
+                // stack: nm, table
                 // because value is boxed in a table the module knows not to do visibility check
                 lua_rawset(ctx->L,BS_Params);
             }
@@ -1612,8 +1605,10 @@ static void abspath(BSParserContext* ctx, int n, int row, int col)
                 error(ctx, row, col,"expecting argument of type path" );
             lua_pop(ctx->L,2);
             if( *lua_tostring(ctx->L,-2) == '/' )
+            {
                 lua_pushvalue(ctx->L,-2);
-            else
+                lua_pushvalue(ctx->L,-1);
+            }else
             {
                 lua_getfield(ctx->L,ctx->module.table,"#dir");
                 if( bs_add_path(ctx->L,-1,-3) != 0 )
@@ -3583,16 +3578,21 @@ int bs_getAndCheckParam( lua_State* L, int builtins, int params, int paramName, 
     // stack: val or nil
     if( !lua_isnil(L,parval) )
     {
+        int typed = 0;
         if( lua_istable(L,parval) )
         {
-            // the param value is a table which carries the value in index 1
+            // the param value is a table which carries the value in index 1 and its type in index 2
             // because value is boxed in a table the module knows not to do visibility check
+            lua_rawgeti(L,parval, 2);
             lua_rawgeti(L,parval, 1);
             lua_replace(L,parval);
+            typed = !lua_isnil(L,-1);
+            if( !typed )
+                lua_pop(L,1);
         }else if( !accessible )
         {
             lua_pushfstring(L,"the parameter %s cannot be set because it is not visible from the root directory",
-                   lua_tostring(L,-2));
+                   lua_tostring(L,paramName));
             return -1;
         }
 
@@ -3601,99 +3601,106 @@ int bs_getAndCheckParam( lua_State* L, int builtins, int params, int paramName, 
         lua_pushnil(L);
         lua_rawset(L,params);
 
-        // stack: val
-        const char* val = "";
-        switch(lua_type(L,parval))
+        if( typed )
         {
-        case LUA_TNIL:
-            assert(0);
-        case LUA_TNUMBER:
-        case LUA_TSTRING:
-            val = lua_tostring(L,parval);
-            break;
-        case LUA_TBOOLEAN:
-            if( lua_toboolean(L,parval) )
-                val = "true";
-            else
-                val = "false";
-            break;
-        default:
-            break;
-        }
-        uchar len;
-        const uint ch = unicode_decode_utf8((const uchar*)val, &len );
-        if( len == 0 )
-        {
-           lua_pushfstring(L,"the value of parameter %s is invalid: %s",
-                   lua_tostring(L,paramName), lua_tostring(L,parval));
-           return -1;
-        }
-        if( unicode_isdigit(ch) || ch == '`' || ch == '$' || ch == '/' || ch == '.'
-                || ch == '\'' || ch == '"' )
-        {
-            lua_pushfstring(L, "parameter '%s': %s", lua_tostring(L,paramName),
-                            lua_tostring(L,parval) ); // create pretty name
-
-            // use lexer to check and convert the string representation of the parameter value
-            BSLexer* l = bslex_openFromString(lua_tostring(L,parval),lua_objlen(L,parval),
-                                              lua_tostring(L,-1));
-            if( l == 0 )
-                exit(0);
-            bslex_mute(l);
-            BSToken t = bslex_next(l);
-            bslex_free(l);
-            lua_pop(L,1); // pretty name
-
-            if( t.tok == Tok_Invalid )
-            {
-                lua_pushfstring(L,"the value of parameter %s does not comply with BUSY syntax: %s",
-                       lua_tostring(L,paramName), lua_tostring(L,parval));
-                return -1;
-            }
-            switch(t.tok)
-            {
-            case Tok_integer:
-                lua_getfield(L,builtins,"int");
-                lua_pushinteger(L,lua_tointeger(L,parval));
-                break;
-            case Tok_real:
-                lua_getfield(L,builtins,"real");
-                lua_pushnumber(L,lua_tonumber(L,parval));
-                break;
-            case Tok_path:
-                lua_getfield(L,builtins,"path");
-                if( *t.val == '\'')
-                    lua_pushlstring(L,t.val+1,t.len-2); // remove ''
-                else
-                    lua_pushvalue(L,parval);
-                break;
-            case Tok_symbol:
-                lua_getfield(L,builtins,"symbol");
-                lua_pushstring(L,lua_tostring(L,parval) + 1); // remove '`'
-                break;
-            case Tok_string:
-                lua_getfield(L,builtins,"string");
-                push_unescaped(L,t.val+1,t.len-2); // remove ""
-                break;
-            default:
-                lua_pushfstring(L,"unexpected parameter value type %s: %s",
-                       lua_tostring(L,paramName), lua_tostring(L,parval));
-                return -1;
-            }
+            // stack: val, valtype
+            lua_pushvalue(L,parval);
         }else
         {
-            if( strcmp(val,"true") == 0 )
+            // stack: val
+            const char* val = "";
+            switch(lua_type(L,parval))
             {
-                lua_getfield(L,builtins,"bool");
-                lua_pushboolean(L,1);
-            }else if( strcmp(val,"false") == 0 )
+            case LUA_TNIL:
+                assert(0);
+            case LUA_TNUMBER:
+            case LUA_TSTRING:
+                val = lua_tostring(L,parval);
+                break;
+            case LUA_TBOOLEAN:
+                if( lua_toboolean(L,parval) )
+                    val = "true";
+                else
+                    val = "false";
+                break;
+            default:
+                break;
+            }
+            uchar len;
+            const uint ch = unicode_decode_utf8((const uchar*)val, &len );
+            if( len == 0 )
             {
-                lua_getfield(L,builtins,"bool");
-                lua_pushboolean(L,0);
+               lua_pushfstring(L,"the value of parameter %s is invalid: %s",
+                       lua_tostring(L,paramName), lua_tostring(L,parval));
+               return -1;
+            }
+            if( unicode_isdigit(ch) || ch == '`' || ch == '$' || ch == '/' || ch == '.'
+                    || ch == '\'' || ch == '"' )
+            {
+                lua_pushfstring(L, "parameter '%s': %s", lua_tostring(L,paramName),
+                                lua_tostring(L,parval) ); // create pretty name
+
+                // use lexer to check and convert the string representation of the parameter value
+                BSLexer* l = bslex_openFromString(lua_tostring(L,parval),lua_objlen(L,parval),
+                                                  lua_tostring(L,-1));
+                if( l == 0 )
+                    exit(0);
+                bslex_mute(l);
+                BSToken t = bslex_next(l);
+                bslex_free(l);
+                lua_pop(L,1); // pretty name
+
+                if( t.tok == Tok_Invalid )
+                {
+                    lua_pushfstring(L,"the value of parameter %s does not comply with BUSY syntax: %s",
+                           lua_tostring(L,paramName), lua_tostring(L,parval));
+                    return -1;
+                }
+                switch(t.tok)
+                {
+                case Tok_integer:
+                    lua_getfield(L,builtins,"int");
+                    lua_pushinteger(L,lua_tointeger(L,parval));
+                    break;
+                case Tok_real:
+                    lua_getfield(L,builtins,"real");
+                    lua_pushnumber(L,lua_tonumber(L,parval));
+                    break;
+                case Tok_path:
+                    lua_getfield(L,builtins,"path");
+                    if( *t.val == '\'')
+                        lua_pushlstring(L,t.val+1,t.len-2); // remove ''
+                    else
+                        lua_pushvalue(L,parval);
+                    break;
+                case Tok_symbol:
+                    lua_getfield(L,builtins,"symbol");
+                    lua_pushstring(L,lua_tostring(L,parval) + 1); // remove '`'
+                    break;
+                case Tok_string:
+                    lua_getfield(L,builtins,"string");
+                    push_unescaped(L,t.val+1,t.len-2); // remove ""
+                    break;
+                default:
+                    lua_pushfstring(L,"unexpected parameter value type %s: %s",
+                           lua_tostring(L,paramName), lua_tostring(L,parval));
+                    return -1;
+                }
             }else
             {
-                lua_getfield(L,builtins,"string"); // assume string
-                lua_pushstring(L,val);
+                if( strcmp(val,"true") == 0 )
+                {
+                    lua_getfield(L,builtins,"bool");
+                    lua_pushboolean(L,1);
+                }else if( strcmp(val,"false") == 0 )
+                {
+                    lua_getfield(L,builtins,"bool");
+                    lua_pushboolean(L,0);
+                }else
+                {
+                    lua_getfield(L,builtins,"string"); // assume string
+                    lua_pushstring(L,val);
+                }
             }
         }
         // stack: valstr, valtype, val
