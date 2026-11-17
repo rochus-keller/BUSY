@@ -12,7 +12,7 @@
 
 === Version
 
-2026-10-20
+2026-11-17
 
 === Author
 
@@ -738,6 +738,20 @@ let process : LuaScriptForeach {
 }
 ....
 
+Scripts can use the `bsexec` library of BUSY to run programs and to create,
+list and copy files and directories, without depending on a shell or on tools like `cp` or `mkdir`.
+This keeps scripts portable between Unix and Windows:
+
+....
+local src, out = arg[1], arg[2]
+assert(bsexec.mkdir(out .. "/include"))
+assert(bsexec.copytree(out .. "/include", src .. "/headers"))
+local status = bsexec.spawn{ "gen", "-o", out .. "/tab.c", stderr = "nul" }
+if status ~= 0 then error("gen failed") end
+....
+
+See the BUSY specification for more information.
+
 === Macros
 
 Macros combine a sequence of declarations and statements into a reusable command. They work at the lexical token level:
@@ -1205,11 +1219,19 @@ These variables are set by BUSY and available in all BUSY files:
 
 |`host_toolchain`
 |`CompilerType`
-|Toolchain used to compile BUSY
+|Toolchain for products with `.to_host` set (defaults to the toolchain used to compile BUSY, settable via `-P`)
 
 |`host_toolchain_ver`
 |`int`
 |Version of the toolchain used to compile BUSY
+
+|`host_toolchain_path`
+|`path`
+|Path to host toolchain binaries (default `.`)
+
+|`host_toolchain_prefix`
+|`string`
+|Prefix for host tool names
 
 |`target_os`
 |`OsType`
@@ -1310,6 +1332,13 @@ Set the `target_toolchain_path` and optionally `target_toolchain_prefix` paramet
 ....
 lua build.lua .. -P target_toolchain_path=//path/to/cross/bin \
     -P "target_toolchain_prefix=\"arm-linux-gnueabihf-\""
+....
+
+Products marked with `.to_host = true` (e.g. code generators run during the build) are built with the host toolchain instead. To use a host compiler other than the one which compiled BUSY, set `host_toolchain`, `host_toolchain_path` and `host_toolchain_prefix` accordingly:
+
+....
+lua build.lua .. -P host_toolchain=gcc -P host_toolchain_path=//opt/mycc/bin \
+    -P "host_toolchain_prefix=\"x86_64-linux-musl-\""
 ....
 
 The `cross_compiling()` function returns `true` when the host and target differ, which you can use in your BUSY files to conditionally adjust the build.

@@ -20,78 +20,12 @@
 #include "bshost.h"
 #include "bsunicode.h"
 #include "bsdetect.h"
+#include "bsexec.h"
 #include <stdlib.h> 
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h>
 #include <string.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <direct.h>
-#include <libloaderapi.h>
-#include <sys/stat.h>
-#include <sys/utime.h>
-#include <errno.h>
-#define getcwd _getcwd
-#define stat _stat
-#define utime _utime
-#define PATH_MAX MAX_PATH
-
-static int appPath(char* buf, int len)
-{
-    // TODO: ANSI to UTF-8
-    return GetModuleFileNameA(NULL,buf,len);
-}
-
-// https://stackoverflow.com/questions/23427804/cant-find-mkdir-function-in-dirent-h-for-windows
-int bs_mkdir2(const char* denormalizedPath)
-{
-    // TODO: is the Windows version expecting ANSI or UTF-8?
-    const int res = _mkdir(denormalizedPath);
-    if( res == -1 && errno == EEXIST )
-        return 0;
-    else
-        return res;
-}
-
-#else // Unix and the like
-#include <unistd.h>
-#include <limits.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include <utime.h>
-
-// https://stackoverflow.com/questions/933850/how-do-i-find-the-location-of-the-executable-in-c
-static int appPath(char* buf, int len)
-{
-    ssize_t res = readlink("/proc/self/exe",buf,len-1);
-    if( res < 0 )
-    {
-        res = readlink("/proc/curproc/file",buf,len-1);
-        if( res < 0 )
-        {
-            res = readlink("/proc/self/path/a.out",buf,len-1);
-            if( res < 0 )
-                return -1;
-        }
-    }
-    buf[res] = 0;
-    return res;
-}
-
-// https://stackoverflow.com/questions/23427804/cant-find-mkdir-function-in-dirent-h-for-windows
-int bs_mkdir2(const char* denormalizedPath)
-{
-    const int res = mkdir(denormalizedPath,0777); // returns 0 on success, -1 otherwise
-    if( res == -1 && errno == EEXIST )
-        return 0;
-    else
-        return res;
-}
-
-#endif
 
 int bs_mkrdir2(const char* denormalizedPath)
 {
@@ -117,10 +51,10 @@ int bs_mkdir(const char* normalizedPath)
     return bs_mkdir2(bs_denormalize_path(normalizedPath));
 }
 
-static char s_buf[PATH_MAX];
+static char s_buf[4096];
 // https://stackoverflow.com/questions/833291/is-there-an-equivalent-to-winapis-max-path-under-linux-unix
 
-int bs_global_buffer_len() { return PATH_MAX; }
+int bs_global_buffer_len() { return sizeof(s_buf); }
 const char* bs_global_buffer() { return s_buf; }
 
 BSPathStatus bs_normalize_path(const char* in, char* out, int outlen)
@@ -312,14 +246,14 @@ const char* bs_denormalize_path(const char* path)
 
 BSPathStatus bs_normalize_path2(const char* in)
 {
-    return bs_normalize_path(in,s_buf,PATH_MAX-1);
+    return bs_normalize_path(in,s_buf,bs_global_buffer_len()-1);
 }
 
 // https://stackoverflow.com/questions/2868680/what-is-a-cross-platform-way-to-get-the-current-directory
 BSPathStatus bs_cwd()
 {
-    char buffer[PATH_MAX];
-    if( getcwd(buffer, sizeof(buffer)) )
+    char buffer[4096];
+    if( bs_os_getcwd(buffer, sizeof(buffer)) == 0 )
         return bs_normalize_path2(buffer);
     else
         return BS_NotSupported;
@@ -327,8 +261,8 @@ BSPathStatus bs_cwd()
 
 BSPathStatus bs_thisapp()
 {
-    char buffer[PATH_MAX];
-    const int res = appPath(buffer, sizeof(buffer));
+    char buffer[4096];
+    const int res = bs_os_app_path(buffer, sizeof(buffer));
     if( res < 0 )
         return BS_NOP;
     else
@@ -340,9 +274,9 @@ BSPathStatus bs_thisapp()
 // https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
 time_t bs_exists(const char* normalizedPath)
 {
-    struct stat st = {0};
-    if( stat(bs_denormalize_path(normalizedPath), &st) == 0 )
-        return st.st_mtime;
+    time_t result;
+    if( bs_os_mtime(bs_denormalize_path(normalizedPath), &result) == 0 )
+        return result;
     else
         return 0;
 }
@@ -557,7 +491,7 @@ FILE* bs_fopen(const char* path, const char* modes)
 int bs_exec(const char* cmd)
 {
     // TODO convert from utf-8
-    return system(cmd);
+    return bs_system(cmd);
 }
 
 const char*bs_filename(const char* path)
@@ -686,7 +620,7 @@ BSPathStatus bs_apply_source_expansion(const char* source, const char* string, i
 {
     const char* s = string;
     char* p = s_buf;
-    char* q = s_buf + PATH_MAX;
+    char* q = s_buf + bs_global_buffer_len();
     while( *s && p < q )
     {
         int offset, len;
@@ -732,9 +666,9 @@ BSPathStatus bs_apply_source_expansion(const char* source, const char* string, i
 
 time_t bs_exists2(const char* denormalizedPath)
 {
-    struct stat st = {0};
-    if( stat(denormalizedPath, &st) == 0 )
-        return st.st_mtime;
+    time_t result;
+    if( bs_os_mtime(denormalizedPath, &result) == 0 )
+        return result;
     else
         return 0;
 }
@@ -743,26 +677,8 @@ int bs_copy(const char* normalizedToPath, const char* normalizedFromPath)
 {
     bs_apply_source_expansion(normalizedToPath,"{{source_dir}}",0);
     bs_mkrdir2(bs_global_buffer());
-
-#ifdef _WIN32
-    return CopyFileA(bs_denormalize_path(normalizedFromPath), bs_denormalize_path(normalizedToPath), FALSE ) ? 0 : -1; // returns 0 on success, -1 otherwise
-#else
-    const char* to = bs_denormalize_path(normalizedToPath);
-    const char* from = bs_denormalize_path(normalizedFromPath);
-    const int fromLen = strlen(from);
-    const int toLen = 3+fromLen+strlen(to)+2;
-    char* cmd = (char*)malloc(toLen+1);
-    strcpy(cmd,"cp ");
-    strcpy(cmd+3,from);
-    *(cmd+3+fromLen) = ' ';
-    strcpy(cmd+3+1+fromLen,to);
-    cmd[toLen] = 0;
-    // fprintf(stdout,"%s\n",cmd);
-    // fflush(stdout);
-    const int res = bs_exec(cmd);
-    free(cmd);
-    return res;
-#endif
+    return bs_copyfile(bs_denormalize_path(normalizedToPath),
+                       bs_denormalize_path(normalizedFromPath));
 }
 
 BSPathStatus bs_makeRelative(const char* normalizedRefDir, const char* normalizedTarget)
@@ -933,10 +849,10 @@ BSPathPart bs_tokenType(const char* what, int len)
 
 int bs_touch(const char* normalizedPath)
 {
-    return utime(bs_denormalize_path(normalizedPath),0); // returns zero on success, -1 otherwise
+    return bs_os_touch(bs_denormalize_path(normalizedPath));
 }
 
 int bs_touch2(const char* denormalizedPath)
 {
-    return utime(denormalizedPath,0); // returns zero on success, -1 otherwise
+    return bs_os_touch(denormalizedPath);
 }

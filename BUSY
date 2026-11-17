@@ -8,7 +8,7 @@ let run_rcc * : Rcc {
 
 let lib * : Library {
 	.sources += [
-		./bshost.c      ./bsunicode.c  ./ldebug.c  ./liolib.c    ./lopcodes.c  ./ltable.c   ./lzio.c
+		./bshost.c      ./bsexec.c     ./bsunicode.c  ./ldebug.c  ./liolib.c    ./lopcodes.c  ./ltable.c   ./lzio.c
 		./bslex.c       ./lapi.c       ./ldo.c     ./llex.c      ./loslib.c    ./ltablib.c  ./print.c
 		./bslib.c       ./lauxlib.c    ./ldump.c   ./lmathlib.c  ./lparser.c   ./ltm.c
 		./bsparser.c    ./lbaselib.c   ./lfunc.c   ./lmem.c      ./lstate.c    

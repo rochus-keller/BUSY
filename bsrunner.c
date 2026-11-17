@@ -69,11 +69,21 @@ static int runcmd(lua_State* L, const char* cmd)
 static int copycmd(lua_State* L, const char* normalizedToPath, const char* normalizedFromPath)
 {
 #ifdef BS_ALT_RUNCMD
-    const char* to = bs_denormalize_path(normalizedToPath);
-    const char* from = bs_denormalize_path(normalizedFromPath);
-    const int len = 4 + 1 + 2 + strlen(from) + 1 + 2 + strlen(to) + 1;
-    sprintf( (char*)bs_global_buffer(), "copy \"%s\" \"%s\"", from, to );
-    return runcmd(L, bs_global_buffer());
+    int hook;
+    lua_getglobal(L,"#runcmd");
+    hook = lua_islightuserdata(L,-1);
+    lua_pop(L,1);
+    if( !hook )
+    {
+        return bs_copy(normalizedToPath,normalizedFromPath);
+    }
+    {
+        const char* to = bs_denormalize_path(normalizedToPath);
+        const char* from = bs_denormalize_path(normalizedFromPath);
+        const int len = 4 + 1 + 2 + strlen(from) + 1 + 2 + strlen(to) + 1;
+        sprintf( (char*)bs_global_buffer(), "copy \"%s\" \"%s\"", from, to );
+        return runcmd(L, bs_global_buffer());
+    }
 #else
     return bs_copy(normalizedToPath,normalizedFromPath);
 #endif
@@ -380,7 +390,17 @@ static void prefixCmd(lua_State* L, int cmd, int binst, int to_host)
 {
     const char* toolchain_prefix = "#toolchain_prefix";
     const char* toolchain_path = "#toolchain_path";
-    if( !to_host )
+    if( to_host )
+    {
+        lua_getfield(L,binst,"host_toolchain_prefix");
+        if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
+            toolchain_prefix = "host_toolchain_prefix";
+        lua_pop(L,1);
+        lua_getfield(L,binst,"host_toolchain_path");
+        if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
+            toolchain_path = "host_toolchain_path";
+        lua_pop(L,1);
+    }else
     {
         toolchain_prefix = "target_toolchain_prefix";
         toolchain_path = "target_toolchain_path";
@@ -705,6 +725,25 @@ static void addall2(lua_State* L,int inst,int ldflags, int lib_dirs, int lib_nam
     }
     lua_pop(L,1); // lnames
 
+    lua_getfield(L,inst,"lib_files");
+    const int lfiles = lua_gettop(L);
+    for( i = 1; i <= lua_objlen(L,lfiles); i++ )
+    {
+        lua_rawgeti(L,lfiles,i);
+        const int path = lua_gettop(L);
+        if( *lua_tostring(L,path) != '/' )
+        {
+            addPath(L,absDir,path);
+            lua_replace(L,path);
+        }
+        lua_pushvalue(L,lib_files);
+        lua_pushfstring(L," \"%s\" ", bs_denormalize_path(lua_tostring(L,path)) );
+        lua_concat(L,2);
+        lua_replace(L,lib_files);
+        lua_pop(L,1); // path
+    }
+    lua_pop(L,1); // lfiles
+
     if(ismac)
     {
         lua_getfield(L,inst,"frameworks");
@@ -744,8 +783,6 @@ static void addall2(lua_State* L,int inst,int ldflags, int lib_dirs, int lib_nam
         }
         lua_pop(L,1);// def_file
     }
-
-    //  TODO: lib_files
 
     lua_pop(L,1); // absDir
     const int bottom = lua_gettop(L);
@@ -1197,7 +1234,13 @@ static void link(lua_State* L, int inst, int builtins, int inlist, int resKind)
     {
         // luaL_Buffer doesn't work; luaL_pushresult produces "attempt to concatenate a table value"
         srcExists = renderobjectfiles(L,inlist,0,cmd, toolchain, resKind);
-        // TODO lib_files
+        if( resKind != BS_StaticLib )
+        {
+            lua_pushvalue(L,cmd);
+            lua_pushvalue(L,lib_files);
+            lua_concat(L,2);
+            lua_replace(L,cmd);
+        }
     }
 
     if( !outExists || outExists < srcExists )
@@ -1765,11 +1808,11 @@ int bs_runmoc(lua_State* L)
                     lua_tostring(L,defines));
     if( includePrivateHeader && lang == BS_header )
     {
-        lua_pushstring(L," -p {{source_dir}}");
+        lua_pushstring(L," -p \"{{source_dir}}\"");
         bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
         lua_pushstring(L, bs_global_buffer());
         lua_replace(L,-2);
-        lua_pushstring(L," -b {{source_name_part}}_p.h");
+        lua_pushstring(L," -b \"{{source_name_part}}_p.h\"");
         bs_apply_source_expansion(lua_tostring(L,source),lua_tostring(L,-1), 0);
         lua_pushstring(L, bs_global_buffer());
         lua_replace(L,-2);

@@ -26,6 +26,7 @@
 #include "bsninjagen.h"
 #include "bscmakegen.h"
 #include "bshost.h"
+#include "bsexec.h"
 #include "bsunicode.h"
 #include "bsvisitor.h"
 #include <ctype.h>
@@ -689,5 +690,6 @@ static const luaL_Reg bslib[] = {
 
 LUALIB_API int bs_open_busy (lua_State *L) {
   luaL_register(L, BS_BSLIBNAME, bslib);
+  bs_open_bsexec(L);
   return 1;
 }

@@ -1010,6 +1010,14 @@ static int resolveInstance(BSParserContext* ctx, BSScope* scope )
         lua_pop(ctx->L,1);
         if( rw == BS_let || ( method != LocalOnly && rw == BS_param ) )
             ret = 1;
+        else if( rw == BS_param )
+        {
+            // predeclared params can only be set by the command line
+            lua_getfield(ctx->L,ctx->builtins,"#inst");
+            if( lua_rawequal(ctx->L,-1,-3) )
+                ret = 1;
+            lua_pop(ctx->L,1);
+        }
     }
 
     // Now we have top on stack an instance of BS_ModuleDef, BS_BlockDef or BS_ClassDecl and a
@@ -4463,7 +4471,12 @@ static void assigOrCall(BSParserContext* ctx, BSScope* scope)
     case Tok_MinusEq:
     case Tok_StarEq:
         if( lro == 1 )
+        {
+            lua_getfield(ctx->L,-1,"#rw");
+            if( lua_tointeger(ctx->L,-1) == BS_param )
+                error(ctx, t.loc.row, t.loc.col,"parameter can only be set by the submod declaration or the command line" );
             error(ctx, t.loc.row, t.loc.col,"cannot modify immutable object" );
+        }
         assignment(ctx, scope, lro);
         break;
     case Tok_Lpar:

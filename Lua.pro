@@ -61,7 +61,8 @@ HEADERS += \
     bsninjagen.h \
     bscmakegen.h \
     bsvisitor.h \
-    bscallbacks.h
+    bscallbacks.h \
+    bsexec.h
 
 SOURCES += \
     lapi.c \
@@ -104,8 +105,7 @@ SOURCES += \
     bsqmakegen.c \
     bsninjagen.c \
     bscmakegen.c \
-    bsvisitor.c
-
-
+    bsvisitor.c \
+    bsexec.c
 
 

@@ -4,15 +4,13 @@
 // License (GPL) versions 2.0 or 3.0 as published by the Free Software
 // Foundation, see http://www.gnu.org/copyleft/gpl.html for more information
 
-image:logo_small.png[BUSY Logo]
-
 = A Statically Typed, Zero-Dependency Build System for C/C++
-
 Rochus Keller <me@rochus-keller.ch>
-2026-07-16
-
+2026-11-17
 :toc:
 :numbered:
+
+image:logo_small.png[BUSY Logo]
 
 == Executive Summary
 
