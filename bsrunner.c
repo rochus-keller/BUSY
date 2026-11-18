@@ -1569,12 +1569,13 @@ static void callLua(lua_State* L, int builtins, int inst, int app, int script, c
     for( j = 1; j <= lua_objlen(L,arglist); j++ )
     {
         lua_pushvalue(L,args);
-        lua_pushstring(L," ");
+        lua_pushstring(L," \"");
         lua_rawgeti(L,arglist,j);
         if( apply_arg_expansion(L,inst,builtins,source,lua_tostring(L,-1)) != BS_OK )
             luaL_error(L,"cannot do source expansion, invalid placeholders in string: %s", lua_tostring(L,-1));
         lua_replace(L,-2);
-        lua_concat(L,3);
+        lua_pushstring(L,"\"");
+        lua_concat(L,4);
         lua_replace(L,args);
     }
     lua_pop(L,1); // arglist

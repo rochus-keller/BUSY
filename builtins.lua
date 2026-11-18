@@ -276,8 +276,10 @@ variable("host_cpu", globals.CpuType, Let)
 variable("host_cpu_ver", globals.int, Let)
 variable("host_wordsize", globals.WordSize, Let )
 variable("host_os", globals.OsType, Let)
-variable("host_toolchain", globals.CompilerType, Let)
+variable("host_toolchain", globals.CompilerType, Param)
 variable("host_toolchain_ver", globals.int, Let)
+variable("host_toolchain_path", globals.path, Param)
+variable("host_toolchain_prefix", globals.string, Param)
 variable("root_build_dir", globals.path, Let)
 variable("root_source_dir", globals.path, Let)
 variable("target_cpu", globals.CpuType, Param)
@@ -303,6 +305,8 @@ inst.target_wordsize = inst.host_wordsize
 inst.host_os = B.os()
 inst.target_os = inst.host_os
 inst.host_toolchain, inst.host_toolchain_ver = B.compiler()
+inst.host_toolchain_path = "."
+inst.host_toolchain_prefix = ""
 inst.target_toolchain, inst.target_toolchain_ver = inst.host_toolchain, inst.host_toolchain_ver
 inst.moc_path = "."
 inst.rcc_path = "."
@@ -338,8 +342,8 @@ else
 	inst.build_mode = "optimized"
 	inst["#ctdefaults"] = optimized
 end
-inst["#toolchain_path"] = "."  -- to be set by IDE
-inst["#toolchain_prefix"] = "" -- to be set by IDE
+inst["#toolchain_path"] = inst.host_toolchain_path
+inst["#toolchain_prefix"] = inst.host_toolchain_prefix
 
 
 return globals

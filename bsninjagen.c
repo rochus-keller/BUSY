@@ -684,6 +684,18 @@ static void write_copy(NinjaCtx* ctx)
             db_str(&ctx->outfile),
             db_str(&ctx->infiles),
             db_str(&deps));
+#ifdef _WIN32
+    {
+        const char* p;
+        fprintf(out, "  copy_in = ");
+        for( p = db_str(&ctx->infiles); *p; ++p )
+            fputc(*p == '/' ? '\\' : *p, out);
+        fprintf(out, "\n  copy_out = ");
+        for( p = db_str(&ctx->outfile); *p; ++p )
+            fputc(*p == '/' ? '\\' : *p, out);
+        fputc('\n', out);
+    }
+#endif
     db_free(&deps);
 }
 
@@ -790,10 +802,17 @@ static void write_rules(FILE* out, int toolchain, int os)
         fprintf(out, "rule link_exe\n");
         fprintf(out, "  command = $linker /nologo $ldflags /out:\"$out\" $in\n");
         fprintf(out, "  description = LINK $out\n\n");
-    }else
+    }else if( os == BS_mac )
     {
         fprintf(out, "rule link_exe\n");
         fprintf(out, "  command = $linker $in -o \"$out\" $ldflags\n");
+        fprintf(out, "  description = LINK $out\n\n");
+    }else
+    {
+        fprintf(out, "rule link_exe\n");
+        fprintf(out, "  command = $linker @$out.rsp -o \"$out\" $ldflags\n");
+        fprintf(out, "  rspfile = $out.rsp\n");
+        fprintf(out, "  rspfile_content = $in\n");
         fprintf(out, "  description = LINK $out\n\n");
     }
 
@@ -821,10 +840,18 @@ static void write_rules(FILE* out, int toolchain, int os)
         fprintf(out, "rule ar\n");
         fprintf(out, "  command = $arcmd /nologo /out:\"$out\" $in\n");
         fprintf(out, "  description = AR $out\n\n");
+    }else if( os == BS_mac )
+    {
+        // ar on macs doesn't support @file
+        fprintf(out, "rule ar\n");
+        fprintf(out, "  command = $arcmd r \"$out\" $in\n");
+        fprintf(out, "  description = AR $out\n\n");
     }else
     {
         fprintf(out, "rule ar\n");
-        fprintf(out, "  command = $arcmd r \"$out\" $in\n");
+        fprintf(out, "  command = $arcmd r \"$out\" @$out.rsp\n");
+        fprintf(out, "  rspfile = $out.rsp\n");
+        fprintf(out, "  rspfile_content = $in\n");
         fprintf(out, "  description = AR $out\n\n");
     }
 
@@ -846,7 +873,8 @@ static void write_rules(FILE* out, int toolchain, int os)
     /* copy */
 #ifdef _WIN32
     fprintf(out, "rule cp\n");
-    fprintf(out, "  command = copy /Y \"$in\" \"$out\"\n");
+    fprintf(out, "  command = \"%s\" /d /c copy /Y \"$copy_in\" \"$copy_out\"\n",
+            getenv("COMSPEC") ? getenv("COMSPEC") : "cmd.exe");
     fprintf(out, "  description = COPY $out\n\n");
 #else
     fprintf(out, "rule cp\n");

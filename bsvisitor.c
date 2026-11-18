@@ -118,7 +118,17 @@ static void prefixCmd(lua_State* L, int cmd, int binst, int to_host)
 {
     const char* toolchain_prefix = "#toolchain_prefix";
     const char* toolchain_path = "#toolchain_path";
-    if( !to_host )
+    if( to_host )
+    {
+        lua_getfield(L,binst,"host_toolchain_prefix");
+        if( !lua_isnil(L,-1) && *lua_tostring(L,-1) != 0 )
+            toolchain_prefix = "host_toolchain_prefix";
+        lua_pop(L,1);
+        lua_getfield(L,binst,"host_toolchain_path");
+        if( !lua_isnil(L,-1) && strcmp( lua_tostring(L,-1), "." ) != 0 )
+            toolchain_path = "host_toolchain_path";
+        lua_pop(L,1);
+    }else
     {
         toolchain_prefix = "target_toolchain_prefix";
         toolchain_path = "target_toolchain_path";
